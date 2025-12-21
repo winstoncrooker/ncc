@@ -13,14 +13,14 @@ const Profile = {
    * Initialize the profile page
    */
   async init() {
-    // Check authentication
+    // Handle OAuth callback first (extracts token from URL if present)
+    Auth.init();
+
+    // Then check authentication
     if (!Auth.isAuthenticated()) {
       window.location.href = '/';
       return;
     }
-
-    // Handle OAuth callback
-    Auth.init();
 
     // Setup event listeners
     this.setupEventListeners();
