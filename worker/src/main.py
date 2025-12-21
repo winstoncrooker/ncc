@@ -8,7 +8,7 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 import asgi
 
-from routes import discogs, chat, auth, collection, profile
+from routes import discogs, chat, auth, collection, profile, upload
 
 # Create FastAPI app
 app = FastAPI(
@@ -32,6 +32,7 @@ app.include_router(chat.router, prefix="/api/chat", tags=["chat"])
 app.include_router(auth.router, prefix="/api/auth", tags=["auth"])
 app.include_router(collection.router, prefix="/api/collection", tags=["collection"])
 app.include_router(profile.router, prefix="/api/profile", tags=["profile"])
+app.include_router(upload.router, prefix="/api/uploads", tags=["uploads"])
 
 
 @app.get("/api/health")

@@ -24,6 +24,7 @@ const Profile = {
 
     // Setup event listeners
     this.setupEventListeners();
+    this.setupCropperListeners();
 
     // Load data
     await Promise.all([
@@ -383,32 +384,184 @@ const Profile = {
     }
   },
 
+  // Cropper state
+  cropper: null,
+  cropperType: null, // 'profile' or 'background'
+
   /**
-   * Handle profile photo upload
+   * Handle profile photo upload - opens cropper
    */
   handlePhotoUpload(file) {
-    // For now, convert to data URL and show preview
-    // In production, upload to R2 storage
+    this.openCropper(file, 'profile');
+  },
+
+  /**
+   * Handle background image upload - opens cropper
+   */
+  handleBackgroundUpload(file) {
+    this.openCropper(file, 'background');
+  },
+
+  /**
+   * Open image cropper modal
+   */
+  openCropper(file, type) {
     const reader = new FileReader();
     reader.onload = (e) => {
-      document.getElementById('profile-picture').src = e.target.result;
-      // TODO: Upload to R2 and save URL to profile
-      alert('Photo preview shown. Full upload functionality coming soon!');
+      this.cropperType = type;
+
+      // Update modal title
+      document.getElementById('cropper-title').textContent =
+        type === 'profile' ? 'Adjust Profile Picture' : 'Adjust Background Image';
+
+      // Set image source
+      const cropperImage = document.getElementById('cropper-image');
+      cropperImage.src = e.target.result;
+
+      // Open modal
+      document.getElementById('cropper-modal').classList.add('open');
+      if (type === 'background') {
+        document.getElementById('cropper-modal').classList.add('background-mode');
+      } else {
+        document.getElementById('cropper-modal').classList.remove('background-mode');
+      }
+
+      // Initialize cropper after image loads
+      cropperImage.onload = () => {
+        // Destroy previous cropper if exists
+        if (this.cropper) {
+          this.cropper.destroy();
+        }
+
+        // Create new cropper with appropriate aspect ratio
+        this.cropper = new Cropper(cropperImage, {
+          aspectRatio: type === 'profile' ? 1 : 16/9,
+          viewMode: 1,
+          dragMode: 'move',
+          autoCropArea: 0.9,
+          restore: false,
+          guides: true,
+          center: true,
+          highlight: false,
+          cropBoxMovable: true,
+          cropBoxResizable: true,
+          toggleDragModeOnDblclick: false,
+        });
+      };
     };
     reader.readAsDataURL(file);
   },
 
   /**
-   * Handle background image upload
+   * Setup cropper event listeners
    */
-  handleBackgroundUpload(file) {
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      document.getElementById('hero-background').style.backgroundImage = `url(${e.target.result})`;
-      // TODO: Upload to R2 and save URL to profile
-      alert('Background preview shown. Full upload functionality coming soon!');
+  setupCropperListeners() {
+    const addListener = (id, event, handler) => {
+      const el = document.getElementById(id);
+      if (el) el.addEventListener(event, handler);
     };
-    reader.readAsDataURL(file);
+
+    addListener('cropper-modal-close', 'click', () => this.closeCropper());
+    addListener('cropper-cancel', 'click', () => this.closeCropper());
+
+    addListener('crop-rotate-left', 'click', () => {
+      if (this.cropper) this.cropper.rotate(-90);
+    });
+
+    addListener('crop-rotate-right', 'click', () => {
+      if (this.cropper) this.cropper.rotate(90);
+    });
+
+    addListener('crop-zoom-in', 'click', () => {
+      if (this.cropper) this.cropper.zoom(0.1);
+    });
+
+    addListener('crop-zoom-out', 'click', () => {
+      if (this.cropper) this.cropper.zoom(-0.1);
+    });
+
+    addListener('crop-reset', 'click', () => {
+      if (this.cropper) this.cropper.reset();
+    });
+
+    addListener('cropper-save', 'click', () => this.saveCroppedImage());
+  },
+
+  /**
+   * Close cropper modal
+   */
+  closeCropper() {
+    document.getElementById('cropper-modal').classList.remove('open');
+    document.getElementById('cropper-modal').classList.remove('background-mode');
+    if (this.cropper) {
+      this.cropper.destroy();
+      this.cropper = null;
+    }
+    this.cropperType = null;
+  },
+
+  /**
+   * Save cropped image - upload to R2
+   */
+  async saveCroppedImage() {
+    if (!this.cropper) return;
+
+    const saveBtn = document.getElementById('cropper-save');
+    const btnText = saveBtn.querySelector('.btn-text');
+    const btnLoading = saveBtn.querySelector('.btn-loading');
+
+    try {
+      // Show loading state
+      btnText.style.display = 'none';
+      btnLoading.style.display = 'inline-flex';
+      saveBtn.disabled = true;
+
+      // Get cropped canvas
+      const canvas = this.cropper.getCroppedCanvas({
+        width: this.cropperType === 'profile' ? 400 : 1200,
+        height: this.cropperType === 'profile' ? 400 : 675,
+        imageSmoothingEnabled: true,
+        imageSmoothingQuality: 'high',
+      });
+
+      // Convert to base64
+      const base64 = canvas.toDataURL('image/jpeg', 0.9);
+
+      // Upload to server
+      const response = await Auth.apiRequest('/api/uploads/image', {
+        method: 'POST',
+        body: JSON.stringify({
+          image: base64,
+          type: this.cropperType
+        })
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+
+        // Update UI
+        if (this.cropperType === 'profile') {
+          document.getElementById('profile-picture').src = data.url;
+          this.profile.picture = data.url;
+        } else {
+          document.getElementById('hero-background').style.backgroundImage = `url(${data.url})`;
+          this.profile.background_image = data.url;
+        }
+
+        this.closeCropper();
+      } else {
+        const error = await response.json();
+        alert(error.detail || 'Failed to upload image');
+      }
+    } catch (error) {
+      console.error('Upload error:', error);
+      alert('Failed to upload image');
+    } finally {
+      // Reset button state
+      btnText.style.display = 'inline';
+      btnLoading.style.display = 'none';
+      saveBtn.disabled = false;
+    }
   },
 
   /**
