@@ -1,0 +1,24 @@
+name = "vinyl-vault-api"
+main = "src/main.py"
+compatibility_date = "2025-12-21"
+compatibility_flags = ["python_workers"]
+
+[vars]
+ENVIRONMENT = "production"
+
+# D1 Database binding
+[[d1_databases]]
+binding = "DB"
+database_name = "vinyl-vault"
+database_id = "PLACEHOLDER"
+
+# R2 Storage binding
+[[r2_buckets]]
+binding = "CACHE"
+bucket_name = "vinyl-vault-cache"
+
+# Secrets (set via: wrangler secret put SECRET_NAME)
+# DISCOGS_KEY
+# DISCOGS_SECRET
+# TOGETHER_API_KEY
+# JWT_SECRET

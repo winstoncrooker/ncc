@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Album | VinylVault</title>
+  <link rel="stylesheet" href="style.css">
+  <style>
+    body { background:#0e0e0e; color:#eee; font-family:'Montserrat',sans-serif; }
+    .container { max-width:900px; margin:auto; padding:40px 20px; display:flex; flex-wrap:wrap; gap:30px; align-items:flex-start; }
+    img.cover { width:300px; border-radius:15px; box-shadow:0 0 20px rgba(0,0,0,.5); }
+    .info { flex:1; min-width: 250px; }
+    h1 { color:#1db954; margin-bottom:10px; }
+    .price { font-size:1.2em; color:#1db954; margin-top:10px; }
+    .metadata { 
+      margin-top: 20px;
+      padding: 15px;
+      background: #1a1a1a;
+      border-radius: 8px;
+      border-left: 3px solid #1db954;
+    }
+    .metadata p {
+      margin: 8px 0;
+      color: #ccc;
+    }
+    .metadata strong {
+      color: #fff;
+    }
+    .fun-fact {
+      margin-top: 20px;
+      padding: 15px;
+      background: #1a1a1a;
+      border-radius: 8px;
+      font-style: italic;
+      color: #aaa;
+      border-left: 3px solid #1db954;
+    }
+    .fun-fact::before {
+      content: "💿 Fun Fact: ";
+      font-weight: 600;
+      color: #1db954;
+      font-style: normal;
+    }
+    .tracks { margin-top:30px; }
+    .tracks h4 { 
+      color: #1db954; 
+      margin-bottom: 15px;
+      font-size: 1.1rem;
+    }
+    .tracks ul {
+      list-style: none;
+      padding: 0;
+    }
+    .tracks li { 
+      margin:8px 0; 
+      padding: 8px 12px;
+      background: #1a1a1a;
+      border-radius: 5px;
+      transition: background 0.3s;
+    }
+    .tracks li:hover {
+      background: #252525;
+    }
+    .tracks li::before {
+      content: "▶ ";
+      color: #1db954;
+      margin-right: 8px;
+    }
+    .placeholder-text {
+      color: #666;
+      font-style: italic;
+    }
+    .back { 
+      display:inline-block; 
+      margin-top:40px; 
+      color:#1db954; 
+      text-decoration:none; 
+      border:1px solid #1db954; 
+      padding:10px 15px; 
+      border-radius:5px; 
+      transition:.3s; 
+    }
+    .back:hover { background:#1db954; color:#000; }
+    
+    @media (max-width: 800px) {
+      .container { padding: 20px 15px; gap: 20px; }
+      img.cover { width: 100%; max-width: 300px; margin: 0 auto; display: block; }
+      .info { width: 100%; }
+      h1 { font-size: 1.5rem; }
+    }
+  </style>
+</head>
+<body>
+  <nav id="mainNav">
+    <button class="hamburger" id="hamburger" aria-label="Menu">
+      <span></span><span></span><span></span>
+    </button>
+    <div class="nav-links" id="navLinks">
+      <a href="index.html">Home</a>
+      <a href="stats.html">📊 Stats</a>
+      <a href="mycollection.html">📝 My Collection</a>
+      <a href="genre.html?genre=rock">Rock</a>
+      <a href="genre.html?genre=blues">Blues</a>
+      <a href="genre.html?genre=metal">Metal</a>
+      <a href="genre.html?genre=pop">Pop</a>
+      <a href="genre.html?genre=jazz">Jazz</a>
+      <a href="genre.html?genre=soul">Soul</a>
+      <a href="genre.html?genre=funk">Funk</a>
+      <a href="genre.html?genre=country">Country</a>
+      <a href="genre.html?genre=hiphop">Hip-Hop</a>
+      <a href="genre.html?genre=folk">Folk</a>
+      <a href="genre.html?genre=classical">Classical</a>
+      <a href="genre.html?genre=experimental">Experimental</a>
+      <a href="genre.html?genre=comedy">Comedy</a>
+    </div>
+  </nav>
+  
+  <div class="container" id="albumContainer"></div>
+
+  <script>
+    // Hamburger menu toggle
+    document.addEventListener('DOMContentLoaded', () => {
+      const hamburger = document.getElementById('hamburger');
+      const navLinks = document.getElementById('navLinks');
+      
+      if (hamburger && navLinks) {
+        hamburger.addEventListener('click', () => {
+          hamburger.classList.toggle('active');
+          navLinks.classList.toggle('active');
+          document.body.classList.toggle('menu-open');
+        });
+        
+        // Close menu when clicking outside
+        document.addEventListener('click', (e) => {
+          if (!e.target.closest('nav')) {
+            hamburger.classList.remove('active');
+            navLinks.classList.remove('active');
+            document.body.classList.remove('menu-open');
+          }
+        });
+        
+        // Close menu when clicking a link
+        navLinks.querySelectorAll('a').forEach(link => {
+          link.addEventListener('click', () => {
+            hamburger.classList.remove('active');
+            navLinks.classList.remove('active');
+            document.body.classList.remove('menu-open');
+          });
+        });
+      }
+    });
+  </script>
+  
+  <script src="utils.js"></script>
+  <script src="record.js"></script>
+  <script>
+    // Utility functions
+    function getRecordById(id) {
+      return records.find(r => r.id === id);
+    }
+
+    function formatPrice(value) {
+      if (value === null || value === undefined) return "N/A";
+      return `$${value.toLocaleString()}`;
+    }
+  </script>
+  <script>
+    const params = new URLSearchParams(window.location.search);
+    const id = params.get("id");
+    const genre = params.get("genre");
+    const rec = getRecordById(id);
+
+    const div = document.getElementById("albumContainer");
+    if (!rec) {
+      div.innerHTML = "<h2>Album not found.</h2>";
+    } else {
+      const priceDisplay = formatPrice(rec.price);
+      const coverImg = rec.cover || `https://via.placeholder.com/400x400/1a1a1a/1db954?text=${encodeURIComponent(rec.artist + ' - ' + rec.album)}`;
+      
+      // Build tracklist HTML
+      let tracklistHTML = '';
+      if (rec.tracks && rec.tracks.length > 0) {
+        tracklistHTML = rec.tracks.map(t => `<li>${t}</li>`).join("");
+      } else {
+        tracklistHTML = '<li class="placeholder-text">Tracklist coming soon... Want to help? Add the tracks for this album!</li>';
+      }
+      
+      // Build fun fact HTML
+      let funFactHTML = '';
+      if (rec.fun && rec.fun.trim()) {
+        funFactHTML = `<div class="fun-fact">${rec.fun}</div>`;
+      } else {
+        funFactHTML = '<div class="fun-fact placeholder-text">Fun fact coming soon... Know something interesting about this album? Add it!</div>';
+      }
+      
+      div.innerHTML = `
+        <img src="${coverImg}" class="cover" alt="${rec.album}">
+        <div class="info">
+          <h1>${rec.album}</h1>
+          <h3>${rec.artist}</h3>
+          
+          <div class="metadata">
+            <p><strong>Genre:</strong> ${rec.genre.charAt(0).toUpperCase() + rec.genre.slice(1)}</p>
+            <p><strong>Median Resale Value:</strong> ${priceDisplay}</p>
+          </div>
+          
+          ${funFactHTML}
+          
+          <div class="tracks">
+            <h4>Tracklist</h4>
+            <ul>${tracklistHTML}</ul>
+          </div>
+          
+          <a class="back" href="genre.html?genre=${genre}">&larr; Back to ${genre}</a>
+        </div>
+      `;
+    }
+  </script>
+</body>
+</html>
