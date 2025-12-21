@@ -1,0 +1,15 @@
+[project]
+name = "oauth-setup"
+version = "1.0.0"
+description = "Configure Google OAuth2 credentials for Vinyl Vault"
+requires-python = ">=3.10"
+dependencies = [
+    "rich>=13.0.0",
+]
+
+[project.scripts]
+oauth-setup = "oauth_setup:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
