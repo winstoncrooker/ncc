@@ -52,6 +52,13 @@ class ShowcaseReorder(BaseModel):
     album_ids: list[int]  # List of showcase album IDs in new order
 
 
+def to_python_value(val):
+    """Convert JsNull and other JS types to Python equivalents"""
+    if val is None or (hasattr(val, '__class__') and 'JsNull' in str(type(val))):
+        return None
+    return val
+
+
 @router.get("/me")
 async def get_profile(
     request: Request,
@@ -78,12 +85,12 @@ async def get_profile(
         return ProfileResponse(
             id=user["id"],
             email=user["email"],
-            name=user.get("name"),
-            picture=user.get("picture"),
-            bio=user.get("bio"),
-            pronouns=user.get("pronouns"),
-            background_image=user.get("background_image"),
-            created_at=str(user["created_at"]) if user.get("created_at") else None
+            name=to_python_value(user.get("name")),
+            picture=to_python_value(user.get("picture")),
+            bio=to_python_value(user.get("bio")),
+            pronouns=to_python_value(user.get("pronouns")),
+            background_image=to_python_value(user.get("background_image")),
+            created_at=str(user["created_at"]) if to_python_value(user.get("created_at")) else None
         )
     except HTTPException:
         raise
