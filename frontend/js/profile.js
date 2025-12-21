@@ -910,7 +910,7 @@ const Profile = {
   },
 
   /**
-   * Add album from chat
+   * Add album from chat (includes Discogs cover data)
    */
   async addAlbumFromChat(album) {
     try {
@@ -918,7 +918,10 @@ const Profile = {
         method: 'POST',
         body: JSON.stringify({
           artist: album.artist,
-          album: album.album
+          album: album.album,
+          cover: album.cover || null,
+          year: album.year || null,
+          discogs_id: album.discogs_id || null
         })
       });
 

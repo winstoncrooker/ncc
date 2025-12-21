@@ -4,18 +4,23 @@ Together.ai Chat API proxy for AI collection assistant
 
 from fastapi import APIRouter, Request, HTTPException
 from pydantic import BaseModel
+from typing import Optional
 import httpx
 
 router = APIRouter()
 
 TOGETHER_API_URL = "https://api.together.xyz/v1/chat/completions"
 CHAT_MODEL = "meta-llama/Llama-3.3-70B-Instruct-Turbo"
+DISCOGS_API_URL = "https://api.discogs.com/database/search"
 
 
 class Album(BaseModel):
     """Album in user's collection"""
     artist: str
     album: str
+    cover: Optional[str] = None
+    year: Optional[int] = None
+    discogs_id: Optional[int] = None
 
 
 class ChatMessage(BaseModel):
@@ -101,6 +106,111 @@ def parse_album_actions(response: str) -> tuple[list[Album], list[Album]]:
     return albums_to_add, albums_to_remove
 
 
+async def search_discogs_for_album(artist: str, album: str, discogs_key: str, discogs_secret: str) -> Album:
+    """
+    Search Discogs for album info and return enriched album with cover, year, discogs_id.
+    Intelligently picks the best matching result.
+    """
+    query = f"{artist} {album}"
+
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.get(
+                DISCOGS_API_URL,
+                params={
+                    "q": query,
+                    "type": "release",
+                    "per_page": 10
+                },
+                headers={
+                    "Authorization": f"Discogs key={discogs_key}, secret={discogs_secret}",
+                    "User-Agent": "NicheCollectorConnector/1.0"
+                },
+                timeout=10.0
+            )
+
+            if response.status_code != 200:
+                # Return basic album if Discogs fails
+                return Album(artist=artist, album=album)
+
+            data = response.json()
+            results = data.get("results", [])
+
+            if not results:
+                return Album(artist=artist, album=album)
+
+            # Score results to find best match
+            best_result = None
+            best_score = -1
+
+            for result in results:
+                score = 0
+                title = result.get("title", "").lower()
+
+                # Check artist match
+                if artist.lower() in title:
+                    score += 10
+
+                # Check album match
+                if album.lower() in title:
+                    score += 10
+
+                # Prefer results with cover images
+                if result.get("cover_image") and "spacer.gif" not in result.get("cover_image", ""):
+                    score += 5
+
+                # Prefer vinyl/LP formats
+                formats = result.get("format", [])
+                if isinstance(formats, list):
+                    format_str = " ".join(formats).lower()
+                    if "vinyl" in format_str or "lp" in format_str:
+                        score += 3
+                    if "album" in format_str:
+                        score += 2
+
+                # Prefer original releases (lower year often means original)
+                year = result.get("year")
+                if year and isinstance(year, (int, str)):
+                    try:
+                        year_int = int(year)
+                        if 1950 <= year_int <= 2030:
+                            score += 1
+                    except:
+                        pass
+
+                if score > best_score:
+                    best_score = score
+                    best_result = result
+
+            if best_result:
+                # Get cover - prefer cover_image over thumb
+                cover = best_result.get("cover_image")
+                if not cover or "spacer.gif" in cover:
+                    cover = best_result.get("thumb")
+
+                # Get year
+                year = None
+                if best_result.get("year"):
+                    try:
+                        year = int(best_result["year"])
+                    except:
+                        pass
+
+                return Album(
+                    artist=artist,
+                    album=album,
+                    cover=cover,
+                    year=year,
+                    discogs_id=best_result.get("id")
+                )
+
+            return Album(artist=artist, album=album)
+
+    except Exception as e:
+        print(f"Discogs search error: {e}")
+        return Album(artist=artist, album=album)
+
+
 def clean_response(response: str) -> str:
     """Clean up AI response for display"""
     import re
@@ -179,12 +289,23 @@ async def chat(request: Request, body: ChatMessage) -> ChatResponse:
             # Parse actions before cleaning
             albums_to_add, albums_to_remove = parse_album_actions(assistant_message)
 
+            # Enrich albums with Discogs data (covers, year, etc.)
+            enriched_albums = []
+            for album in albums_to_add:
+                enriched = await search_discogs_for_album(
+                    album.artist,
+                    album.album,
+                    env.DISCOGS_KEY,
+                    env.DISCOGS_SECRET
+                )
+                enriched_albums.append(enriched)
+
             # Clean response for display
             cleaned_response = clean_response(assistant_message)
 
             return ChatResponse(
                 response=cleaned_response,
-                albums_to_add=albums_to_add,
+                albums_to_add=enriched_albums,
                 albums_to_remove=albums_to_remove
             )
 
