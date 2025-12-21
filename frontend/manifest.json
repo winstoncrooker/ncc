@@ -1,0 +1,20 @@
+{
+  "name": "Vinyl Vault",
+  "short_name": "Vinyl Vault",
+  "description": "Track and manage your vinyl record collection",
+  "start_url": "/mycollection.html",
+  "display": "standalone",
+  "background_color": "#0e0e0e",
+  "theme_color": "#1db954",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect fill='%230e0e0e' width='100' height='100' rx='20'/><text x='50' y='65' font-size='50' text-anchor='middle' fill='%231db954'>🎵</text></svg>",
+      "sizes": "192x192",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["entertainment", "music"],
+  "lang": "en"
+}

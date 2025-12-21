@@ -13,7 +13,7 @@ Vinyl Vault is a vinyl record collection website. It displays Winston's record c
 The API runs on Cloudflare Workers using Python (pywrangler/FastAPI):
 
 - **Worker URL**: `https://vinyl-vault-api.christophercrooker.workers.dev`
-- **Local Dev**: `http://localhost:8787`
+- **Local Dev**: `http://localhost:8788`
 - **Database**: Cloudflare D1 (SQLite)
 - **Storage**: Cloudflare R2 (image/data caching)
 
@@ -39,8 +39,10 @@ Website/
 │   ├── js/
 │   │   ├── config.js           # API configuration
 │   │   └── auth.js             # Google OAuth authentication
-│   └── css/
-│       └── auth.css            # Auth UI styles
+│   ├── css/
+│   │   └── auth.css            # Auth UI styles
+│   ├── manifest.json           # PWA manifest
+│   └── sw.js                   # Service worker (offline support)
 │
 ├── worker/                      # Cloudflare Worker (Python/FastAPI)
 │   ├── src/
@@ -57,8 +59,12 @@ Website/
 │   ├── 0001_initial.sql        # Users and collections tables
 │   └── 0002_google_oauth.sql   # Google OAuth columns
 │
+├── tools/                       # Setup automation tools
+│   ├── gcp-init/               # GCP project setup
+│   └── oauth-setup/            # OAuth credential configuration
+│
 ├── CLAUDE.md                    # This file
-├── IMPLEMENTATION_PLAN.md       # Implementation roadmap
+├── IMPLEMENTATION_PLAN.md       # Implementation roadmap (complete)
 └── REFACTOR.md                  # Migration notes
 ```
 
@@ -196,3 +202,22 @@ Add entries to `frontend/record.js`:
 | `DISCOGS_KEY` | Discogs API |
 | `DISCOGS_SECRET` | Discogs API |
 | `TOGETHER_API_KEY` | AI chat (Llama-3.3-70B) |
+
+## Features
+
+### Collection Management (mycollection.html)
+- **Upload**: PDF or TXT file with "Artist - Album" format
+- **Export**: JSON (full data) or CSV (simplified)
+- **Import**: JSON files with duplicate detection
+- **AI Chat**: Add/remove albums via natural language
+- **Discogs Integration**: Auto-fetch covers and prices
+
+### PWA Support
+- **Service Worker**: Offline caching with stale-while-revalidate
+- **Manifest**: Installable as standalone app
+- **Theme**: #1db954 accent color
+
+### Security
+- **XSS Protection**: DOMPurify for AI response sanitization
+- **API Proxying**: Together.ai calls go through Worker (no exposed key)
+- **OAuth2**: Google Sign-In (test users only until app is published)

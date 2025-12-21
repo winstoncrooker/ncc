@@ -3,7 +3,11 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#1db954" />
+  <meta name="description" content="Track and manage your vinyl record collection" />
   <title>My Collection - Vinyl Vault</title>
+  <link rel="manifest" href="manifest.json" />
+  <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect fill='%230e0e0e' width='100' height='100' rx='20'/><text x='50' y='65' font-size='50' text-anchor='middle' fill='%231db954'>🎵</text></svg>" />
   <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500&family=Montserrat:wght@300;600&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="style.css" />
   <link rel="stylesheet" href="css/auth.css" />
@@ -606,10 +610,14 @@
     <div class="collection-list" id="collectionList" style="display: none;">
       <h2>Your Collection (<span id="collectionCount">0</span> albums) <span id="collectionValue" style="font-size: 0.8em; color: #1db954;"></span></h2>
       <div class="collection-grid" id="collectionItems"></div>
-      <div style="display: flex; gap: 10px; justify-content: center; margin-top: 20px;">
+      <div style="display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; margin-top: 20px;">
         <button class="clear-all-btn" style="background: #1db954;" onclick="fetchAllAlbumData(true)">Refresh Covers & Prices</button>
+        <button class="clear-all-btn" style="background: #2196f3;" onclick="exportCollection('json')">Export JSON</button>
+        <button class="clear-all-btn" style="background: #2196f3;" onclick="exportCollection('csv')">Export CSV</button>
+        <button class="clear-all-btn" style="background: #9c27b0;" onclick="document.getElementById('importInput').click()">Import JSON</button>
         <button class="clear-all-btn" onclick="clearCollection()">Clear All</button>
       </div>
+      <input type="file" id="importInput" accept=".json" style="display: none;" onchange="importCollection(event)" />
     </div>
 
     <div class="empty-state" id="emptyState">
@@ -939,7 +947,7 @@
         card.innerHTML = `
           <div class="cover-container">
             ${coverUrl
-              ? `<img class="cover" src="${coverUrl}" alt="${escapeHtml(entry.album)}" onerror="this.parentElement.innerHTML='<div class=\\'loading-cover\\'>💿</div>'">`
+              ? `<img class="cover" src="${coverUrl}" alt="${escapeHtml(entry.album)}" loading="lazy" onerror="this.parentElement.innerHTML='<div class=\\'loading-cover\\'>💿</div>'">`
               : `<div class="loading-cover">${isLoading ? '⏳' : '💿'}</div>`
             }
           </div>
@@ -1013,10 +1021,102 @@
       message.textContent = text;
       message.className = `status-message ${type}`;
       message.style.display = 'block';
-      
+
       setTimeout(() => {
         message.style.display = 'none';
       }, 4000);
+    }
+
+    // Export collection to JSON or CSV
+    function exportCollection(format) {
+      if (userCollection.length === 0) {
+        showMessage('No collection to export', 'error');
+        return;
+      }
+
+      let content, filename, mimeType;
+      const timestamp = new Date().toISOString().split('T')[0];
+
+      if (format === 'json') {
+        content = JSON.stringify(userCollection, null, 2);
+        filename = `vinyl-vault-collection-${timestamp}.json`;
+        mimeType = 'application/json';
+      } else if (format === 'csv') {
+        const headers = ['Artist', 'Album', 'Year', 'Price'];
+        const rows = userCollection.map(item => [
+          `"${(item.artist || '').replace(/"/g, '""')}"`,
+          `"${(item.album || '').replace(/"/g, '""')}"`,
+          item.year || '',
+          item.price || ''
+        ].join(','));
+        content = [headers.join(','), ...rows].join('\n');
+        filename = `vinyl-vault-collection-${timestamp}.csv`;
+        mimeType = 'text/csv';
+      }
+
+      const blob = new Blob([content], { type: mimeType });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      showMessage(`Collection exported as ${format.toUpperCase()}`, 'success');
+    }
+
+    // Import collection from JSON
+    async function importCollection(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      try {
+        const text = await file.text();
+        const imported = JSON.parse(text);
+
+        if (!Array.isArray(imported)) {
+          throw new Error('Invalid format');
+        }
+
+        // Validate and merge
+        let addedCount = 0;
+        for (const item of imported) {
+          if (item.artist && item.album) {
+            const exists = userCollection.some(
+              existing => existing.artist.toLowerCase() === item.artist.toLowerCase() &&
+                         existing.album.toLowerCase() === item.album.toLowerCase()
+            );
+            if (!exists) {
+              userCollection.push({
+                artist: item.artist,
+                album: item.album,
+                cover: item.cover || null,
+                year: item.year || null,
+                price: item.price || null,
+                discogsId: item.discogsId || null
+              });
+              addedCount++;
+            }
+          }
+        }
+
+        saveCollection();
+        displayCollection();
+        showMessage(`Imported ${addedCount} new album(s)`, 'success');
+
+        // Fetch missing covers
+        if (addedCount > 0) {
+          onAlbumsAdded();
+        }
+      } catch (error) {
+        console.error('Import error:', error);
+        showMessage('Invalid JSON file. Please export from Vinyl Vault.', 'error');
+      }
+
+      // Reset input
+      event.target.value = '';
     }
 
     function escapeHtml(text) {
@@ -1383,6 +1483,13 @@
 
     // Initialize chat when page loads
     window.addEventListener('DOMContentLoaded', initChat);
+
+    // Register service worker for PWA support
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/sw.js')
+        .then(reg => console.log('Service Worker registered'))
+        .catch(err => console.log('Service Worker registration failed:', err));
+    }
   </script>
 </body>
 </html>
