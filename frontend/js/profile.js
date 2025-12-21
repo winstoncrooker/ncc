@@ -40,53 +40,61 @@ const Profile = {
    * Setup event listeners
    */
   setupEventListeners() {
+    // Helper to safely add event listeners
+    const addListener = (id, event, handler) => {
+      const el = document.getElementById(id);
+      if (el) el.addEventListener(event, handler);
+      else console.warn(`Element #${id} not found`);
+    };
+
     // AI Sidebar
-    document.getElementById('ai-toggle-btn').addEventListener('click', () => {
-      document.getElementById('ai-sidebar').classList.add('open');
-      document.getElementById('sidebar-overlay').classList.add('show');
+    addListener('ai-toggle-btn', 'click', () => {
+      document.getElementById('ai-sidebar')?.classList.add('open');
+      document.getElementById('sidebar-overlay')?.classList.add('show');
     });
 
-    document.getElementById('ai-close-btn').addEventListener('click', () => {
-      document.getElementById('ai-sidebar').classList.remove('open');
-      document.getElementById('sidebar-overlay').classList.remove('show');
+    addListener('ai-close-btn', 'click', () => {
+      document.getElementById('ai-sidebar')?.classList.remove('open');
+      document.getElementById('sidebar-overlay')?.classList.remove('show');
     });
 
-    document.getElementById('sidebar-overlay').addEventListener('click', () => {
-      document.getElementById('ai-sidebar').classList.remove('open');
-      document.getElementById('sidebar-overlay').classList.remove('show');
+    addListener('sidebar-overlay', 'click', () => {
+      document.getElementById('ai-sidebar')?.classList.remove('open');
+      document.getElementById('sidebar-overlay')?.classList.remove('show');
     });
 
     // AI Chat form
-    document.getElementById('ai-input-form').addEventListener('submit', (e) => {
+    addListener('ai-input-form', 'submit', (e) => {
       e.preventDefault();
       this.sendChatMessage();
     });
 
     // Edit Profile
-    document.getElementById('edit-profile-btn').addEventListener('click', () => {
+    addListener('edit-profile-btn', 'click', () => {
       this.openEditProfileModal();
     });
 
-    document.getElementById('edit-profile-close').addEventListener('click', () => {
+    addListener('edit-profile-close', 'click', () => {
       this.closeModal('edit-profile-modal');
     });
 
-    document.getElementById('edit-profile-cancel').addEventListener('click', () => {
+    addListener('edit-profile-cancel', 'click', () => {
       this.closeModal('edit-profile-modal');
     });
 
-    document.getElementById('edit-profile-form').addEventListener('submit', (e) => {
+    addListener('edit-profile-form', 'submit', (e) => {
       e.preventDefault();
       this.saveProfile();
     });
 
     // Bio character count
-    document.getElementById('edit-bio').addEventListener('input', (e) => {
-      document.getElementById('bio-char-count').textContent = e.target.value.length;
+    addListener('edit-bio', 'input', (e) => {
+      const countEl = document.getElementById('bio-char-count');
+      if (countEl) countEl.textContent = e.target.value.length;
     });
 
     // Add to Showcase button
-    document.getElementById('add-to-showcase-btn').addEventListener('click', () => {
+    addListener('add-to-showcase-btn', 'click', () => {
       if (this.collection.length === 0) {
         this.openAddRecordModal();
       } else {
@@ -95,34 +103,34 @@ const Profile = {
     });
 
     // Add Record button (in collection section)
-    document.getElementById('add-record-btn').addEventListener('click', () => {
+    addListener('add-record-btn', 'click', () => {
       this.openAddRecordModal();
     });
 
-    document.getElementById('add-record-close').addEventListener('click', () => {
+    addListener('add-record-close', 'click', () => {
       this.closeModal('add-record-modal');
     });
 
-    document.getElementById('manual-add-cancel').addEventListener('click', () => {
+    addListener('manual-add-cancel', 'click', () => {
       this.closeModal('add-record-modal');
     });
 
     // Photo upload buttons
-    document.getElementById('upload-photo-btn').addEventListener('click', () => {
-      document.getElementById('photo-upload-input').click();
+    addListener('upload-photo-btn', 'click', () => {
+      document.getElementById('photo-upload-input')?.click();
     });
 
-    document.getElementById('photo-upload-input').addEventListener('change', (e) => {
+    addListener('photo-upload-input', 'change', (e) => {
       if (e.target.files[0]) {
         this.handlePhotoUpload(e.target.files[0]);
       }
     });
 
-    document.getElementById('change-bg-btn').addEventListener('click', () => {
-      document.getElementById('bg-upload-input').click();
+    addListener('change-bg-btn', 'click', () => {
+      document.getElementById('bg-upload-input')?.click();
     });
 
-    document.getElementById('bg-upload-input').addEventListener('change', (e) => {
+    addListener('bg-upload-input', 'change', (e) => {
       if (e.target.files[0]) {
         this.handleBackgroundUpload(e.target.files[0]);
       }
@@ -135,24 +143,24 @@ const Profile = {
         document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
         document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
         btn.classList.add('active');
-        document.getElementById(`tab-${tab}`).classList.add('active');
+        document.getElementById(`tab-${tab}`)?.classList.add('active');
       });
     });
 
     // Manual add form
-    document.getElementById('manual-add-form').addEventListener('submit', (e) => {
+    addListener('manual-add-form', 'submit', (e) => {
       e.preventDefault();
       this.addRecordManually();
     });
 
     // Discogs search form
-    document.getElementById('discogs-search-form').addEventListener('submit', (e) => {
+    addListener('discogs-search-form', 'submit', (e) => {
       e.preventDefault();
       this.searchDiscogs();
     });
 
     // Showcase modal
-    document.getElementById('showcase-modal-close').addEventListener('click', () => {
+    addListener('showcase-modal-close', 'click', () => {
       this.closeModal('showcase-modal');
     });
 
