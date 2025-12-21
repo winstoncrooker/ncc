@@ -10,9 +10,13 @@ const CONFIG = {
     if (hostname === 'localhost' || hostname === '127.0.0.1') {
       return 'http://localhost:8787';  // Local pywrangler dev
     }
-    // Production: Update this after deploying the worker
-    return 'https://vinyl-vault-api.YOUR_SUBDOMAIN.workers.dev';
+    // Production Worker URL
+    return 'https://vinyl-vault-api.christophercrooker.workers.dev';
   })(),
+
+  // Discogs credentials - client-side calls (Worker requests blocked by Cloudflare)
+  DISCOGS_KEY: 'yRxzvHyveKiFOEHuwmcW',
+  DISCOGS_SECRET: 'GnnPcnLGovdJLMfMyEpaSRoXOsRqojBr',
 
   // Auth token storage key
   AUTH_TOKEN_KEY: 'vinyl_vault_token',

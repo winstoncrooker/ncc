@@ -138,6 +138,13 @@ async def search_album(
 
     # Search Discogs
     try:
+        # Get secrets (convert from JsProxy if needed)
+        discogs_key = str(env.DISCOGS_KEY) if hasattr(env, 'DISCOGS_KEY') else None
+        discogs_secret = str(env.DISCOGS_SECRET) if hasattr(env, 'DISCOGS_SECRET') else None
+
+        if not discogs_key or not discogs_secret:
+            raise HTTPException(status_code=500, detail="Discogs credentials not configured")
+
         async with httpx.AsyncClient() as client:
             query = f"{artist} {album}"
             response = await client.get(
@@ -145,17 +152,19 @@ async def search_album(
                 params={
                     "q": query,
                     "type": "release",
-                    "key": env.DISCOGS_KEY,
-                    "secret": env.DISCOGS_SECRET
+                    "key": discogs_key,
+                    "secret": discogs_secret
                 },
                 headers={"User-Agent": "VinylVault/2.0"},
                 timeout=10.0
             )
 
             if response.status_code != 200:
+                # Include response body for debugging
+                error_body = response.text[:200] if response.text else "No body"
                 raise HTTPException(
                     status_code=response.status_code,
-                    detail=f"Discogs API error: {response.status_code}"
+                    detail=f"Discogs API error: {response.status_code} - {error_body}"
                 )
 
             data = response.json()
@@ -214,14 +223,21 @@ async def get_price(request: Request, release_id: int) -> PriceResult:
     """
     env = request.scope["env"]
 
+    # Get secrets (convert from JsProxy if needed)
+    discogs_key = str(env.DISCOGS_KEY) if hasattr(env, 'DISCOGS_KEY') else None
+    discogs_secret = str(env.DISCOGS_SECRET) if hasattr(env, 'DISCOGS_SECRET') else None
+
+    if not discogs_key or not discogs_secret:
+        return PriceResult(price=None)
+
     try:
         async with httpx.AsyncClient() as client:
             # Try price suggestions first
             response = await client.get(
                 f"{DISCOGS_API}/marketplace/price_suggestions/{release_id}",
                 params={
-                    "key": env.DISCOGS_KEY,
-                    "secret": env.DISCOGS_SECRET
+                    "key": discogs_key,
+                    "secret": discogs_secret
                 },
                 headers={"User-Agent": "VinylVault/2.0"},
                 timeout=10.0
@@ -238,8 +254,8 @@ async def get_price(request: Request, release_id: int) -> PriceResult:
             response = await client.get(
                 f"{DISCOGS_API}/releases/{release_id}",
                 params={
-                    "key": env.DISCOGS_KEY,
-                    "secret": env.DISCOGS_SECRET
+                    "key": discogs_key,
+                    "secret": discogs_secret
                 },
                 headers={"User-Agent": "VinylVault/2.0"},
                 timeout=10.0
