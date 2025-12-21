@@ -6,6 +6,7 @@
   <title>My Collection - Vinyl Vault</title>
   <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500&family=Montserrat:wght@300;600&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="css/auth.css" />
   <style>
     .upload-section {
       max-width: 800px;
@@ -560,6 +561,11 @@
     </div>
   </nav>
 
+  <!-- Auth Header -->
+  <div id="authContainer" class="auth-container">
+    <!-- Login button or user profile will be inserted here by auth.js -->
+  </div>
+
   <section class="upload-section">
     <h1>Add Your Own Collection</h1>
     <div class="alpha-badge">ALPHA MODE</div>
@@ -659,6 +665,8 @@
   <footer>© 2025 Vinyl Vault - My Collection (Alpha)</footer>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <script src="js/config.js"></script>
+  <script src="js/auth.js"></script>
   <script>
     // Set up PDF.js worker
     pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
@@ -669,7 +677,48 @@
     window.addEventListener('DOMContentLoaded', () => {
       loadCollection();
       setupEventListeners();
+      setupAuth();
     });
+
+    // Set up authentication UI
+    function setupAuth() {
+      const authContainer = document.getElementById('authContainer');
+      if (!authContainer) return;
+
+      function updateAuthUI() {
+        authContainer.innerHTML = '';
+
+        if (Auth.isAuthenticated()) {
+          const user = Auth.getUser();
+          const profile = document.createElement('div');
+          profile.className = 'user-profile';
+
+          if (user?.picture) {
+            profile.innerHTML = `
+              <img src="${user.picture}" alt="${user.name || user.email}" class="user-avatar" />
+              <span class="user-name">${user.name || user.email}</span>
+              <button class="logout-btn" onclick="Auth.logout(); location.reload();">Sign out</button>
+            `;
+          } else {
+            profile.innerHTML = `
+              <span class="user-name">${user?.email || 'User'}</span>
+              <button class="logout-btn" onclick="Auth.logout(); location.reload();">Sign out</button>
+            `;
+          }
+          authContainer.appendChild(profile);
+        } else {
+          const loginBtn = Auth.createLoginButton('Sign in with Google', window.location.href);
+          authContainer.appendChild(loginBtn);
+        }
+      }
+
+      // Initial render
+      updateAuthUI();
+
+      // Listen for auth events
+      window.addEventListener('auth:success', updateAuthUI);
+      window.addEventListener('auth:logout', updateAuthUI);
+    }
 
     function setupEventListeners() {
       const uploadBox = document.getElementById('uploadBox');
