@@ -1,287 +1,222 @@
-# Vinyl Vault Implementation Plan
+# Vinyl Vault Implementation Plan (Updated)
 
 **Created**: 2025-12-21
-**Status**: PENDING USER APPROVAL
-**Scope**: 12 improvements based on code review
+**Updated**: 2025-12-21
+**Status**: IN PROGRESS
 
 ---
 
-## Context & Decisions
+## Architecture Summary
 
-| Question | Answer |
-|----------|--------|
-| Authentication | JWT with offline-to-online merge library |
-| Discogs API key | Single personal key, proxy through server |
-| Together.ai key | Remove custom key option, use single hardcoded key |
-| Legacy pages | Delete after confirming genre.html coverage |
-| Collection size | 1-1000 albums expected |
-| Offline support | Resiliency backup only (service worker) |
-| Deployment | Multi-user, self-hosted now, Cloudflare research in progress |
+The project has been migrated to Cloudflare Workers:
+- **Backend**: Cloudflare Worker (Python/FastAPI) at `vinyl-vault-api.christophercrooker.workers.dev`
+- **Database**: Cloudflare D1 (SQLite)
+- **Storage**: Cloudflare R2 (image/data caching)
+- **Frontend**: Static files in `frontend/` directory
 
 ---
 
-## Implementation Tasks
+## Remaining Implementation Tasks
 
-### Phase 1: Security (Critical)
+### Phase 1: Google OAuth2 Authentication (Primary Auth)
 
-#### 1.1 Move API Credentials to Environment Variables
-**Files affected**: `server.py`, `mycollection.html`
+**Goal**: Replace email/password JWT auth with Google OAuth2 as sole authentication mechanism.
 
-- Create `.env` file (add to `.gitignore`)
-- Install `python-dotenv` for Flask
-- Move Discogs credentials to `.env`:
-  ```
-  DISCOGS_KEY=yRxzvHyveKiFOEHuwmcW
-  DISCOGS_SECRET=GnnPcnLGovdJLMfMyEpaSRoXOsRqojBr
-  TOGETHER_API_KEY=cd6f547c5977a88af60b786907b065bfb293faab06dc78d35c50fe230f249161
-  ```
-- Update `server.py` to load from environment
-- Add Together.ai proxy endpoint to `server.py`
-- Remove hardcoded keys from `mycollection.html`
+#### 1.1 Google Cloud Console Setup (MANUAL STEPS)
 
-#### 1.2 Remove Custom API Key Option
-**Files affected**: `mycollection.html`
+1. Go to [Google Cloud Console](https://console.cloud.google.com/)
+2. Create or select a project (e.g., "Vinyl Vault")
+3. Navigate to **APIs & Services > Credentials**
+4. Click **Create Credentials > OAuth 2.0 Client ID**
+5. Configure OAuth consent screen:
+   - User Type: External
+   - App name: "Vinyl Vault"
+   - User support email: your email
+   - Developer contact: your email
+6. Create OAuth 2.0 Client ID:
+   - Application type: **Web application**
+   - Name: "Vinyl Vault Web"
+   - Authorized JavaScript origins:
+     - `http://localhost:8787` (dev)
+     - `https://vinyl-vault.pages.dev` (prod)
+     - Your custom domain if applicable
+   - Authorized redirect URIs:
+     - `http://localhost:8787/api/auth/google/callback`
+     - `https://vinyl-vault-api.christophercrooker.workers.dev/api/auth/google/callback`
+7. Copy **Client ID** and **Client Secret**
+8. Set secrets in Cloudflare Worker:
+   ```bash
+   cd worker
+   wrangler secret put GOOGLE_CLIENT_ID
+   wrangler secret put GOOGLE_CLIENT_SECRET
+   ```
 
-- Remove API key setup UI (`apiKeySetup` div)
-- Remove `saveApiKey()` function
-- Remove localStorage API key logic
-- All API calls route through server proxy
+#### 1.2 Backend: Google OAuth Routes
 
-#### 1.3 Add XSS Sanitization for AI Responses
-**Files affected**: `mycollection.html`
+Update `worker/src/routes/auth.py`:
+- Remove email/password registration
+- Add `/auth/google` - Redirect to Google OAuth
+- Add `/auth/google/callback` - Handle OAuth callback
+- Keep `/auth/me` and `/auth/refresh` for session management
 
-- Add DOMPurify library (CDN or bundled)
-- Sanitize AI responses before rendering
+#### 1.3 Frontend: Google Sign-In
+
+- Add Google Sign-In button to UI
+- Remove email/password forms
+- Handle OAuth redirect flow
+- Store JWT token from callback
+
+#### 1.4 Database Schema Update
+
+- Remove `password_hash` from users table (optional, can keep for backwards compat)
+- Add `google_id` column for linking Google accounts
+
+---
+
+### Phase 2: Security Improvements
+
+#### 2.1 XSS Sanitization for AI Responses
+- Add DOMPurify library
+- Sanitize all AI-generated content before rendering
 - Sanitize user input display
 
+#### 2.2 Remove Exposed API Keys
+- Discogs credentials already moved to Worker secrets
+- Together.ai key already proxied through Worker
+- Remove any remaining client-side keys
+
 ---
 
-### Phase 2: Structure & Organization
+### Phase 3: Frontend Modularization
 
-#### 2.1 Extract Navigation to Shared Component
-**Files affected**: All HTML files
-
-- Create `components/nav.js` that injects navigation
-- Single source of truth for nav links
-- Include hamburger menu logic
-
-#### 2.2 Delete Legacy Static Pages
-**Files affected**: `rock.html`, `blues.html`, `misc.html`
-
-- Verify all content accessible via `genre.html?genre=X`
-- Delete redundant files
-- Update any internal links if needed
-
-#### 2.3 Consolidate Utility Functions
-**Files affected**: `utils.js`, `index.html`, `genre.html`, `album.html`
-
-- Remove inline `getRecordById`, `getRecordsByGenre`, `formatPrice` definitions
-- Ensure `utils.js` loads before usage in all pages
-- Add `escapeHtml` to utils.js (currently only in mycollection.html)
-
-#### 2.4 Split mycollection.html into Modules
-**New files**:
-- `js/collection.js` - Collection management, display, search
-- `js/discogs.js` - Discogs API integration
+#### 3.1 Split mycollection.html into Modules
+- `js/collection.js` - Collection display and management
+- `js/discogs.js` - Discogs API integration (via cache-first pattern)
 - `js/chat.js` - AI chat functionality
+- `js/auth.js` - Authentication state management
 - `css/mycollection.css` - Page-specific styles
 
+#### 3.2 Shared Navigation Component
+- Already exists: `components/nav.js`
+- Integrate into all pages
+
 ---
 
-### Phase 3: Performance
+### Phase 4: Performance & UX
 
-#### 3.1 Add Lazy Loading to Images
-**Files affected**: `index.html`, `genre.html`, `album.html`, `stats.html`, `mycollection.html`
+#### 4.1 Lazy Loading Images
+- Add `loading="lazy"` to all album cover images
+- Apply to dynamically created images
 
-- Add `loading="lazy"` attribute to album cover images
-- Apply to dynamically created images via JS
+#### 4.2 Collection Export/Import
+- Export to JSON
+- Export to CSV
+- Import from JSON with merge logic
 
-#### 3.2 Implement Service Worker for Offline Resiliency
-**New files**: `sw.js`, `manifest.json`
+#### 4.3 Input Validation
+- Stricter validation for "Artist - Album" format
+- Max field lengths
+- Error display
 
-- Cache static assets (HTML, CSS, JS, fonts)
-- Cache `record.js` data
+#### 4.4 AI Chat Error Handling
+- Retry logic with exponential backoff
+- Error messages and retry button
+- Loading states
+
+---
+
+### Phase 5: Offline Support
+
+#### 5.1 Service Worker
+- Cache static assets
+- Cache collection data
 - Offline fallback page
-- Background sync for collection updates when back online
+- Background sync for changes
+
+#### 5.2 PWA Manifest
+- App icons
+- Theme colors
+- Standalone display mode
 
 ---
 
-### Phase 4: Reliability & Data Handling
+### Phase 6: Cleanup
 
-#### 4.1 Add Collection Export/Import
-**Files affected**: `mycollection.html` (or new `js/collection.js`)
+#### 6.1 Delete Legacy Files
+- Remove any remaining Flask files
+- Remove old static genre pages if present
+- Clean up test files
 
-- Export to JSON button
-- Export to CSV button
-- Import from JSON file
-- Merge logic for duplicates
-
-#### 4.2 Add Input Validation for Uploads
-**Files affected**: `mycollection.html`
-
-- Stricter regex for "Artist - Album" format
-- Max artist/album name length (255 chars)
-- Reject entries with suspicious content
-- Display validation errors clearly
-
-#### 4.3 Implement AI Chat Error Handling & Retry
-**Files affected**: `mycollection.html` (or new `js/chat.js`)
-
-- Exponential backoff on API failures
-- Retry button for failed messages
-- Rate limiting indicator
-- Graceful degradation message
+#### 6.2 Update Documentation
+- Update CLAUDE.md with new architecture
+- Update any inline comments
 
 ---
 
-### Phase 5: Authentication & Sync (JWT)
-
-#### 5.1 Research & Select JWT Library
-**Candidates for offline-to-online merge**:
-- **localForage + JWT**: IndexedDB wrapper with JWT auth
-- **PouchDB + CouchDB**: Automatic sync with conflict resolution
-- **Dexie.js + custom sync**: IndexedDB with manual sync logic
-- **RxDB**: Reactive database with offline-first sync
-
-**Recommended**: Dexie.js with custom JWT sync
-- Lightweight (~20KB)
-- IndexedDB-based (larger storage than localStorage)
-- Observable queries
-- Easy JWT integration
-
-#### 5.2 Database Schema
-```javascript
-// Dexie schema
-db.version(1).stores({
-  collections: '++id, odId, artist, album, genre, cover, price, synced',
-  syncQueue: '++id, action, data, timestamp'
-});
-```
-
-#### 5.3 Server Endpoints (Flask)
-```
-POST /api/auth/register - Create account
-POST /api/auth/login - Get JWT token
-POST /api/auth/refresh - Refresh token
-GET  /api/collection - Get user's collection
-POST /api/collection/sync - Sync offline changes
-```
-
-#### 5.4 Sync Strategy
-1. Local changes stored in IndexedDB immediately
-2. Changes queued in `syncQueue` table
-3. When online, sync queue processed
-4. Server returns merged state
-5. Conflicts resolved by timestamp (last-write-wins) or user choice
-
----
-
-## File Structure After Implementation
+## Current File Structure
 
 ```
 Website/
-├── .env                    # API credentials (gitignored)
-├── .gitignore              # Add .env, cache/, *.pyc
-├── index.html
-├── genre.html
-├── album.html
-├── stats.html
-├── mycollection.html
-├── manifest.json           # PWA manifest
-├── sw.js                   # Service worker
-├── record.js
-├── utils.js
-├── style.css
-├── server.py               # Enhanced with auth + proxy
-├── components/
-│   └── nav.js              # Shared navigation
-├── js/
-│   ├── collection.js       # Collection management
-│   ├── discogs.js          # Discogs integration
-│   ├── chat.js             # AI chat
-│   └── sync.js             # Offline sync logic
-├── css/
-│   └── mycollection.css    # Page-specific styles
-├── cache/                  # Discogs cache (gitignored)
-│   ├── images/
-│   └── data/
-├── CLAUDE.md
-├── BACKLOG.md
-└── IMPLEMENTATION_PLAN.md
+├── frontend/                    # Static frontend files
+│   ├── index.html
+│   ├── genre.html
+│   ├── album.html
+│   ├── stats.html
+│   ├── mycollection.html
+│   ├── record.js               # Album data
+│   ├── utils.js                # Shared utilities
+│   ├── style.css               # Global styles
+│   ├── components/
+│   │   └── nav.js              # Shared navigation
+│   ├── js/
+│   │   └── config.js           # API configuration
+│   └── css/
+│       └── (empty, to be populated)
+│
+├── worker/                      # Cloudflare Worker (Python)
+│   ├── src/
+│   │   ├── main.py             # FastAPI entry point
+│   │   ├── routes/
+│   │   │   ├── auth.py         # Authentication (to be updated for OAuth)
+│   │   │   ├── collection.py   # Collection CRUD
+│   │   │   ├── discogs.py      # Discogs proxy + caching
+│   │   │   └── chat.py         # AI chat proxy
+│   │   └── ...
+│   ├── wrangler.toml           # Worker config
+│   └── pyproject.toml          # Python deps
+│
+├── migrations/                  # D1 database migrations
+│   └── 0001_initial.sql
+│
+├── CLAUDE.md                    # Project documentation
+├── IMPLEMENTATION_PLAN.md       # This file
+└── REFACTOR.md                  # Cloudflare migration notes
 ```
 
 ---
 
-## Dependencies to Add
+## Implementation Order
 
-### Python (server.py)
-```
-flask
-flask-cors
-python-dotenv
-PyJWT
-bcrypt (for password hashing)
-```
-
-### Frontend (CDN or bundled)
-```
-DOMPurify - XSS sanitization
-Dexie.js - IndexedDB wrapper
-PDF.js - Already in use
-```
+1. **Google OAuth2** - Primary authentication (Phase 1)
+2. **XSS Sanitization** - Security critical (Phase 2)
+3. **Frontend Modularization** - Code organization (Phase 3)
+4. **Performance** - UX improvements (Phase 4)
+5. **Offline Support** - PWA features (Phase 5)
+6. **Cleanup** - Final polish (Phase 6)
 
 ---
 
-## Deployment Considerations (Cloudflare)
+## Secrets Required
 
-### Cloudflare Pages (Static Frontend)
-- Host HTML/CSS/JS files
-- Automatic CDN distribution
-- Free SSL
-
-### Cloudflare Workers (API Backend)
-- Serverless Python alternative: Convert Flask to Workers
-- Or: Use Cloudflare Tunnel to self-hosted Flask
-
-### Cloudflare D1 (SQLite Database)
-- Serverless SQLite at edge
-- Compatible with existing SQLite schema plans
-
-### Migration Path
-1. Deploy static files to Cloudflare Pages
-2. Keep Flask server self-hosted initially
-3. Use Cloudflare Tunnel for API
-4. Optional: Migrate to Workers + D1 later
+| Secret | Purpose | Status |
+|--------|---------|--------|
+| `DISCOGS_KEY` | Discogs API | Set |
+| `DISCOGS_SECRET` | Discogs API | Set |
+| `TOGETHER_API_KEY` | AI chat | Set |
+| `JWT_SECRET` | Token signing | Set |
+| `GOOGLE_CLIENT_ID` | OAuth2 | **TO SET** |
+| `GOOGLE_CLIENT_SECRET` | OAuth2 | **TO SET** |
 
 ---
 
-## Risk Mitigation
-
-| Risk | Mitigation |
-|------|------------|
-| Breaking existing functionality | Keep backup of current state, incremental deploys |
-| localStorage to IndexedDB migration | One-time migration script on first load |
-| API key exposure during transition | Server proxy first, then remove client keys |
-| Sync conflicts | Last-write-wins with optional manual resolution |
-
----
-
-## Estimated Complexity
-
-| Phase | Effort | Dependencies |
-|-------|--------|--------------|
-| Phase 1: Security | Medium | python-dotenv, DOMPurify |
-| Phase 2: Structure | Low-Medium | None |
-| Phase 3: Performance | Low | None |
-| Phase 4: Reliability | Medium | None |
-| Phase 5: Auth/Sync | High | Dexie.js, PyJWT, bcrypt |
-
----
-
-## Questions for User Before Implementation
-
-*Awaiting user questions before proceeding*
-
----
-
-**Status**: Plan finalized, implementation PAUSED pending user questions.
+**Next Step**: Set up Google OAuth2 credentials in Google Cloud Console.

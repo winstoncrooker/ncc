@@ -1,37 +1,23 @@
 """
-JWT Authentication routes
+Google OAuth2 Authentication routes
 """
 
 from fastapi import APIRouter, Request, HTTPException, Depends
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi.responses import RedirectResponse
 from pydantic import BaseModel
 import jwt
-import hashlib
-import re
+import httpx
+import urllib.parse
 from datetime import datetime, timedelta
 
 router = APIRouter()
 security = HTTPBearer(auto_error=False)
 
-# Simple email validation regex
-EMAIL_REGEX = re.compile(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$')
-
-
-def validate_email(email: str) -> bool:
-    """Simple email validation"""
-    return bool(EMAIL_REGEX.match(email))
-
-
-class RegisterRequest(BaseModel):
-    """User registration request"""
-    email: str
-    password: str
-
-
-class LoginRequest(BaseModel):
-    """User login request"""
-    email: str
-    password: str
+# Google OAuth2 endpoints
+GOOGLE_AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth"
+GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token"
+GOOGLE_USERINFO_URL = "https://www.googleapis.com/oauth2/v2/userinfo"
 
 
 class TokenResponse(BaseModel):
@@ -40,28 +26,17 @@ class TokenResponse(BaseModel):
     token_type: str = "bearer"
     user_id: int
     email: str
+    name: str | None = None
+    picture: str | None = None
 
 
 class UserResponse(BaseModel):
     """Current user info"""
     id: int
     email: str
+    name: str | None = None
+    picture: str | None = None
     created_at: str | None = None
-
-
-def hash_password(password: str) -> str:
-    """
-    Hash password using SHA-256.
-    Note: In production, consider using argon2 if available in Pyodide.
-    """
-    # Add a simple salt based on the password length for basic security
-    salted = f"vinyl_vault_{len(password)}_{password}"
-    return hashlib.sha256(salted.encode()).hexdigest()
-
-
-def verify_password(password: str, hashed: str) -> bool:
-    """Verify password against hash"""
-    return hash_password(password) == hashed
 
 
 def create_token(user_id: int, email: str, secret: str) -> str:
@@ -117,96 +92,180 @@ async def require_auth(
     return user_id
 
 
-@router.post("/register")
-async def register(request: Request, body: RegisterRequest) -> TokenResponse:
+def get_redirect_uri(request: Request) -> str:
+    """Get the OAuth callback URI based on the request origin"""
+    # Check for X-Forwarded headers (common in proxied environments)
+    forwarded_proto = request.headers.get("x-forwarded-proto", "https")
+    forwarded_host = request.headers.get("x-forwarded-host")
+
+    if forwarded_host:
+        base_url = f"{forwarded_proto}://{forwarded_host}"
+    else:
+        # Fallback to request URL
+        host = request.headers.get("host", "localhost:8787")
+        scheme = "https" if "workers.dev" in host else "http"
+        base_url = f"{scheme}://{host}"
+
+    return f"{base_url}/api/auth/google/callback"
+
+
+@router.get("/google")
+async def google_login(request: Request, redirect_to: str = "/"):
     """
-    Register a new user.
-    Returns JWT token on success.
+    Initiate Google OAuth2 login.
+    Redirects user to Google's consent screen.
     """
     env = request.scope["env"]
 
-    # Validate email
-    if not validate_email(body.email):
-        raise HTTPException(status_code=400, detail="Invalid email address")
+    client_id = str(env.GOOGLE_CLIENT_ID) if hasattr(env, 'GOOGLE_CLIENT_ID') else None
 
-    # Validate password
-    if len(body.password) < 6:
-        raise HTTPException(status_code=400, detail="Password must be at least 6 characters")
+    if not client_id:
+        raise HTTPException(status_code=500, detail="Google OAuth not configured")
 
-    # Check if email already exists
+    redirect_uri = get_redirect_uri(request)
+
+    # Build OAuth URL
+    params = {
+        "client_id": client_id,
+        "redirect_uri": redirect_uri,
+        "response_type": "code",
+        "scope": "openid email profile",
+        "access_type": "offline",
+        "prompt": "select_account",
+        "state": redirect_to  # Pass the redirect destination in state
+    }
+
+    auth_url = f"{GOOGLE_AUTH_URL}?{urllib.parse.urlencode(params)}"
+    return RedirectResponse(url=auth_url)
+
+
+@router.get("/google/callback")
+async def google_callback(request: Request, code: str = None, error: str = None, state: str = "/"):
+    """
+    Handle Google OAuth2 callback.
+    Exchanges code for tokens, creates/updates user, returns JWT.
+    """
+    env = request.scope["env"]
+
+    if error:
+        # Redirect to frontend with error
+        return RedirectResponse(url=f"{state}?auth_error={error}")
+
+    if not code:
+        raise HTTPException(status_code=400, detail="No authorization code received")
+
+    client_id = str(env.GOOGLE_CLIENT_ID) if hasattr(env, 'GOOGLE_CLIENT_ID') else None
+    client_secret = str(env.GOOGLE_CLIENT_SECRET) if hasattr(env, 'GOOGLE_CLIENT_SECRET') else None
+
+    if not client_id or not client_secret:
+        raise HTTPException(status_code=500, detail="Google OAuth not configured")
+
+    redirect_uri = get_redirect_uri(request)
+
     try:
+        async with httpx.AsyncClient() as client:
+            # Exchange code for tokens
+            token_response = await client.post(
+                GOOGLE_TOKEN_URL,
+                data={
+                    "client_id": client_id,
+                    "client_secret": client_secret,
+                    "code": code,
+                    "grant_type": "authorization_code",
+                    "redirect_uri": redirect_uri
+                },
+                headers={"Content-Type": "application/x-www-form-urlencoded"},
+                timeout=10.0
+            )
+
+            if token_response.status_code != 200:
+                error_detail = token_response.text[:200]
+                raise HTTPException(status_code=400, detail=f"Token exchange failed: {error_detail}")
+
+            tokens = token_response.json()
+            access_token = tokens.get("access_token")
+
+            if not access_token:
+                raise HTTPException(status_code=400, detail="No access token received")
+
+            # Get user info from Google
+            userinfo_response = await client.get(
+                GOOGLE_USERINFO_URL,
+                headers={"Authorization": f"Bearer {access_token}"},
+                timeout=10.0
+            )
+
+            if userinfo_response.status_code != 200:
+                raise HTTPException(status_code=400, detail="Failed to get user info")
+
+            google_user = userinfo_response.json()
+            google_id = google_user.get("id")
+            email = google_user.get("email")
+            name = google_user.get("name")
+            picture = google_user.get("picture")
+
+            if not google_id or not email:
+                raise HTTPException(status_code=400, detail="Invalid user info from Google")
+
+        # Find or create user in database
         existing = await env.DB.prepare(
-            "SELECT id FROM users WHERE email = ?"
-        ).bind(body.email).first()
+            "SELECT id, email, name, picture FROM users WHERE google_id = ?"
+        ).bind(google_id).first()
 
         # Convert JsProxy to dict if needed
         if existing and hasattr(existing, 'to_py'):
             existing = existing.to_py()
 
         if existing:
-            raise HTTPException(status_code=400, detail="Email already registered")
+            user_id = existing["id"]
+            # Update user info if changed
+            await env.DB.prepare(
+                "UPDATE users SET name = ?, picture = ? WHERE id = ?"
+            ).bind(name, picture, user_id).run()
+        else:
+            # Check if email already exists (from old password auth)
+            email_user = await env.DB.prepare(
+                "SELECT id FROM users WHERE email = ?"
+            ).bind(email).first()
+
+            if email_user and hasattr(email_user, 'to_py'):
+                email_user = email_user.to_py()
+
+            if email_user:
+                # Link Google account to existing user
+                user_id = email_user["id"]
+                await env.DB.prepare(
+                    "UPDATE users SET google_id = ?, name = ?, picture = ? WHERE id = ?"
+                ).bind(google_id, name, picture, user_id).run()
+            else:
+                # Create new user
+                result = await env.DB.prepare(
+                    """INSERT INTO users (email, google_id, name, picture, password_hash)
+                       VALUES (?, ?, ?, ?, '') RETURNING id"""
+                ).bind(email, google_id, name, picture).first()
+
+                if hasattr(result, 'to_py'):
+                    result = result.to_py()
+
+                user_id = result["id"]
+
+        # Create JWT token
+        token = create_token(user_id, email, env.JWT_SECRET)
+
+        # Redirect to frontend with token
+        # Frontend will extract token from URL and store it
+        redirect_url = f"{state}?token={token}&user_id={user_id}&email={urllib.parse.quote(email)}"
+        if name:
+            redirect_url += f"&name={urllib.parse.quote(name)}"
+        if picture:
+            redirect_url += f"&picture={urllib.parse.quote(picture)}"
+
+        return RedirectResponse(url=redirect_url)
+
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
-
-    # Create user
-    try:
-        hashed = hash_password(body.password)
-        result = await env.DB.prepare(
-            "INSERT INTO users (email, password_hash) VALUES (?, ?) RETURNING id"
-        ).bind(body.email, hashed).first()
-
-        # Convert JsProxy to dict if needed
-        if hasattr(result, 'to_py'):
-            result = result.to_py()
-
-        user_id = result["id"]
-        token = create_token(user_id, body.email, env.JWT_SECRET)
-
-        return TokenResponse(
-            access_token=token,
-            user_id=user_id,
-            email=body.email
-        )
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to create user: {str(e)}")
-
-
-@router.post("/login")
-async def login(request: Request, body: LoginRequest) -> TokenResponse:
-    """
-    Login with email and password.
-    Returns JWT token on success.
-    """
-    env = request.scope["env"]
-
-    try:
-        user = await env.DB.prepare(
-            "SELECT id, email, password_hash FROM users WHERE email = ?"
-        ).bind(body.email).first()
-
-        # Convert JsProxy to dict if needed
-        if user and hasattr(user, 'to_py'):
-            user = user.to_py()
-
-        if not user:
-            raise HTTPException(status_code=401, detail="Invalid email or password")
-
-        if not verify_password(body.password, user["password_hash"]):
-            raise HTTPException(status_code=401, detail="Invalid email or password")
-
-        token = create_token(user["id"], user["email"], env.JWT_SECRET)
-
-        return TokenResponse(
-            access_token=token,
-            user_id=user["id"],
-            email=user["email"]
-        )
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Login error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"OAuth error: {str(e)}")
 
 
 @router.get("/me")
@@ -222,8 +281,11 @@ async def get_me(
 
     try:
         user = await env.DB.prepare(
-            "SELECT id, email, created_at FROM users WHERE id = ?"
+            "SELECT id, email, name, picture, created_at FROM users WHERE id = ?"
         ).bind(user_id).first()
+
+        if user and hasattr(user, 'to_py'):
+            user = user.to_py()
 
         if not user:
             raise HTTPException(status_code=404, detail="User not found")
@@ -231,6 +293,8 @@ async def get_me(
         return UserResponse(
             id=user["id"],
             email=user["email"],
+            name=user.get("name"),
+            picture=user.get("picture"),
             created_at=str(user["created_at"]) if user["created_at"] else None
         )
     except HTTPException:
@@ -252,8 +316,11 @@ async def refresh_token(
 
     try:
         user = await env.DB.prepare(
-            "SELECT id, email FROM users WHERE id = ?"
+            "SELECT id, email, name, picture FROM users WHERE id = ?"
         ).bind(user_id).first()
+
+        if user and hasattr(user, 'to_py'):
+            user = user.to_py()
 
         if not user:
             raise HTTPException(status_code=404, detail="User not found")
@@ -263,9 +330,21 @@ async def refresh_token(
         return TokenResponse(
             access_token=token,
             user_id=user["id"],
-            email=user["email"]
+            email=user["email"],
+            name=user.get("name"),
+            picture=user.get("picture")
         )
     except HTTPException:
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error refreshing token: {str(e)}")
+
+
+@router.post("/logout")
+async def logout():
+    """
+    Logout endpoint.
+    Client should clear stored token.
+    Returns success message.
+    """
+    return {"status": "logged_out", "message": "Clear token from client storage"}
