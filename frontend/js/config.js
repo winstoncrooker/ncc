@@ -8,7 +8,7 @@ const CONFIG = {
   API_BASE: (() => {
     const hostname = window.location.hostname;
     if (hostname === 'localhost' || hostname === '127.0.0.1') {
-      return 'http://localhost:8787';  // Local pywrangler dev
+      return 'http://localhost:8788';  // Local pywrangler dev
     }
     // Production Worker URL
     return 'https://vinyl-vault-api.christophercrooker.workers.dev';
