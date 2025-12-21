@@ -37,6 +37,9 @@ def get_cache_key(artist: str, album: str) -> str:
 
 async def get_cached_data(env, cache_key: str) -> dict | None:
     """Get cached album data from R2 if it exists"""
+    # Check if R2 is available
+    if not hasattr(env, 'CACHE') or env.CACHE is None:
+        return None
     try:
         obj = await env.CACHE.get(f"data/{cache_key}.json")
         if obj:
@@ -49,6 +52,9 @@ async def get_cached_data(env, cache_key: str) -> dict | None:
 
 async def save_cached_data(env, cache_key: str, data: dict) -> None:
     """Save album data to R2 cache"""
+    # Check if R2 is available
+    if not hasattr(env, 'CACHE') or env.CACHE is None:
+        return
     try:
         await env.CACHE.put(
             f"data/{cache_key}.json",
@@ -60,9 +66,13 @@ async def save_cached_data(env, cache_key: str, data: dict) -> None:
 
 
 async def cache_image(env, url: str, cache_key: str) -> str | None:
-    """Download and cache image in R2, return local path"""
+    """Download and cache image in R2, return local path or original URL"""
     if not url:
         return None
+
+    # If R2 not available, return original URL
+    if not hasattr(env, 'CACHE') or env.CACHE is None:
+        return url
 
     # Determine extension
     ext = "jpg"
@@ -100,7 +110,8 @@ async def cache_image(env, url: str, cache_key: str) -> str | None:
     except Exception:
         pass
 
-    return None
+    # Fallback to original URL
+    return url
 
 
 @router.get("/search")

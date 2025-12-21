@@ -2,6 +2,7 @@ name = "vinyl-vault-api"
 main = "src/main.py"
 compatibility_date = "2025-12-21"
 compatibility_flags = ["python_workers"]
+account_id = "9afe1741eb5cf958177ce6cc0acdf6fd"  # CrookerTech
 
 [vars]
 ENVIRONMENT = "production"
@@ -10,12 +11,12 @@ ENVIRONMENT = "production"
 [[d1_databases]]
 binding = "DB"
 database_name = "vinyl-vault"
-database_id = "PLACEHOLDER"
+database_id = "a0f6124f-ba4c-4d5d-945b-bfba29b5abd9"
 
-# R2 Storage binding
-[[r2_buckets]]
-binding = "CACHE"
-bucket_name = "vinyl-vault-cache"
+# R2 Storage binding (enable R2 in dashboard first, then uncomment)
+# [[r2_buckets]]
+# binding = "CACHE"
+# bucket_name = "vinyl-vault-cache"
 
 # Secrets (set via: wrangler secret put SECRET_NAME)
 # DISCOGS_KEY

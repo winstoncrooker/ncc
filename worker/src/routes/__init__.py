@@ -1,1 +1,1 @@
-from . import discogs, chat, auth, collection
+# Routes package

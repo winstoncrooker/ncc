@@ -4,24 +4,33 @@ JWT Authentication routes
 
 from fastapi import APIRouter, Request, HTTPException, Depends
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel
 import jwt
 import hashlib
+import re
 from datetime import datetime, timedelta
 
 router = APIRouter()
 security = HTTPBearer(auto_error=False)
 
+# Simple email validation regex
+EMAIL_REGEX = re.compile(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$')
+
+
+def validate_email(email: str) -> bool:
+    """Simple email validation"""
+    return bool(EMAIL_REGEX.match(email))
+
 
 class RegisterRequest(BaseModel):
     """User registration request"""
-    email: EmailStr
+    email: str
     password: str
 
 
 class LoginRequest(BaseModel):
     """User login request"""
-    email: EmailStr
+    email: str
     password: str
 
 
@@ -116,6 +125,10 @@ async def register(request: Request, body: RegisterRequest) -> TokenResponse:
     """
     env = request.scope["env"]
 
+    # Validate email
+    if not validate_email(body.email):
+        raise HTTPException(status_code=400, detail="Invalid email address")
+
     # Validate password
     if len(body.password) < 6:
         raise HTTPException(status_code=400, detail="Password must be at least 6 characters")
@@ -125,6 +138,10 @@ async def register(request: Request, body: RegisterRequest) -> TokenResponse:
         existing = await env.DB.prepare(
             "SELECT id FROM users WHERE email = ?"
         ).bind(body.email).first()
+
+        # Convert JsProxy to dict if needed
+        if existing and hasattr(existing, 'to_py'):
+            existing = existing.to_py()
 
         if existing:
             raise HTTPException(status_code=400, detail="Email already registered")
@@ -139,6 +156,10 @@ async def register(request: Request, body: RegisterRequest) -> TokenResponse:
         result = await env.DB.prepare(
             "INSERT INTO users (email, password_hash) VALUES (?, ?) RETURNING id"
         ).bind(body.email, hashed).first()
+
+        # Convert JsProxy to dict if needed
+        if hasattr(result, 'to_py'):
+            result = result.to_py()
 
         user_id = result["id"]
         token = create_token(user_id, body.email, env.JWT_SECRET)
@@ -164,6 +185,10 @@ async def login(request: Request, body: LoginRequest) -> TokenResponse:
         user = await env.DB.prepare(
             "SELECT id, email, password_hash FROM users WHERE email = ?"
         ).bind(body.email).first()
+
+        # Convert JsProxy to dict if needed
+        if user and hasattr(user, 'to_py'):
+            user = user.to_py()
 
         if not user:
             raise HTTPException(status_code=401, detail="Invalid email or password")
