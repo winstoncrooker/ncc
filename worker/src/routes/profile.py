@@ -169,8 +169,8 @@ async def get_showcase(
                 position=row["position"],
                 artist=row["artist"],
                 album=row["album"],
-                cover=row["cover"],
-                year=row["year"]
+                cover=to_python_value(row["cover"]),
+                year=to_python_value(row["year"])
             ))
 
         return albums
@@ -246,8 +246,8 @@ async def add_to_showcase(
             position=next_pos,
             artist=album["artist"],
             album=album["album"],
-            cover=album["cover"],
-            year=album["year"]
+            cover=to_python_value(album["cover"]),
+            year=to_python_value(album["year"])
         )
     except HTTPException:
         raise

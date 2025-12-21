@@ -323,13 +323,15 @@ const Profile = {
     const emptyEl = document.getElementById('showcase-empty');
 
     if (this.showcase.length === 0) {
-      emptyEl.style.display = 'block';
-      grid.innerHTML = '';
-      grid.appendChild(emptyEl);
+      if (emptyEl) {
+        emptyEl.style.display = 'block';
+        grid.innerHTML = '';
+        grid.appendChild(emptyEl);
+      }
       return;
     }
 
-    emptyEl.style.display = 'none';
+    if (emptyEl) emptyEl.style.display = 'none';
 
     grid.innerHTML = this.showcase.map(album => `
       <div class="album-card showcase-item" data-id="${album.id}">
@@ -414,40 +416,55 @@ const Profile = {
       document.getElementById('cropper-title').textContent =
         type === 'profile' ? 'Adjust Profile Picture' : 'Adjust Background Image';
 
-      // Set image source
+      // Get image element
       const cropperImage = document.getElementById('cropper-image');
-      cropperImage.src = e.target.result;
 
-      // Open modal
-      document.getElementById('cropper-modal').classList.add('open');
-      if (type === 'background') {
-        document.getElementById('cropper-modal').classList.add('background-mode');
-      } else {
-        document.getElementById('cropper-modal').classList.remove('background-mode');
+      // Destroy previous cropper if exists
+      if (this.cropper) {
+        this.cropper.destroy();
+        this.cropper = null;
       }
 
-      // Initialize cropper after image loads
-      cropperImage.onload = () => {
-        // Destroy previous cropper if exists
-        if (this.cropper) {
-          this.cropper.destroy();
-        }
+      // Open modal
+      const modal = document.getElementById('cropper-modal');
+      modal.classList.add('open');
+      if (type === 'background') {
+        modal.classList.add('background-mode');
+      } else {
+        modal.classList.remove('background-mode');
+      }
 
-        // Create new cropper with appropriate aspect ratio
-        this.cropper = new Cropper(cropperImage, {
-          aspectRatio: type === 'profile' ? 1 : 16/9,
-          viewMode: 1,
-          dragMode: 'move',
-          autoCropArea: 0.9,
-          restore: false,
-          guides: true,
-          center: true,
-          highlight: false,
-          cropBoxMovable: true,
-          cropBoxResizable: true,
-          toggleDragModeOnDblclick: false,
-        });
+      // Initialize cropper function
+      const initCropper = () => {
+        // Small delay to ensure DOM is ready
+        setTimeout(() => {
+          this.cropper = new Cropper(cropperImage, {
+            aspectRatio: type === 'profile' ? 1 : 16/9,
+            viewMode: 1,
+            dragMode: 'move',
+            autoCropArea: 0.9,
+            restore: false,
+            guides: true,
+            center: true,
+            highlight: false,
+            cropBoxMovable: true,
+            cropBoxResizable: true,
+            toggleDragModeOnDblclick: false,
+          });
+        }, 100);
       };
+
+      // Set up onload before changing src
+      cropperImage.onload = initCropper;
+
+      // Reset src to force reload (add timestamp to prevent caching)
+      cropperImage.src = '';
+      cropperImage.src = e.target.result;
+
+      // Also handle case where image loads synchronously (cached)
+      if (cropperImage.complete && cropperImage.naturalHeight !== 0) {
+        initCropper();
+      }
     };
     reader.readAsDataURL(file);
   },

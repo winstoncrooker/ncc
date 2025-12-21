@@ -7,6 +7,7 @@ from pydantic import BaseModel
 import base64
 import uuid
 from datetime import datetime
+import js
 
 from routes.auth import require_auth
 
@@ -80,10 +81,13 @@ async def upload_image(
         unique_id = str(uuid.uuid4())[:8]
         filename = f"users/{user_id}/{body.type}_{timestamp}_{unique_id}.{ext}"
 
+        # Convert Python bytes to JavaScript Uint8Array for R2
+        js_array = js.Uint8Array.new(list(image_bytes))
+
         # Upload to R2
         await env.CACHE.put(
             filename,
-            image_bytes,
+            js_array,
             httpMetadata={"contentType": content_type}
         )
 

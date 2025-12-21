@@ -11,8 +11,8 @@ from routes.auth import require_auth, get_current_user
 router = APIRouter()
 
 
-def to_python_value(val):
-    """Convert JsNull/undefined to Python None"""
+def to_python_value(val, expected_type=None):
+    """Convert JsNull/undefined to Python None, with optional type coercion"""
     if val is None or (hasattr(val, '__class__') and ('JsNull' in str(type(val)) or 'JsUndefined' in str(type(val)))):
         return None
     return val
@@ -97,11 +97,11 @@ async def get_collection(
                 id=row["id"],
                 artist=row["artist"],
                 album=row["album"],
-                genre=row["genre"],
-                cover=row["cover"],
-                price=row["price"],
-                discogs_id=row["discogs_id"],
-                year=row["year"]
+                genre=to_python_value(row["genre"]),
+                cover=to_python_value(row["cover"]),
+                price=to_python_value(row["price"]),
+                discogs_id=to_python_value(row["discogs_id"]),
+                year=to_python_value(row["year"])
             ))
 
         return albums
@@ -244,15 +244,18 @@ async def update_album(
             "SELECT * FROM collections WHERE id = ?"
         ).bind(album_id).first()
 
+        if updated and hasattr(updated, 'to_py'):
+            updated = updated.to_py()
+
         return Album(
             id=updated["id"],
             artist=updated["artist"],
             album=updated["album"],
-            genre=updated["genre"],
-            cover=updated["cover"],
-            price=updated["price"],
-            discogs_id=updated["discogs_id"],
-            year=updated["year"]
+            genre=to_python_value(updated["genre"]),
+            cover=to_python_value(updated["cover"]),
+            price=to_python_value(updated["price"]),
+            discogs_id=to_python_value(updated["discogs_id"]),
+            year=to_python_value(updated["year"])
         )
     except HTTPException:
         raise
