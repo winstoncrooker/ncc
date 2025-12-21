@@ -1,0 +1,304 @@
+"""
+User profile CRUD routes for Niche Collector Connector
+"""
+
+from fastapi import APIRouter, Request, HTTPException, Depends
+from pydantic import BaseModel
+from typing import Optional
+
+from routes.auth import require_auth
+
+router = APIRouter()
+
+
+class ProfileResponse(BaseModel):
+    """User profile response"""
+    id: int
+    email: str
+    name: Optional[str] = None
+    picture: Optional[str] = None
+    bio: Optional[str] = None
+    pronouns: Optional[str] = None
+    background_image: Optional[str] = None
+    created_at: Optional[str] = None
+
+
+class ProfileUpdate(BaseModel):
+    """Profile update request"""
+    name: Optional[str] = None
+    bio: Optional[str] = None
+    pronouns: Optional[str] = None
+    background_image: Optional[str] = None
+
+
+class ShowcaseAlbum(BaseModel):
+    """Album in showcase"""
+    id: int
+    collection_id: int
+    position: int
+    artist: str
+    album: str
+    cover: Optional[str] = None
+    year: Optional[int] = None
+
+
+class ShowcaseAdd(BaseModel):
+    """Add album to showcase"""
+    collection_id: int
+
+
+class ShowcaseReorder(BaseModel):
+    """Reorder showcase albums"""
+    album_ids: list[int]  # List of showcase album IDs in new order
+
+
+@router.get("/me")
+async def get_profile(
+    request: Request,
+    user_id: int = Depends(require_auth)
+) -> ProfileResponse:
+    """
+    Get current user's profile.
+    Requires authentication.
+    """
+    env = request.scope["env"]
+
+    try:
+        user = await env.DB.prepare(
+            """SELECT id, email, name, picture, bio, pronouns, background_image, created_at
+               FROM users WHERE id = ?"""
+        ).bind(user_id).first()
+
+        if user and hasattr(user, 'to_py'):
+            user = user.to_py()
+
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+
+        return ProfileResponse(
+            id=user["id"],
+            email=user["email"],
+            name=user.get("name"),
+            picture=user.get("picture"),
+            bio=user.get("bio"),
+            pronouns=user.get("pronouns"),
+            background_image=user.get("background_image"),
+            created_at=str(user["created_at"]) if user.get("created_at") else None
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error fetching profile: {str(e)}")
+
+
+@router.put("/me")
+async def update_profile(
+    request: Request,
+    body: ProfileUpdate,
+    user_id: int = Depends(require_auth)
+) -> ProfileResponse:
+    """
+    Update current user's profile.
+    Requires authentication.
+    """
+    env = request.scope["env"]
+
+    try:
+        # Build update query dynamically
+        updates = []
+        values = []
+
+        if body.name is not None:
+            updates.append("name = ?")
+            values.append(body.name)
+        if body.bio is not None:
+            updates.append("bio = ?")
+            values.append(body.bio)
+        if body.pronouns is not None:
+            updates.append("pronouns = ?")
+            values.append(body.pronouns)
+        if body.background_image is not None:
+            updates.append("background_image = ?")
+            values.append(body.background_image)
+
+        if updates:
+            query = f"UPDATE users SET {', '.join(updates)} WHERE id = ?"
+            values.append(user_id)
+            await env.DB.prepare(query).bind(*values).run()
+
+        # Return updated profile
+        return await get_profile(request, user_id)
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error updating profile: {str(e)}")
+
+
+@router.get("/me/showcase")
+async def get_showcase(
+    request: Request,
+    user_id: int = Depends(require_auth)
+) -> list[ShowcaseAlbum]:
+    """
+    Get user's showcase albums.
+    Returns featured albums for profile display.
+    """
+    env = request.scope["env"]
+
+    try:
+        results = await env.DB.prepare(
+            """SELECT s.id, s.collection_id, s.position, c.artist, c.album, c.cover, c.year
+               FROM showcase_albums s
+               JOIN collections c ON s.collection_id = c.id
+               WHERE s.user_id = ?
+               ORDER BY s.position ASC"""
+        ).bind(user_id).all()
+
+        albums = []
+        for row in results.results:
+            albums.append(ShowcaseAlbum(
+                id=row["id"],
+                collection_id=row["collection_id"],
+                position=row["position"],
+                artist=row["artist"],
+                album=row["album"],
+                cover=row["cover"],
+                year=row["year"]
+            ))
+
+        return albums
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error fetching showcase: {str(e)}")
+
+
+@router.post("/me/showcase")
+async def add_to_showcase(
+    request: Request,
+    body: ShowcaseAdd,
+    user_id: int = Depends(require_auth)
+) -> ShowcaseAlbum:
+    """
+    Add album to showcase.
+    Limits showcase to 8 albums max.
+    """
+    env = request.scope["env"]
+
+    try:
+        # Verify album belongs to user
+        album = await env.DB.prepare(
+            "SELECT id, artist, album, cover, year FROM collections WHERE id = ? AND user_id = ?"
+        ).bind(body.collection_id, user_id).first()
+
+        if album and hasattr(album, 'to_py'):
+            album = album.to_py()
+
+        if not album:
+            raise HTTPException(status_code=404, detail="Album not found in your collection")
+
+        # Check showcase limit
+        count = await env.DB.prepare(
+            "SELECT COUNT(*) as count FROM showcase_albums WHERE user_id = ?"
+        ).bind(user_id).first()
+
+        if count and hasattr(count, 'to_py'):
+            count = count.to_py()
+
+        if count and count["count"] >= 8:
+            raise HTTPException(status_code=400, detail="Showcase limit reached (max 8 albums)")
+
+        # Check if already in showcase
+        existing = await env.DB.prepare(
+            "SELECT id FROM showcase_albums WHERE user_id = ? AND collection_id = ?"
+        ).bind(user_id, body.collection_id).first()
+
+        if existing:
+            raise HTTPException(status_code=400, detail="Album already in showcase")
+
+        # Get next position
+        max_pos = await env.DB.prepare(
+            "SELECT COALESCE(MAX(position), -1) as max_pos FROM showcase_albums WHERE user_id = ?"
+        ).bind(user_id).first()
+
+        if max_pos and hasattr(max_pos, 'to_py'):
+            max_pos = max_pos.to_py()
+
+        next_pos = (max_pos["max_pos"] if max_pos else -1) + 1
+
+        # Insert into showcase
+        result = await env.DB.prepare(
+            """INSERT INTO showcase_albums (user_id, collection_id, position)
+               VALUES (?, ?, ?) RETURNING id"""
+        ).bind(user_id, body.collection_id, next_pos).first()
+
+        if result and hasattr(result, 'to_py'):
+            result = result.to_py()
+
+        return ShowcaseAlbum(
+            id=result["id"],
+            collection_id=body.collection_id,
+            position=next_pos,
+            artist=album["artist"],
+            album=album["album"],
+            cover=album["cover"],
+            year=album["year"]
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error adding to showcase: {str(e)}")
+
+
+@router.delete("/me/showcase/{showcase_id}")
+async def remove_from_showcase(
+    request: Request,
+    showcase_id: int,
+    user_id: int = Depends(require_auth)
+) -> dict:
+    """
+    Remove album from showcase.
+    """
+    env = request.scope["env"]
+
+    try:
+        # Verify ownership
+        existing = await env.DB.prepare(
+            "SELECT id FROM showcase_albums WHERE id = ? AND user_id = ?"
+        ).bind(showcase_id, user_id).first()
+
+        if not existing:
+            raise HTTPException(status_code=404, detail="Showcase album not found")
+
+        await env.DB.prepare(
+            "DELETE FROM showcase_albums WHERE id = ? AND user_id = ?"
+        ).bind(showcase_id, user_id).run()
+
+        return {"status": "removed", "id": showcase_id}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error removing from showcase: {str(e)}")
+
+
+@router.put("/me/showcase/reorder")
+async def reorder_showcase(
+    request: Request,
+    body: ShowcaseReorder,
+    user_id: int = Depends(require_auth)
+) -> list[ShowcaseAlbum]:
+    """
+    Reorder showcase albums.
+    Pass list of showcase album IDs in desired order.
+    """
+    env = request.scope["env"]
+
+    try:
+        # Update positions based on order in list
+        for position, showcase_id in enumerate(body.album_ids):
+            await env.DB.prepare(
+                "UPDATE showcase_albums SET position = ? WHERE id = ? AND user_id = ?"
+            ).bind(position, showcase_id, user_id).run()
+
+        # Return updated showcase
+        return await get_showcase(request, user_id)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error reordering showcase: {str(e)}")

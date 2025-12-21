@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Vinyl Vault is a vinyl record collection website. It displays Winston's record collection with browsing by genre, album details, collection statistics, and user collection management features with AI-powered recommendations.
+Niche Collector Connector is a profile-based social platform for vinyl collectors. Users sign in with Google, create their profile, build their vinyl collection, and showcase their favorite records. The AI assistant helps with profile creation and collection management.
 
 ## Architecture
 
@@ -26,21 +26,16 @@ Pure vanilla HTML/CSS/JavaScript in `frontend/` directory. No build system requi
 ```
 Website/
 ├── frontend/                    # Static frontend files
-│   ├── index.html              # Homepage with album carousel
-│   ├── genre.html              # Genre listing with search/filter
-│   ├── album.html              # Individual album details
-│   ├── stats.html              # Collection statistics
-│   ├── mycollection.html       # User collection management
-│   ├── record.js               # Album data store (112 records)
-│   ├── utils.js                # Shared utility functions
+│   ├── index.html              # Login page (Google Sign-In)
+│   ├── profile.html            # Main profile page with showcase
 │   ├── style.css               # Global styles
-│   ├── components/
-│   │   └── nav.js              # Shared navigation
 │   ├── js/
 │   │   ├── config.js           # API configuration
-│   │   └── auth.js             # Google OAuth authentication
+│   │   ├── auth.js             # Google OAuth authentication
+│   │   └── profile.js          # Profile page logic
 │   ├── css/
-│   │   └── auth.css            # Auth UI styles
+│   │   ├── auth.css            # Auth UI styles
+│   │   └── profile.css         # Profile page styles
 │   ├── manifest.json           # PWA manifest
 │   └── sw.js                   # Service worker (offline support)
 │
@@ -49,22 +44,24 @@ Website/
 │   │   ├── main.py             # FastAPI entry point
 │   │   └── routes/
 │   │       ├── auth.py         # Google OAuth2 authentication
+│   │       ├── profile.py      # User profile CRUD + showcase
 │   │       ├── collection.py   # User collection CRUD
 │   │       ├── discogs.py      # Discogs proxy + R2 caching
-│   │       └── chat.py         # Together.ai proxy
+│   │       └── chat.py         # Together.ai AI proxy
 │   ├── wrangler.toml           # Worker config (D1, R2 bindings)
 │   └── pyproject.toml          # Python dependencies
 │
 ├── migrations/                  # D1 database migrations
 │   ├── 0001_initial.sql        # Users and collections tables
-│   └── 0002_google_oauth.sql   # Google OAuth columns
+│   ├── 0002_google_oauth.sql   # Google OAuth columns
+│   └── 0003_profile_fields.sql # Profile fields and showcase table
 │
 ├── tools/                       # Setup automation tools
 │   ├── gcp-init/               # GCP project setup
 │   └── oauth-setup/            # OAuth credential configuration
 │
 ├── CLAUDE.md                    # This file
-├── IMPLEMENTATION_PLAN.md       # Implementation roadmap (complete)
+├── IMPLEMENTATION_PLAN.md       # Implementation roadmap
 └── REFACTOR.md                  # Migration notes
 ```
 
@@ -77,6 +74,16 @@ GET  /api/auth/google/callback  # OAuth callback (internal)
 GET  /api/auth/me               # Get current user (requires auth)
 POST /api/auth/refresh          # Refresh JWT token
 POST /api/auth/logout           # Logout
+```
+
+### User Profile (requires auth)
+```
+GET    /api/profile/me                 # Get user profile
+PUT    /api/profile/me                 # Update profile (bio, pronouns, etc.)
+GET    /api/profile/me/showcase        # Get showcase albums
+POST   /api/profile/me/showcase        # Add album to showcase
+DELETE /api/profile/me/showcase/{id}   # Remove from showcase
+PUT    /api/profile/me/showcase/reorder # Reorder showcase albums
 ```
 
 ### User Collection (requires auth)
@@ -94,16 +101,13 @@ GET    /api/collection/stats    # Get collection statistics
 GET  /api/discogs/cache/check   # Check if album is cached
 POST /api/discogs/cache/store   # Store album data + image
 GET  /api/discogs/cache/{path}  # Serve cached images
-GET  /api/discogs/search        # Search (may be blocked by Cloudflare)
-GET  /api/discogs/price/{id}    # Get price (may be blocked)
 ```
 
-**Note**: Direct Worker→Discogs requests are blocked by Cloudflare. Client-side Discogs calls with cache-first pattern are used instead.
+**Note**: Direct Worker→Discogs requests are blocked by Cloudflare. Client-side Discogs calls are used instead.
 
 ### AI Chat
 ```
 POST /api/chat                  # Send message to AI
-POST /api/chat/stream           # Streaming response
 ```
 
 ## Development
@@ -114,6 +118,12 @@ cd worker
 uv run pywrangler dev
 ```
 
+### Frontend Server
+```bash
+cd frontend
+python3 -m http.server 8000
+```
+
 ### Deploy Worker
 ```bash
 cd worker
@@ -122,9 +132,13 @@ uv run pywrangler deploy
 
 ### Database Migrations
 ```bash
-# Run migration
+# Run migration locally
+cd worker
+npx wrangler d1 execute vinyl-vault --local --file=../migrations/0003_profile_fields.sql
+
+# Run migration on production
 CLOUDFLARE_ACCOUNT_ID=9afe1741eb5cf958177ce6cc0acdf6fd \
-  wrangler d1 execute vinyl-vault --file=migrations/0002_google_oauth.sql --remote
+  wrangler d1 execute vinyl-vault --file=migrations/0003_profile_fields.sql --remote
 ```
 
 ### Set Secrets
@@ -138,52 +152,41 @@ wrangler secret put DISCOGS_SECRET
 wrangler secret put TOGETHER_API_KEY
 ```
 
-## Core Data Files
-
-### record.js
-Central data store containing all album records as a `records` array. Each record has:
-- `id` - lowercase hyphen-separated slug
-- `artist`, `album`, `genre`
-- `cover` - album art URL
-- `tracks` - array of track names
-- `fun` - fun fact string
-- `price` - number or null
-
-### Genres
-rock, blues, metal, pop, jazz, soul, funk, country, hiphop, folk, classical, experimental, comedy
-
 ## Authentication Flow
 
-1. User clicks "Sign in with Google" button
-2. Frontend redirects to `/api/auth/google`
-3. Worker redirects to Google OAuth consent screen
-4. After consent, Google redirects to `/api/auth/google/callback`
-5. Worker exchanges code for tokens, creates/updates user in D1
-6. Worker redirects to frontend with JWT token in URL params
-7. Frontend extracts token, stores in localStorage, clears URL
+1. User visits index.html, sees login prompt
+2. User clicks "Sign in with Google" button
+3. Frontend redirects to `/api/auth/google`
+4. Worker redirects to Google OAuth consent screen
+5. After consent, Google redirects to `/api/auth/google/callback`
+6. Worker exchanges code for tokens, creates/updates user in D1
+7. Worker redirects to `/profile.html` with JWT token in URL params
+8. Frontend extracts token, stores in localStorage, clears URL
+9. Profile page loads user data and renders
+
+## Database Schema
+
+### Users Table
+- `id`, `email`, `password_hash` (legacy), `google_id`
+- `name`, `picture` (from Google)
+- `bio`, `pronouns`, `background_image` (profile fields)
+- `created_at`
+
+### Collections Table
+- `id`, `user_id`, `artist`, `album`
+- `genre`, `cover`, `price`, `discogs_id`, `year`
+- `created_at`, `updated_at`
+
+### Showcase Albums Table
+- `id`, `user_id`, `collection_id`, `position`
+- `created_at`
 
 ## Styling Conventions
 
 - Primary accent: `#1db954` (Spotify green)
 - Background: `#0e0e0e`, cards: `#1a1a1a`
 - Fonts: Orbitron (headings), Montserrat (body)
-- Mobile breakpoint: 800px
-
-## Adding New Records
-
-Add entries to `frontend/record.js`:
-```javascript
-{
-  id: "artist-album-slug",
-  artist: "Artist Name",
-  album: "Album Name",
-  genre: "rock",
-  cover: "https://...",
-  tracks: ["Track 1", "Track 2"],
-  fun: "Fun fact about the album",
-  price: 25.00
-}
-```
+- Mobile breakpoint: 768px
 
 ## Cloudflare Resources
 
@@ -205,12 +208,21 @@ Add entries to `frontend/record.js`:
 
 ## Features
 
-### Collection Management (mycollection.html)
-- **Upload**: PDF or TXT file with "Artist - Album" format
-- **Export**: JSON (full data) or CSV (simplified)
-- **Import**: JSON files with duplicate detection
-- **AI Chat**: Add/remove albums via natural language
-- **Discogs Integration**: Auto-fetch covers and prices
+### Profile Page
+- **Profile Card**: Picture, name, pronouns, bio
+- **Showcase**: Up to 8 featured albums from collection
+- **Collection Grid**: All albums in user's collection
+- **Edit Mode**: Update profile info via modal
+
+### AI Assistant Sidebar
+- Draggable sidebar with chat interface
+- Helps write bios, add records, get recommendations
+- Uses Llama-3.3-70B via Together.ai
+
+### Collection Management
+- Manual entry: Artist, album, year, cover URL
+- Discogs search: Find and add albums from Discogs
+- AI-powered: Add/remove via natural language
 
 ### PWA Support
 - **Service Worker**: Offline caching with stale-while-revalidate
@@ -221,3 +233,4 @@ Add entries to `frontend/record.js`:
 - **XSS Protection**: DOMPurify for AI response sanitization
 - **API Proxying**: Together.ai calls go through Worker (no exposed key)
 - **OAuth2**: Google Sign-In (test users only until app is published)
+- **Auth Required**: All pages require login (no public browsing)

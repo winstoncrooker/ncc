@@ -1,22 +1,19 @@
 /**
- * Vinyl Vault Service Worker
+ * Niche Collector Connector Service Worker
  * Enables offline support and caching
  */
 
-const CACHE_NAME = 'vinyl-vault-v1';
+const CACHE_NAME = 'niche-collector-v1';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
-  '/mycollection.html',
-  '/genre.html',
-  '/album.html',
-  '/stats.html',
+  '/profile.html',
   '/style.css',
-  '/record.js',
-  '/utils.js',
   '/js/config.js',
   '/js/auth.js',
-  '/css/auth.css'
+  '/js/profile.js',
+  '/css/auth.css',
+  '/css/profile.css'
 ];
 
 // External resources to cache
@@ -103,7 +100,7 @@ self.addEventListener('fetch', (event) => {
       }).catch(() => {
         // Offline fallback for HTML pages
         if (event.request.headers.get('accept')?.includes('text/html')) {
-          return caches.match('/mycollection.html');
+          return caches.match('/profile.html');
         }
       });
     })

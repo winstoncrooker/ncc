@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>My Profile - Niche Collector Connector</title>
+  <link rel="manifest" href="/manifest.json">
+  <meta name="theme-color" content="#1db954">
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700&family=Montserrat:wght@300;400;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="css/auth.css">
+  <link rel="stylesheet" href="css/profile.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.0.6/purify.min.js"></script>
+</head>
+<body>
+  <!-- Header -->
+  <header class="profile-header">
+    <div class="header-content">
+      <a href="/" class="site-logo">
+        <span class="logo-icon">🎵</span>
+        <span class="logo-text">NCC</span>
+      </a>
+      <div id="user-menu" class="user-menu"></div>
+    </div>
+  </header>
+
+  <!-- Main Profile Content -->
+  <main class="profile-main">
+    <!-- Profile Hero Section -->
+    <section class="profile-hero">
+      <!-- Background Image -->
+      <div class="hero-background" id="hero-background">
+        <button class="change-bg-btn" id="change-bg-btn" title="Change background">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+            <circle cx="12" cy="13" r="4"/>
+          </svg>
+        </button>
+      </div>
+
+      <!-- Profile Card -->
+      <div class="profile-card">
+        <div class="profile-left">
+          <!-- Profile Picture -->
+          <div class="profile-picture-wrapper">
+            <img src="" alt="Profile" class="profile-picture" id="profile-picture">
+            <button class="upload-photo-btn" id="upload-photo-btn" title="Upload photo">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="12" y1="5" x2="12" y2="19"></line>
+                <line x1="5" y1="12" x2="19" y2="12"></line>
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        <div class="profile-right">
+          <div class="profile-name-row">
+            <h1 class="profile-name" id="profile-name">Loading...</h1>
+            <span class="profile-pronouns" id="profile-pronouns"></span>
+          </div>
+          <p class="profile-bio" id="profile-bio"></p>
+          <button class="edit-profile-btn" id="edit-profile-btn">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+              <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+            </svg>
+            Edit Profile
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Showcase Section -->
+    <section class="showcase-section">
+      <div class="section-header">
+        <h2>
+          <span class="section-icon">✨</span>
+          My Showcase
+        </h2>
+        <button class="add-btn" id="add-to-showcase-btn">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="12" y1="5" x2="12" y2="19"></line>
+            <line x1="5" y1="12" x2="19" y2="12"></line>
+          </svg>
+          Add Record
+        </button>
+      </div>
+      <div class="showcase-grid" id="showcase-grid">
+        <div class="showcase-empty" id="showcase-empty">
+          <div class="empty-icon">📀</div>
+          <p>No records in your showcase yet</p>
+          <span>Feature your favorite albums here!</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Collection Section -->
+    <section class="collection-section">
+      <div class="section-header">
+        <h2>
+          <span class="section-icon">📚</span>
+          My Collection
+          <span class="collection-count" id="collection-count">0</span>
+        </h2>
+        <button class="add-btn" id="add-record-btn">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="12" y1="5" x2="12" y2="19"></line>
+            <line x1="5" y1="12" x2="19" y2="12"></line>
+          </svg>
+          Add Record
+        </button>
+      </div>
+      <div class="collection-grid" id="collection-grid">
+        <div class="collection-empty" id="collection-empty">
+          <div class="empty-icon">🎵</div>
+          <p>Your collection is empty</p>
+          <span>Start adding your vinyl records!</span>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- AI Assistant Toggle -->
+  <button class="ai-toggle-btn" id="ai-toggle-btn" title="AI Assistant">
+    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+    </svg>
+  </button>
+
+  <!-- AI Sidebar -->
+  <aside class="ai-sidebar" id="ai-sidebar">
+    <div class="ai-header">
+      <div class="ai-title">
+        <span class="ai-icon">🤖</span>
+        <h3>AI Assistant</h3>
+      </div>
+      <button class="ai-close" id="ai-close-btn">&times;</button>
+    </div>
+    <div class="ai-chat" id="ai-chat-container">
+      <div class="ai-welcome">
+        <div class="welcome-icon">👋</div>
+        <h4>Hey there!</h4>
+        <p>I can help you with:</p>
+        <ul>
+          <li>Writing your bio</li>
+          <li>Adding records to your collection</li>
+          <li>Finding albums on Discogs</li>
+          <li>Choosing what to showcase</li>
+        </ul>
+      </div>
+    </div>
+    <form class="ai-form" id="ai-input-form">
+      <input type="text" id="ai-input" placeholder="Type a message..." autocomplete="off">
+      <button type="submit" id="ai-send-btn">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="22" y1="2" x2="11" y2="13"></line>
+          <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+        </svg>
+      </button>
+    </form>
+  </aside>
+
+  <!-- Overlay for sidebar -->
+  <div class="sidebar-overlay" id="sidebar-overlay"></div>
+
+  <!-- Edit Profile Modal -->
+  <div class="modal" id="edit-profile-modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3>Edit Profile</h3>
+        <button class="modal-close" id="edit-profile-close">&times;</button>
+      </div>
+      <form id="edit-profile-form">
+        <div class="form-group">
+          <label for="edit-name">Display Name</label>
+          <input type="text" id="edit-name" maxlength="100" placeholder="Your name">
+        </div>
+        <div class="form-group">
+          <label for="edit-pronouns">Pronouns</label>
+          <input type="text" id="edit-pronouns" placeholder="e.g., they/them, she/her, he/him" maxlength="50">
+        </div>
+        <div class="form-group">
+          <label for="edit-bio">Bio</label>
+          <textarea id="edit-bio" rows="4" maxlength="500" placeholder="Tell us about yourself and your vinyl journey..."></textarea>
+          <span class="char-count"><span id="bio-char-count">0</span>/500</span>
+        </div>
+        <div class="form-actions">
+          <button type="button" class="btn-cancel" id="edit-profile-cancel">Cancel</button>
+          <button type="submit" class="btn-save">Save Changes</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Add Record Modal -->
+  <div class="modal" id="add-record-modal">
+    <div class="modal-content modal-lg">
+      <div class="modal-header">
+        <h3>Add Record</h3>
+        <button class="modal-close" id="add-record-close">&times;</button>
+      </div>
+      <div class="modal-tabs">
+        <button class="tab-btn active" data-tab="manual">Manual Entry</button>
+        <button class="tab-btn" data-tab="search">Search Discogs</button>
+      </div>
+      <div class="tab-content active" id="tab-manual">
+        <form id="manual-add-form">
+          <div class="form-row">
+            <div class="form-group">
+              <label for="manual-artist">Artist *</label>
+              <input type="text" id="manual-artist" required placeholder="Artist name">
+            </div>
+            <div class="form-group">
+              <label for="manual-album">Album *</label>
+              <input type="text" id="manual-album" required placeholder="Album title">
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label for="manual-year">Year</label>
+              <input type="number" id="manual-year" min="1900" max="2030" placeholder="Release year">
+            </div>
+            <div class="form-group">
+              <label for="manual-cover">Cover Image URL</label>
+              <input type="url" id="manual-cover" placeholder="https://...">
+            </div>
+          </div>
+          <div class="form-actions">
+            <button type="button" class="btn-cancel" id="manual-add-cancel">Cancel</button>
+            <button type="submit" class="btn-save">Add to Collection</button>
+          </div>
+        </form>
+      </div>
+      <div class="tab-content" id="tab-search">
+        <form id="discogs-search-form" class="search-form">
+          <input type="text" id="discogs-query" placeholder="Search for artist or album...">
+          <button type="submit" class="btn-search">Search</button>
+        </form>
+        <div class="search-results" id="search-results"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Showcase Modal -->
+  <div class="modal" id="showcase-modal">
+    <div class="modal-content modal-lg">
+      <div class="modal-header">
+        <h3>Add to Showcase</h3>
+        <button class="modal-close" id="showcase-modal-close">&times;</button>
+      </div>
+      <p class="modal-subtitle">Select a record to feature on your profile</p>
+      <div class="showcase-select-grid" id="showcase-select-grid"></div>
+    </div>
+  </div>
+
+  <!-- Hidden file input for photo upload -->
+  <input type="file" id="photo-upload-input" accept="image/*" style="display:none">
+  <input type="file" id="bg-upload-input" accept="image/*" style="display:none">
+
+  <script src="js/config.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/profile.js"></script>
+
+  <script>
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/sw.js').catch(err => console.log('SW error:', err));
+    }
+  </script>
+</body>
+</html>

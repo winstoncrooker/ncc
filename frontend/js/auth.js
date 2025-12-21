@@ -1,12 +1,12 @@
 /**
- * Vinyl Vault Authentication Module
+ * Niche Collector Connector Authentication Module
  * Google OAuth2 authentication handling
  */
 
 const Auth = {
   // Storage keys
-  TOKEN_KEY: 'vinyl_vault_token',
-  USER_KEY: 'vinyl_vault_user',
+  TOKEN_KEY: 'ncc_token',
+  USER_KEY: 'ncc_user',
 
   /**
    * Initialize auth - check URL for OAuth callback params
@@ -65,11 +65,13 @@ const Auth = {
 
   /**
    * Redirect to Google OAuth login
-   * @param {string} redirectTo - Where to redirect after login
+   * @param {string} redirectTo - Where to redirect after login (path like '/profile.html')
    */
   login(redirectTo = window.location.pathname) {
     const apiBase = typeof CONFIG !== 'undefined' ? CONFIG.API_BASE : '';
-    window.location.href = `${apiBase}/api/auth/google?redirect_to=${encodeURIComponent(redirectTo)}`;
+    // Use full URL so OAuth redirects back to frontend, not the API server
+    const fullRedirectUrl = window.location.origin + redirectTo;
+    window.location.href = `${apiBase}/api/auth/google?redirect_to=${encodeURIComponent(fullRedirectUrl)}`;
   },
 
   /**

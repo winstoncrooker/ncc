@@ -8,13 +8,13 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 import asgi
 
-from routes import discogs, chat, auth, collection
+from routes import discogs, chat, auth, collection, profile
 
 # Create FastAPI app
 app = FastAPI(
-    title="Vinyl Vault API",
-    version="2.0.0",
-    description="API for managing vinyl record collections"
+    title="Niche Collector Connector API",
+    version="3.0.0",
+    description="API for vinyl collector profiles and collections"
 )
 
 # CORS middleware for frontend access
@@ -22,8 +22,8 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],  # Configure for production
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
+    allow_headers=["Authorization", "Content-Type", "Accept", "Origin", "X-Requested-With"],
 )
 
 # Include routers
@@ -31,12 +31,13 @@ app.include_router(discogs.router, prefix="/api/discogs", tags=["discogs"])
 app.include_router(chat.router, prefix="/api/chat", tags=["chat"])
 app.include_router(auth.router, prefix="/api/auth", tags=["auth"])
 app.include_router(collection.router, prefix="/api/collection", tags=["collection"])
+app.include_router(profile.router, prefix="/api/profile", tags=["profile"])
 
 
 @app.get("/api/health")
 async def health_check():
     """Health check endpoint"""
-    return {"status": "ok", "service": "vinyl-vault-api", "version": "2.0.0"}
+    return {"status": "ok", "service": "niche-collector-api", "version": "3.0.0"}
 
 
 @app.get("/api/cache/stats")

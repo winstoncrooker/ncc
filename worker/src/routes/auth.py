@@ -31,11 +31,14 @@ class TokenResponse(BaseModel):
 
 
 class UserResponse(BaseModel):
-    """Current user info"""
+    """Current user info with profile fields"""
     id: int
     email: str
     name: str | None = None
     picture: str | None = None
+    bio: str | None = None
+    pronouns: str | None = None
+    background_image: str | None = None
     created_at: str | None = None
 
 
@@ -281,7 +284,8 @@ async def get_me(
 
     try:
         user = await env.DB.prepare(
-            "SELECT id, email, name, picture, created_at FROM users WHERE id = ?"
+            """SELECT id, email, name, picture, bio, pronouns, background_image, created_at
+               FROM users WHERE id = ?"""
         ).bind(user_id).first()
 
         if user and hasattr(user, 'to_py'):
@@ -295,7 +299,10 @@ async def get_me(
             email=user["email"],
             name=user.get("name"),
             picture=user.get("picture"),
-            created_at=str(user["created_at"]) if user["created_at"] else None
+            bio=user.get("bio"),
+            pronouns=user.get("pronouns"),
+            background_image=user.get("background_image"),
+            created_at=str(user["created_at"]) if user.get("created_at") else None
         )
     except HTTPException:
         raise

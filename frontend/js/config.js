@@ -1,5 +1,5 @@
 /**
- * Vinyl Vault Configuration
+ * Niche Collector Connector Configuration
  * API endpoints and settings
  */
 
@@ -19,8 +19,8 @@ const CONFIG = {
   DISCOGS_SECRET: 'GnnPcnLGovdJLMfMyEpaSRoXOsRqojBr',
 
   // Auth token storage key
-  AUTH_TOKEN_KEY: 'vinyl_vault_token',
-  AUTH_USER_KEY: 'vinyl_vault_user',
+  AUTH_TOKEN_KEY: 'ncc_token',
+  AUTH_USER_KEY: 'ncc_user',
 
   // Local storage keys
   COLLECTION_KEY: 'userCollection',

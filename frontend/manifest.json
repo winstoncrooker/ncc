@@ -1,8 +1,8 @@
 {
-  "name": "Vinyl Vault",
-  "short_name": "Vinyl Vault",
-  "description": "Track and manage your vinyl record collection",
-  "start_url": "/mycollection.html",
+  "name": "Niche Collector Connector",
+  "short_name": "NCC",
+  "description": "Connect with fellow vinyl collectors and showcase your collection",
+  "start_url": "/profile.html",
   "display": "standalone",
   "background_color": "#0e0e0e",
   "theme_color": "#1db954",
