@@ -18,72 +18,43 @@ The project has been migrated to Cloudflare Workers:
 
 ## Remaining Implementation Tasks
 
-### Phase 1: Google OAuth2 Authentication (Primary Auth)
+### Phase 1: Google OAuth2 Authentication ✅ COMPLETE
 
-**Goal**: Replace email/password JWT auth with Google OAuth2 as sole authentication mechanism.
+**Status**: Fully implemented and tested.
 
-#### 1.1 Google Cloud Console Setup (MANUAL STEPS)
+- ✅ GCP Project: `vinyl-vault-0204`
+- ✅ OAuth consent screen configured
+- ✅ OAuth 2.0 Client ID created
+- ✅ Worker secrets set: `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`
+- ✅ Backend routes: `/auth/google`, `/auth/google/callback`, `/auth/me`, `/auth/refresh`, `/auth/logout`
+- ✅ Frontend: `js/auth.js` with login button and user profile
+- ✅ Database: `google_id`, `name`, `picture` columns added to users table
+- ✅ Local dev working on localhost:8788
 
-1. Go to [Google Cloud Console](https://console.cloud.google.com/)
-2. Create or select a project (e.g., "Vinyl Vault")
-3. Navigate to **APIs & Services > Credentials**
-4. Click **Create Credentials > OAuth 2.0 Client ID**
-5. Configure OAuth consent screen:
-   - User Type: External
-   - App name: "Vinyl Vault"
-   - User support email: your email
-   - Developer contact: your email
-6. Create OAuth 2.0 Client ID:
-   - Application type: **Web application**
-   - Name: "Vinyl Vault Web"
-   - Authorized JavaScript origins:
-     - `http://localhost:8787` (dev)
-     - `https://vinyl-vault.pages.dev` (prod)
-     - Your custom domain if applicable
-   - Authorized redirect URIs:
-     - `http://localhost:8787/api/auth/google/callback`
-     - `https://vinyl-vault-api.christophercrooker.workers.dev/api/auth/google/callback`
-7. Copy **Client ID** and **Client Secret**
-8. Set secrets in Cloudflare Worker:
-   ```bash
-   cd worker
-   wrangler secret put GOOGLE_CLIENT_ID
-   wrangler secret put GOOGLE_CLIENT_SECRET
-   ```
-
-#### 1.2 Backend: Google OAuth Routes
-
-Update `worker/src/routes/auth.py`:
-- Remove email/password registration
-- Add `/auth/google` - Redirect to Google OAuth
-- Add `/auth/google/callback` - Handle OAuth callback
-- Keep `/auth/me` and `/auth/refresh` for session management
-
-#### 1.3 Frontend: Google Sign-In
-
-- Add Google Sign-In button to UI
-- Remove email/password forms
-- Handle OAuth redirect flow
-- Store JWT token from callback
-
-#### 1.4 Database Schema Update
-
-- Remove `password_hash` from users table (optional, can keep for backwards compat)
-- Add `google_id` column for linking Google accounts
+**Files modified:**
+- `worker/src/routes/auth.py` - Google OAuth flow
+- `frontend/js/auth.js` - Auth state management
+- `frontend/css/auth.css` - Auth UI styles
+- `frontend/mycollection.html` - Integrated auth UI
+- `migrations/0002_google_oauth.sql` - Schema update
+- `tools/gcp-init/` - GCP setup automation
+- `tools/oauth-setup/` - OAuth configuration tool
 
 ---
 
-### Phase 2: Security Improvements
+### Phase 2: Security Improvements ✅ COMPLETE
 
-#### 2.1 XSS Sanitization for AI Responses
-- Add DOMPurify library
-- Sanitize all AI-generated content before rendering
-- Sanitize user input display
+#### 2.1 XSS Sanitization ✅
+- Added DOMPurify library (CDN)
+- All AI chat responses sanitized before rendering
+- Using `textContent` with DOMPurify for safety
 
-#### 2.2 Remove Exposed API Keys
-- Discogs credentials already moved to Worker secrets
-- Together.ai key already proxied through Worker
-- Remove any remaining client-side keys
+#### 2.2 API Key Security ✅
+- **Together.ai key**: Removed from frontend, proxied through Worker `/api/chat/`
+- **Discogs keys**: Kept client-side (intentionally)
+  - Cloudflare Workers blocked by Discogs (403)
+  - Keys are low-risk: read-only, rate-limited
+  - Alternative: Use a non-Cloudflare proxy server
 
 ---
 
@@ -210,13 +181,13 @@ Website/
 
 | Secret | Purpose | Status |
 |--------|---------|--------|
-| `DISCOGS_KEY` | Discogs API | Set |
-| `DISCOGS_SECRET` | Discogs API | Set |
-| `TOGETHER_API_KEY` | AI chat | Set |
-| `JWT_SECRET` | Token signing | Set |
-| `GOOGLE_CLIENT_ID` | OAuth2 | **TO SET** |
-| `GOOGLE_CLIENT_SECRET` | OAuth2 | **TO SET** |
+| `DISCOGS_KEY` | Discogs API | ✅ Set |
+| `DISCOGS_SECRET` | Discogs API | ✅ Set |
+| `TOGETHER_API_KEY` | AI chat | ✅ Set |
+| `JWT_SECRET` | Token signing | ✅ Set |
+| `GOOGLE_CLIENT_ID` | OAuth2 | ✅ Set |
+| `GOOGLE_CLIENT_SECRET` | OAuth2 | ✅ Set |
 
 ---
 
-**Next Step**: Set up Google OAuth2 credentials in Google Cloud Console.
+**Next Step**: Phase 2 - Security Improvements (XSS sanitization).

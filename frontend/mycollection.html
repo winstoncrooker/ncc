@@ -624,24 +624,8 @@
         <button class="chat-toggle" id="chatToggle">▼</button>
       </div>
       <div class="chat-body" id="chatBody">
-        <!-- API Key Setup (shown if no key) -->
-        <div class="api-key-setup" id="apiKeySetup">
-          <p>Enter your Together.ai API key to enable AI features</p>
-          <input
-            type="password"
-            class="api-key-input"
-            id="apiKeyInput"
-            placeholder="Enter Together.ai API key..."
-          />
-          <br>
-          <button class="api-key-btn" onclick="saveApiKey()">Save API Key</button>
-          <p style="margin-top: 15px; font-size: 0.8rem;">
-            <a href="https://api.together.ai" target="_blank" style="color: #1db954;">Get a free API key from Together.ai →</a>
-          </p>
-        </div>
-
-        <!-- Chat Interface (shown after key is set) -->
-        <div id="chatInterface" style="display: none;">
+        <!-- Chat Interface -->
+        <div id="chatInterface">
           <div class="chat-messages" id="chatMessages">
             <div class="chat-message assistant">
               Hi! I'm your vinyl collection assistant powered by Apriel. Ask me anything about your collection, or tell me about albums you want to add!
@@ -665,6 +649,7 @@
   <footer>© 2025 Vinyl Vault - My Collection (Alpha)</footer>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.0.6/purify.min.js"></script>
   <script src="js/config.js"></script>
   <script src="js/auth.js"></script>
   <script>
@@ -1221,18 +1206,14 @@
     }
 
     // ============================================
-    // AI Chat Assistant Functions (Together.ai)
+    // AI Chat Assistant Functions (via Worker API)
     // ============================================
 
-    const TOGETHER_API_URL = 'https://api.together.xyz/v1/chat/completions';
-    const CHAT_MODEL = 'meta-llama/Llama-3.3-70B-Instruct-Turbo';
-    const TOGETHER_API_KEY = 'cd6f547c5977a88af60b786907b065bfb293faab06dc78d35c50fe230f249161';
     let chatHistory = [];
 
     // Initialize chat on page load
     function initChat() {
-      // API key is pre-configured, show chat interface directly
-      document.getElementById('apiKeySetup').style.display = 'none';
+      // Chat is ready - Worker handles API key
       document.getElementById('chatInterface').style.display = 'block';
     }
 
@@ -1244,25 +1225,14 @@
       chatToggle.classList.toggle('collapsed');
     }
 
-    // Save API key
-    function saveApiKey() {
-      const apiKey = document.getElementById('apiKeyInput').value.trim();
-      if (!apiKey) {
-        alert('Please enter a valid API key');
-        return;
-      }
-      localStorage.setItem('togetherApiKey', apiKey);
-      document.getElementById('apiKeySetup').style.display = 'none';
-      document.getElementById('chatInterface').style.display = 'block';
-      addMessage('API key saved! How can I help you with your collection?', 'assistant');
-    }
 
-    // Add message to chat
+    // Add message to chat (with XSS sanitization)
     function addMessage(text, role) {
       const messagesDiv = document.getElementById('chatMessages');
       const messageDiv = document.createElement('div');
       messageDiv.className = `chat-message ${role}`;
-      messageDiv.textContent = text;
+      // Sanitize text to prevent XSS attacks
+      messageDiv.textContent = typeof DOMPurify !== 'undefined' ? DOMPurify.sanitize(text, {ALLOWED_TAGS: []}) : text;
       messagesDiv.appendChild(messageDiv);
       messagesDiv.scrollTop = messagesDiv.scrollHeight;
     }
@@ -1284,67 +1254,6 @@
       if (typing) typing.remove();
     }
 
-    // Build system prompt with collection context
-    function buildSystemPrompt() {
-      let collectionContext = '';
-
-      if (userCollection.length > 0) {
-        collectionContext = `\n\nThe user's vinyl collection currently contains ${userCollection.length} albums:\n`;
-        userCollection.forEach((item, i) => {
-          collectionContext += `${i + 1}. ${item.artist} - ${item.album}\n`;
-        });
-      } else {
-        collectionContext = '\n\nThe user has not uploaded any albums to their collection yet.';
-      }
-
-      return `You are a helpful vinyl record collection assistant for "Vinyl Vault". You help users manage their record collections.
-
-CRITICAL RULES:
-- Keep responses SHORT and friendly (1-3 sentences max)
-- NEVER guess or assume album/artist names you're unsure about
-- If ANY part of a request is unclear, ASK FOR CLARIFICATION before acting
-
-ADDING ALBUMS - ONLY when user explicitly asks to ADD:
-- Use [ADD_ALBUM: Artist Name - Album Name] tag ONLY when user says "add", "put in", "include", etc.
-- NEVER use ADD_ALBUM when giving recommendations or suggestions
-- If user asks "what should I get?" or "recommend something" - just tell them, do NOT add it
-- Example request: "Add Nevermind" → [ADD_ALBUM: Nirvana - Nevermind]
-
-REMOVING ALBUMS - ONLY when user explicitly asks to REMOVE:
-- Use [REMOVE_ALBUM: Artist Name - Album Name] tag ONLY when user says "remove", "delete", "take out", etc.
-- Example: "Remove Abbey Road" → [REMOVE_ALBUM: The Beatles - Abbey Road]
-
-RECOMMENDATIONS:
-- When user asks for recommendations, suggestions, or "what should I get" - just TELL them the recommendation
-- Do NOT use ADD_ALBUM tag for recommendations
-- Example: "What do you recommend?" → "Based on your collection, you might enjoy Led Zeppelin IV!"
-- Only add it if they then say "add that" or "yes add it"
-
-WHEN CONFUSED:
-- ASK for clarification instead of guessing
-- "I'm not sure which album you mean. Could you give me the artist and album name?"
-
-Keep your response concise and natural.${collectionContext}`;
-    }
-
-    // Parse AI response for album additions
-    function parseAlbumAdditions(response) {
-      const albumPattern = /\[ADD_ALBUM:\s*(.+?)\s*-\s*(.+?)\]/g;
-      const albums = [];
-      let match;
-
-      while ((match = albumPattern.exec(response)) !== null) {
-        const artist = match[1].trim();
-        const album = match[2].trim();
-        // Only add if both artist and album are valid (not empty, not just punctuation)
-        if (artist && album && artist.length > 1 && album.length > 1 &&
-            !/^[\s\-\.\,\?\!]+$/.test(artist) && !/^[\s\-\.\,\?\!]+$/.test(album)) {
-          albums.push({ artist, album });
-        }
-      }
-
-      return albums;
-    }
 
     // Add albums from chat response
     function addAlbumsFromChat(albums) {
@@ -1373,25 +1282,6 @@ Keep your response concise and natural.${collectionContext}`;
       return addedCount;
     }
 
-    // Parse AI response for album removals
-    function parseAlbumRemovals(response) {
-      const albumPattern = /\[REMOVE_ALBUM:\s*(.+?)\s*-\s*(.+?)\]/g;
-      const albums = [];
-      let match;
-
-      while ((match = albumPattern.exec(response)) !== null) {
-        const artist = match[1].trim();
-        const album = match[2].trim();
-        // Only process if both artist and album are valid
-        if (artist && album && artist.length > 1 && album.length > 1 &&
-            !/^[\s\-\.\,\?\!]+$/.test(artist) && !/^[\s\-\.\,\?\!]+$/.test(album)) {
-          albums.push({ artist, album });
-        }
-      }
-
-      return albums;
-    }
-
     // Remove albums from chat response
     function removeAlbumsFromChat(albums) {
       let removedCount = 0;
@@ -1416,15 +1306,13 @@ Keep your response concise and natural.${collectionContext}`;
       return removedCount;
     }
 
-    // Send message to Together.ai API
+    // Send message via Worker API (proxied to Together.ai)
     async function sendMessage() {
       const input = document.getElementById('chatInput');
       const sendBtn = document.getElementById('chatSend');
       const userMessage = input.value.trim();
 
       if (!userMessage) return;
-
-      const apiKey = TOGETHER_API_KEY;
 
       // Add user message to chat
       addMessage(userMessage, 'user');
@@ -1438,20 +1326,14 @@ Keep your response concise and natural.${collectionContext}`;
       showTyping();
 
       try {
-        const response = await fetch(TOGETHER_API_URL, {
+        const response = await fetch(`${CONFIG.API_BASE}/api/chat/`, {
           method: 'POST',
           headers: {
-            'Authorization': `Bearer ${apiKey}`,
             'Content-Type': 'application/json'
           },
           body: JSON.stringify({
-            model: CHAT_MODEL,
-            messages: [
-              { role: 'system', content: buildSystemPrompt() },
-              ...chatHistory.slice(-10) // Keep last 10 messages for context
-            ],
-            max_tokens: 256,
-            temperature: 0.2
+            message: userMessage,
+            collection: userCollection.map(item => ({ artist: item.artist, album: item.album }))
           })
         });
 
@@ -1459,38 +1341,15 @@ Keep your response concise and natural.${collectionContext}`;
 
         if (!response.ok) {
           const errorData = await response.json().catch(() => ({}));
-          throw new Error(errorData.error?.message || `API error: ${response.status}`);
+          throw new Error(errorData.detail || `API error: ${response.status}`);
         }
 
         const data = await response.json();
-        const assistantMessage = data.choices[0]?.message?.content || 'Sorry, I could not generate a response.';
+        const cleanedMessage = data.response || 'Sorry, I could not generate a response.';
 
-        // Parse for album additions and removals BEFORE cleaning
-        const albumsToAdd = parseAlbumAdditions(assistantMessage);
-        const albumsToRemove = parseAlbumRemovals(assistantMessage);
-
-        // Clean up thinking tags, internal processing, and command tags from display
-        let cleanedMessage = assistantMessage
-          // Remove thinking tags and their contents
-          .replace(/<think>[\s\S]*?<\/think>/gi, '')
-          .replace(/<thinking>[\s\S]*?<\/thinking>/gi, '')
-          .replace(/\[think\][\s\S]*?\[\/think\]/gi, '')
-          .replace(/\[thinking\][\s\S]*?\[\/thinking\]/gi, '')
-          // Remove internal markers
-          .replace(/\[BEGIN FINAL RESPONSE\]/gi, '')
-          .replace(/\[END FINAL RESPONSE\]/gi, '')
-          .replace(/\[INTERNAL\][\s\S]*?\[\/INTERNAL\]/gi, '')
-          // Remove command tags
-          .replace(/\[ADD_ALBUM:\s*.+?\s*-\s*.+?\]/g, '')
-          .replace(/\[REMOVE_ALBUM:\s*.+?\s*-\s*.+?\]/g, '')
-          // Clean up extra whitespace and newlines
-          .replace(/\n{3,}/g, '\n\n')
-          .trim();
-
-        // If cleaning resulted in empty or very short response, provide fallback
-        if (!cleanedMessage || cleanedMessage.length < 5) {
-          cleanedMessage = "I've processed your request. Is there anything else I can help with?";
-        }
+        // Worker returns parsed album actions directly
+        const albumsToAdd = data.albums_to_add || [];
+        const albumsToRemove = data.albums_to_remove || [];
 
         // Process album additions
         if (albumsToAdd.length > 0) {
