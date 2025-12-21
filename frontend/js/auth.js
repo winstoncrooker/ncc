@@ -17,10 +17,11 @@ const Auth = {
     const token = params.get('token');
     const authError = params.get('auth_error');
 
+    console.log('[Auth] init called, token in URL:', !!token, 'stored token:', !!this.getToken());
+
     if (authError) {
-      console.error('Auth error:', authError);
+      console.error('[Auth] OAuth error:', authError);
       this.showError(`Authentication failed: ${authError}`);
-      // Clean up URL
       this.cleanUrl();
       return false;
     }
@@ -34,6 +35,7 @@ const Auth = {
         picture: params.get('picture') || null
       };
 
+      console.log('[Auth] Storing token and user:', user.email);
       this.setToken(token);
       this.setUser(user);
 
@@ -46,6 +48,7 @@ const Auth = {
       return true;
     }
 
+    console.log('[Auth] No token in URL, isAuthenticated:', this.isAuthenticated());
     return this.isAuthenticated();
   },
 
@@ -138,13 +141,18 @@ const Auth = {
       headers['Authorization'] = `Bearer ${token}`;
     }
 
+    console.log('[Auth] API request:', options.method || 'GET', endpoint);
+
     const response = await fetch(url, {
       ...options,
       headers,
     });
 
+    console.log('[Auth] API response:', endpoint, response.status);
+
     // Handle 401 - token expired
     if (response.status === 401) {
+      console.log('[Auth] Got 401, logging out');
       this.logout();
       window.dispatchEvent(new CustomEvent('auth:expired'));
     }
@@ -237,16 +245,9 @@ const Auth = {
   }
 };
 
-// Auto-initialize on load
+// Expose Auth globally (but don't auto-init - let pages handle it)
 if (typeof window !== 'undefined') {
   window.Auth = Auth;
-
-  // Initialize when DOM is ready
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', () => Auth.init());
-  } else {
-    Auth.init();
-  }
 }
 
 // Export for module usage
