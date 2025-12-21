@@ -1,0 +1,46 @@
+# Environment and secrets
+.env
+.dev.vars
+*.local
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+ENV/
+.venv/
+*.egg-info/
+dist/
+build/
+
+# Node.js (for wrangler)
+node_modules/
+.wrangler/
+
+# Cache directories
+cache/
+.cache/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Test artifacts
+*.pdf
+test_*.py
+
+# Logs
+*.log
+npm-debug.log*
+
+# Local development
+*.local.html

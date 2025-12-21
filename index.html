@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Vinyl Vault</title>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500&family=Montserrat:wght@300;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+  <style>
+    /* Carousel with 3 column layout */
+    header {
+      position: relative;
+      height: 70vh;
+      display: grid;
+      grid-template-columns: 2fr 1fr 2fr;
+      gap: 0;
+      align-items: center;
+      overflow: hidden;
+      background: #0e0e0e;
+    }
+    
+    .carousel-left, .carousel-right {
+      position: relative;
+      height: 100%;
+      overflow: hidden;
+    }
+    
+    .carousel-left img, .carousel-right img {
+      position: absolute;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      object-fit: cover;
+      opacity: 0;
+      transition: opacity 1s ease;
+    }
+    
+    .carousel-left img.active, .carousel-right img.active { 
+      opacity: 1; 
+    }
+    
+    .header-center {
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      align-items: center;
+      text-align: center;
+      background-image: url('https://img.pixers.pics/pho_wat(s3:700/FO/47/91/87/51/700_FO47918751_8be27edc771dffb08a08b7a2a8a6299f.jpg,700,700,cms:2018/10/5bd1b6b8d04b8_220x50-watermark.png,over,480,650,jpg)/posters-vinyl-record.jpg.jpg');
+      background-size: cover;
+      background-position: center;
+      background-repeat: no-repeat;
+      border-left: 2px solid #000000;
+      border-right: 2px solid #000000;
+      height: 100%;
+      padding: 100px 40px;
+      position: relative;
+    }
+    
+    .header-center::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.6);
+      z-index: 1;
+    }
+    
+    .header-center > * {
+      position: relative;
+      z-index: 2;
+    }
+
+    header h1 {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 2.5rem;
+      color: #fff;
+      text-transform: uppercase;
+      letter-spacing: 4px;
+      margin: 0;
+      margin-top: 60px;
+      text-shadow: 2px 2px 10px rgba(0,0,0,0.8);
+    }
+    header p { 
+      color: #fff; 
+      font-size: 1.3rem;
+      margin: 0;
+      margin-bottom: 60px;
+      text-shadow: 2px 2px 8px rgba(0,0,0,0.9);
+      font-weight: 600;
+    }
+    
+    @media (max-width: 800px) {
+      header {
+        grid-template-columns: 1fr;
+        height: 50vh;
+        gap: 0;
+      }
+      .carousel-left, .carousel-right {
+        display: none;
+      }
+      .header-center {
+        padding: 30px 15px;
+      }
+      header h1 {
+        font-size: 1.4rem;
+        margin-top: 25px;
+        letter-spacing: 2px;
+      }
+      header p {
+        font-size: 0.85rem;
+        margin-bottom: 25px;
+      }
+    }
+
+    /* Favorites grid override */
+    #favoritesGrid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 25px;
+    }
+    @media (max-width: 800px) {
+      #favoritesGrid { grid-template-columns: repeat(2, 1fr); }
+    }
+    .vinyl {
+      position: relative;
+      overflow: hidden;
+      border-radius: 10px;
+      transition: transform 0.3s ease;
+      cursor: pointer;
+    }
+    .vinyl:hover {
+      transform: scale(1.05);
+    }
+    .vinyl img { 
+      width: 100%; 
+      height: 100%; 
+      object-fit: cover; 
+      display: block;
+    }
+    .vinyl a {
+      text-decoration: none;
+      display: block;
+    }
+    .vinyl-info {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: rgba(0,0,0,0.8);
+      padding: 10px;
+      text-align: center;
+      transform: translateY(100%);
+      transition: transform 0.3s ease;
+    }
+    .vinyl:hover .vinyl-info {
+      transform: translateY(0);
+    }
+    .vinyl-info h3 {
+      margin: 0 0 5px 0;
+      font-size: 0.9rem;
+      color: #1db954;
+    }
+    .vinyl-info p {
+      margin: 0;
+      font-size: 0.8rem;
+      color: #ccc;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="carousel-left"></div>
+    <div class="header-center">
+      <h1>Vinyl Vault</h1>
+      <p>Welcome to Winston's Record Collection</p>
+    </div>
+    <div class="carousel-right"></div>
+  </header>
+
+  <nav id="mainNav">
+    <button class="hamburger" id="hamburger" aria-label="Menu">
+      <span></span><span></span><span></span>
+    </button>
+    <div class="nav-links" id="navLinks">
+      <a href="index.html">Home</a>
+      <a href="stats.html">📊 Stats</a>
+      <a href="mycollection.html">📝 My Collection</a>
+      <a href="genre.html?genre=rock">Rock</a>
+      <a href="genre.html?genre=blues">Blues</a>
+      <a href="genre.html?genre=metal">Metal</a>
+      <a href="genre.html?genre=pop">Pop</a>
+      <a href="genre.html?genre=jazz">Jazz</a>
+      <a href="genre.html?genre=soul">Soul</a>
+      <a href="genre.html?genre=funk">Funk</a>
+      <a href="genre.html?genre=country">Country</a>
+      <a href="genre.html?genre=hiphop">Hip-Hop</a>
+      <a href="genre.html?genre=folk">Folk</a>
+      <a href="genre.html?genre=classical">Classical</a>
+      <a href="genre.html?genre=experimental">Experimental</a>
+      <a href="genre.html?genre=comedy">Comedy</a>
+    </div>
+  </nav>
+
+  <section id="favorites">
+    <h2>Current Favorites</h2>
+    <div id="favoritesGrid"></div>
+  </section>
+
+  <footer>© 2025 Vinyl Vault</footer>
+
+  <!-- Scripts -->
+  <script src="record.js"></script>
+  <script>
+    // Utility functions
+    function getRecordById(id) {
+      return records.find(r => r.id === id);
+    }
+
+    function getRecordsByGenre(genre) {
+      return records.filter(r => r.genre.toLowerCase() === genre.toLowerCase())
+        .sort((a, b) => a.artist.localeCompare(b.artist));
+    }
+
+    function formatPrice(value) {
+      if (value === null || value === undefined) return "N/A";
+      return `$${value.toLocaleString()}`;
+    }
+
+    window.records = records;
+    window.getRecordById = getRecordById;
+    window.getRecordsByGenre = getRecordsByGenre;
+    window.formatPrice = formatPrice;
+  </script>
+  <script>
+    // Carousel logic - randomly rotates through record covers every 5 seconds
+    document.addEventListener('DOMContentLoaded', () => {
+      console.log('DOM loaded');
+      console.log('Records available:', window.records ? window.records.length : 'NO RECORDS');
+      
+      const carouselLeft = document.querySelector('.carousel-left');
+      const carouselRight = document.querySelector('.carousel-right');
+      
+      // Get random records for carousels
+      if (window.records && window.records.length > 0) {
+        const shuffled = [...window.records].sort(() => 0.5 - Math.random());
+        
+        // Split records between left and right carousels
+        const leftRecords = shuffled.filter((_, i) => i % 2 === 0); // even indices
+        const rightRecords = shuffled.filter((_, i) => i % 2 === 1); // odd indices
+
+        // Populate left carousel
+        leftRecords.forEach((rec, index) => {
+          const img = document.createElement('img');
+          img.src = rec.cover || `https://via.placeholder.com/600x600/1a1a1a/1db954?text=${encodeURIComponent(rec.artist + ' - ' + rec.album)}`;
+          img.alt = rec.album;
+          if (index === 0) img.classList.add('active');
+          carouselLeft.appendChild(img);
+        });
+
+        // Populate right carousel
+        rightRecords.forEach((rec, index) => {
+          const img = document.createElement('img');
+          img.src = rec.cover || `https://via.placeholder.com/600x600/1a1a1a/1db954?text=${encodeURIComponent(rec.artist + ' - ' + rec.album)}`;
+          img.alt = rec.album;
+          if (index === 0) img.classList.add('active');
+          carouselRight.appendChild(img);
+        });
+
+        // Rotate left carousel
+        const leftSlides = document.querySelectorAll('.carousel-left img');
+        let leftIndex = 0;
+        setInterval(() => {
+          leftSlides[leftIndex].classList.remove('active');
+          leftIndex = (leftIndex + 1) % leftSlides.length;
+          leftSlides[leftIndex].classList.add('active');
+        }, 5000);
+
+        // Rotate right carousel (offset by 2.5s for staggered effect)
+        const rightSlides = document.querySelectorAll('.carousel-right img');
+        let rightIndex = 0;
+        setTimeout(() => {
+          setInterval(() => {
+            rightSlides[rightIndex].classList.remove('active');
+            rightIndex = (rightIndex + 1) % rightSlides.length;
+            rightSlides[rightIndex].classList.add('active');
+          }, 5000);
+        }, 2500);
+      } else {
+        console.error('No records found!');
+      }
+
+      // Dynamic favorites - 8 favorite albums
+      const favoriteIds = [
+        "black-sabbath-paranoid",
+        "nirvana-bleach",
+        "meat-puppets-too-high-to-die",
+        "pink-floyd-wish-you-were-here",
+        "dead-moon-in-the-graveyard",
+        "funkadelic-standing-on-the-verge",
+        "metallica-black-album",
+        "kiss-strutter"
+      ];
+
+      const grid = document.getElementById("favoritesGrid");
+      favoriteIds.forEach(id => {
+        const rec = window.getRecordById ? getRecordById(id) : null;
+        console.log('Looking for record:', id, 'Found:', rec);
+        if (!rec) return;
+        const card = document.createElement("div");
+        card.className = "vinyl";
+        const imgSrc = rec.cover || `https://via.placeholder.com/300x300/1a1a1a/1db954?text=${encodeURIComponent(rec.artist)}`;
+        card.innerHTML = `
+          <a href="album.html?id=${rec.id}&genre=${rec.genre}">
+            <img src="${imgSrc}" alt="${rec.album}">
+            <div class="vinyl-info">
+              <h3>${rec.album}</h3>
+              <p>${rec.artist}</p>
+            </div>
+          </a>
+        `;
+        grid.appendChild(card);
+      });
+      
+      // Stagger animation for vinyl cards
+      setTimeout(() => {
+        const vinyls = document.querySelectorAll('.vinyl');
+        vinyls.forEach((vinyl, index) => {
+          vinyl.style.animationDelay = `${index * 0.1}s`;
+        });
+      }, 100);
+    });
+    
+    // Hamburger menu toggle
+    document.addEventListener('DOMContentLoaded', () => {
+      const hamburger = document.getElementById('hamburger');
+      const navLinks = document.getElementById('navLinks');
+      
+      if (hamburger && navLinks) {
+        hamburger.addEventListener('click', () => {
+          hamburger.classList.toggle('active');
+          navLinks.classList.toggle('active');
+          document.body.classList.toggle('menu-open');
+        });
+        
+        // Close menu when clicking outside
+        document.addEventListener('click', (e) => {
+          if (!e.target.closest('nav')) {
+            hamburger.classList.remove('active');
+            navLinks.classList.remove('active');
+            document.body.classList.remove('menu-open');
+          }
+        });
+        
+        // Close menu when clicking a link
+        navLinks.querySelectorAll('a').forEach(link => {
+          link.addEventListener('click', () => {
+            hamburger.classList.remove('active');
+            navLinks.classList.remove('active');
+            document.body.classList.remove('menu-open');
+          });
+        });
+      }
+    });
+  </script>
+</body>
+</html>
