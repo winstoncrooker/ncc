@@ -1,5 +1,11 @@
 """
 Discogs API proxy with R2 caching
+
+Flow for client-side Discogs (Worker blocked by Cloudflare):
+1. Client calls GET /api/discogs/cache/check?artist=X&album=Y
+2. If cached, Worker returns cached data
+3. If not cached, client fetches from Discogs directly
+4. Client calls POST /api/discogs/cache/store with the data to cache
 """
 
 from fastapi import APIRouter, Request, HTTPException
@@ -7,6 +13,7 @@ from pydantic import BaseModel
 import httpx
 import hashlib
 import json
+import base64
 
 router = APIRouter()
 
@@ -22,6 +29,34 @@ class AlbumSearchResult(BaseModel):
     cover_original: str | None = None
     price: float | None = None
     cached: bool = False
+
+
+class CacheCheckResponse(BaseModel):
+    """Response from cache check"""
+    cached: bool
+    cache_key: str
+    data: AlbumSearchResult | None = None
+
+
+class CacheStoreRequest(BaseModel):
+    """Request to store album data in cache"""
+    artist: str
+    album: str
+    discogs_id: int | None = None
+    title: str | None = None
+    year: int | None = None
+    cover_url: str | None = None
+    price: float | None = None
+    # Base64 encoded image data (optional)
+    image_data: str | None = None
+    image_type: str = "jpg"
+
+
+class CacheStoreResponse(BaseModel):
+    """Response from cache store"""
+    success: bool
+    cache_key: str
+    cover_path: str | None = None
 
 
 class PriceResult(BaseModel):
@@ -269,6 +304,113 @@ async def get_price(request: Request, release_id: int) -> PriceResult:
 
     except Exception:
         return PriceResult(price=None)
+
+
+@router.get("/cache/check")
+async def check_cache(
+    request: Request,
+    artist: str,
+    album: str
+) -> CacheCheckResponse:
+    """
+    Check if album data exists in cache.
+    Client should call this first before fetching from Discogs.
+    """
+    env = request.scope["env"]
+
+    if not artist or not album:
+        raise HTTPException(status_code=400, detail="Artist and album required")
+
+    cache_key = get_cache_key(artist, album)
+
+    # Check cache
+    cached_data = await get_cached_data(env, cache_key)
+
+    if cached_data:
+        # Update cached flag before creating response
+        cached_data["cached"] = True
+        return CacheCheckResponse(
+            cached=True,
+            cache_key=cache_key,
+            data=AlbumSearchResult(**cached_data)
+        )
+
+    return CacheCheckResponse(
+        cached=False,
+        cache_key=cache_key,
+        data=None
+    )
+
+
+@router.post("/cache/store")
+async def store_cache(
+    request: Request,
+    body: CacheStoreRequest
+) -> CacheStoreResponse:
+    """
+    Store album data and optionally image in cache.
+    Client calls this after fetching from Discogs directly.
+
+    If image_data is provided (base64 encoded), it will be stored in R2.
+    Otherwise, cover_url will be stored as-is.
+    """
+    env = request.scope["env"]
+
+    if not body.artist or not body.album:
+        raise HTTPException(status_code=400, detail="Artist and album required")
+
+    cache_key = get_cache_key(body.artist, body.album)
+    cover_path = None
+
+    # Store image if provided
+    if body.image_data and hasattr(env, 'CACHE') and env.CACHE is not None:
+        try:
+            # Decode base64 image
+            image_bytes = base64.b64decode(body.image_data)
+
+            # Determine path and content type
+            ext = body.image_type.lower()
+            if ext not in ["jpg", "jpeg", "png", "gif", "webp"]:
+                ext = "jpg"
+
+            local_path = f"images/{cache_key}.{ext}"
+            content_type = f"image/{ext}" if ext != "jpg" else "image/jpeg"
+
+            # Store in R2
+            await env.CACHE.put(
+                local_path,
+                image_bytes,
+                httpMetadata={"contentType": content_type}
+            )
+
+            cover_path = f"/api/discogs/cache/{local_path}"
+
+        except Exception as e:
+            # If image storage fails, continue with URL
+            cover_path = body.cover_url
+
+    # Build album data
+    album_data = AlbumSearchResult(
+        id=body.discogs_id,
+        title=body.title or f"{body.artist} - {body.album}",
+        year=body.year,
+        cover=cover_path or body.cover_url,
+        cover_original=body.cover_url,
+        price=body.price,
+        cached=False  # Will be True when retrieved
+    )
+
+    # Store in cache
+    try:
+        await save_cached_data(env, cache_key, album_data.model_dump())
+
+        return CacheStoreResponse(
+            success=True,
+            cache_key=cache_key,
+            cover_path=cover_path
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to store cache: {str(e)}")
 
 
 @router.get("/cache/{path:path}")
