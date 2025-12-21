@@ -11,6 +11,13 @@ from routes.auth import require_auth, get_current_user
 router = APIRouter()
 
 
+def to_python_value(val):
+    """Convert JsNull/undefined to Python None"""
+    if val is None or (hasattr(val, '__class__') and ('JsNull' in str(type(val)) or 'JsUndefined' in str(type(val)))):
+        return None
+    return val
+
+
 class Album(BaseModel):
     """Album in user's collection"""
     id: Optional[int] = None
@@ -127,14 +134,39 @@ async def add_album(
         if existing:
             raise HTTPException(status_code=400, detail="Album already in collection")
 
+        # Build dynamic query for optional fields
+        # D1 has issues with None/null values, so we only include fields that have values
+        fields = ["user_id", "artist", "album"]
+        values = [user_id, body.artist, body.album]
+
+        if body.genre:
+            fields.append("genre")
+            values.append(body.genre)
+        if body.cover:
+            fields.append("cover")
+            values.append(body.cover)
+        if body.price is not None:
+            fields.append("price")
+            values.append(body.price)
+        if body.discogs_id is not None:
+            fields.append("discogs_id")
+            values.append(body.discogs_id)
+        if body.year is not None:
+            fields.append("year")
+            values.append(body.year)
+
+        placeholders = ", ".join(["?" for _ in fields])
+        field_names = ", ".join(fields)
+
+        print(f"[Collection] Adding album: {body.artist} - {body.album}")
+        print(f"[Collection] Fields: {field_names}, Values: {values}")
+
         result = await env.DB.prepare(
-            """INSERT INTO collections (user_id, artist, album, genre, cover, price, discogs_id, year)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-               RETURNING id"""
-        ).bind(
-            user_id, body.artist, body.album, body.genre,
-            body.cover, body.price, body.discogs_id, body.year
-        ).first()
+            f"INSERT INTO collections ({field_names}) VALUES ({placeholders}) RETURNING id"
+        ).bind(*values).first()
+
+        if result and hasattr(result, 'to_py'):
+            result = result.to_py()
 
         return Album(
             id=result["id"],
