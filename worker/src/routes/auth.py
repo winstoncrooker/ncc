@@ -45,7 +45,7 @@ class UserResponse(BaseModel):
 def create_token(user_id: int, email: str, secret: str) -> str:
     """Create JWT token"""
     payload = {
-        "sub": user_id,
+        "sub": str(user_id),  # Must be string for PyJWT
         "email": email,
         "exp": datetime.utcnow() + timedelta(days=7),
         "iat": datetime.utcnow()
@@ -66,15 +66,28 @@ async def get_current_user(
 
     env = request.scope["env"]
     try:
+        # Get secret - ensure it's a string
+        secret = str(env.JWT_SECRET) if hasattr(env, 'JWT_SECRET') else None
+        if not secret:
+            print("[Auth] JWT_SECRET not found in env!")
+            raise HTTPException(status_code=500, detail="Server configuration error")
+
+        print(f"[Auth] Verifying token, secret length: {len(secret)}, secret starts: {secret[:10]}...")
+        print(f"[Auth] Token starts: {credentials.credentials[:50]}...")
+
         payload = jwt.decode(
             credentials.credentials,
-            env.JWT_SECRET,
+            secret,
             algorithms=["HS256"]
         )
-        return payload["sub"]
+        user_id = int(payload["sub"])  # Convert back from string
+        print(f"[Auth] Token valid, user_id: {user_id}")
+        return user_id
     except jwt.ExpiredSignatureError:
+        print("[Auth] Token expired!")
         raise HTTPException(status_code=401, detail="Token expired")
-    except jwt.InvalidTokenError:
+    except jwt.InvalidTokenError as e:
+        print(f"[Auth] Invalid token: {e}")
         raise HTTPException(status_code=401, detail="Invalid token")
 
 
