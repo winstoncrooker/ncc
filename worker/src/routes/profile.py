@@ -163,14 +163,17 @@ async def get_showcase(
 
         albums = []
         for row in results.results:
+            # Convert JS proxy row to Python dict
+            if hasattr(row, 'to_py'):
+                row = row.to_py()
             albums.append(ShowcaseAlbum(
                 id=row["id"],
                 collection_id=row["collection_id"],
                 position=row["position"],
                 artist=row["artist"],
                 album=row["album"],
-                cover=to_python_value(row["cover"]),
-                year=to_python_value(row["year"])
+                cover=to_python_value(row.get("cover")),
+                year=to_python_value(row.get("year"))
             ))
 
         return albums

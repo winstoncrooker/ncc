@@ -93,15 +93,18 @@ async def get_collection(
 
         albums = []
         for row in results.results:
+            # Convert JS proxy row to Python dict
+            if hasattr(row, 'to_py'):
+                row = row.to_py()
             albums.append(Album(
                 id=row["id"],
                 artist=row["artist"],
                 album=row["album"],
-                genre=to_python_value(row["genre"]),
-                cover=to_python_value(row["cover"]),
-                price=to_python_value(row["price"]),
-                discogs_id=to_python_value(row["discogs_id"]),
-                year=to_python_value(row["year"])
+                genre=to_python_value(row.get("genre")),
+                cover=to_python_value(row.get("cover")),
+                price=to_python_value(row.get("price")),
+                discogs_id=to_python_value(row.get("discogs_id")),
+                year=to_python_value(row.get("year"))
             ))
 
         return albums
@@ -387,6 +390,9 @@ async def get_stats(
                FROM collections WHERE user_id = ?"""
         ).bind(user_id).first()
 
+        if totals and hasattr(totals, 'to_py'):
+            totals = totals.to_py()
+
         # Get genre breakdown
         genres_result = await env.DB.prepare(
             """SELECT genre, COUNT(*) as count
@@ -398,12 +404,15 @@ async def get_stats(
 
         genres = {}
         for row in genres_result.results:
-            if row["genre"]:
-                genres[row["genre"]] = row["count"]
+            if hasattr(row, 'to_py'):
+                row = row.to_py()
+            genre_val = to_python_value(row.get("genre"))
+            if genre_val:
+                genres[genre_val] = row["count"]
 
         return CollectionStats(
-            total_albums=totals["count"] or 0,
-            total_value=totals["total_value"] or 0.0,
+            total_albums=totals["count"] or 0 if totals else 0,
+            total_value=totals["total_value"] or 0.0 if totals else 0.0,
             genres=genres
         )
     except Exception as e:
