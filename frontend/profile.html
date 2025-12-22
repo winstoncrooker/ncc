@@ -10,6 +10,7 @@
   <link rel="stylesheet" href="style.css">
   <link rel="stylesheet" href="css/auth.css">
   <link rel="stylesheet" href="css/profile.css">
+  <link rel="stylesheet" href="css/forums.css">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.1/cropper.min.css">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.0.6/purify.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.1/cropper.min.js"></script>
@@ -18,10 +19,13 @@
   <!-- Header -->
   <header class="profile-header">
     <div class="header-content">
-      <a href="/" class="site-logo">
-        <span class="logo-icon">🎵</span>
+      <div class="site-logo">
         <span class="logo-text">NCC</span>
-      </a>
+      </div>
+      <nav class="main-tabs">
+        <button class="main-tab-btn active" data-tab="profile">Profile</button>
+        <button class="main-tab-btn" data-tab="forums">Forums</button>
+      </nav>
       <div class="header-actions">
         <div id="user-menu" class="user-menu"></div>
         <button class="messages-toggle-btn" id="messages-toggle-btn" title="Messages">
@@ -35,8 +39,11 @@
     </div>
   </header>
 
-  <!-- Main Profile Content -->
-  <main class="profile-main">
+  <!-- Main Content Area -->
+  <main class="app-main">
+    <!-- Profile View -->
+    <div class="tab-view active" id="profile-view">
+      <div class="profile-main">
     <!-- Profile Hero Section -->
     <section class="profile-hero">
       <!-- Background Image -->
@@ -171,6 +178,58 @@
         </div>
       </div>
     </section>
+      </div><!-- end profile-main -->
+    </div><!-- end profile-view -->
+
+    <!-- Forums View -->
+    <div class="tab-view" id="forums-view">
+      <div class="forums-container">
+        <!-- Forums Header -->
+        <div class="forums-header">
+          <div class="feed-tabs">
+            <button class="feed-tab active" data-sort="hot">Hot</button>
+            <button class="feed-tab" data-sort="new">New</button>
+            <button class="feed-tab" data-sort="top">Top</button>
+          </div>
+          <select class="feed-filter" id="feed-filter">
+            <option value="all">All Posts</option>
+            <option value="discussion">Discussions</option>
+            <option value="showcase">Showcases</option>
+            <option value="wtt_wts">Trading</option>
+            <option value="question">Questions</option>
+          </select>
+          <button class="create-post-btn" id="create-post-btn">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="12" y1="5" x2="12" y2="19"></line>
+              <line x1="5" y1="12" x2="19" y2="12"></line>
+            </svg>
+            New Post
+          </button>
+        </div>
+
+        <div class="forums-layout">
+          <!-- Sidebar -->
+          <aside class="forums-sidebar">
+            <div class="sidebar-section">
+              <h4>My Groups</h4>
+              <div class="my-groups-list" id="my-groups-list">
+                <div class="groups-empty">Join groups to see them here</div>
+              </div>
+              <button class="discover-btn" id="discover-groups-btn">+ Discover Groups</button>
+            </div>
+          </aside>
+
+          <!-- Feed Content -->
+          <div class="feed-content" id="feed-content">
+            <div class="feed-empty" id="feed-empty">
+              <div class="empty-icon">📰</div>
+              <p>No posts yet</p>
+              <span>Join some groups to see posts in your feed!</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div><!-- end forums-view -->
   </main>
 
   <!-- AI Assistant Toggle -->
@@ -475,12 +534,109 @@
     </div>
   </div>
 
+  <!-- Interest Onboarding Modal -->
+  <div class="modal" id="onboarding-modal">
+    <div class="modal-content modal-lg">
+      <div class="modal-header">
+        <h3 id="onboarding-title">Welcome to NCC!</h3>
+      </div>
+      <div class="onboarding-content">
+        <p class="onboarding-subtitle">What do you collect?</p>
+        <div class="categories-grid" id="categories-grid"></div>
+        <div class="onboarding-subgroups" id="onboarding-subgroups" style="display:none">
+          <p class="onboarding-subtitle">Select your interests</p>
+          <div class="subgroups-grid" id="subgroups-grid"></div>
+        </div>
+        <div class="form-actions">
+          <button type="button" class="btn-back" id="onboarding-back" style="display:none">Back</button>
+          <button type="button" class="btn-save" id="onboarding-continue" disabled>Continue</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Create Post Modal -->
+  <div class="modal" id="create-post-modal">
+    <div class="modal-content modal-lg">
+      <div class="modal-header">
+        <h3>Create Post</h3>
+        <button class="modal-close" id="create-post-close">&times;</button>
+      </div>
+      <form id="create-post-form">
+        <div class="form-row">
+          <div class="form-group">
+            <label for="post-category">Category *</label>
+            <select id="post-category" required>
+              <option value="">Select category...</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="post-group">Group (optional)</label>
+            <select id="post-group">
+              <option value="">No specific group</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-group">
+          <label for="post-type">Post Type</label>
+          <select id="post-type">
+            <option value="discussion">Discussion</option>
+            <option value="showcase">Showcase</option>
+            <option value="wtt_wts">Want to Trade / Sell</option>
+            <option value="question">Question</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="post-title">Title *</label>
+          <input type="text" id="post-title" required maxlength="200" placeholder="What's on your mind?">
+        </div>
+        <div class="form-group">
+          <label for="post-body">Content *</label>
+          <textarea id="post-body" required rows="6" maxlength="5000" placeholder="Share your thoughts..."></textarea>
+        </div>
+        <div class="form-actions">
+          <button type="button" class="btn-cancel" id="create-post-cancel">Cancel</button>
+          <button type="submit" class="btn-save">Post</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Post Detail Modal -->
+  <div class="modal" id="post-detail-modal">
+    <div class="modal-content modal-lg">
+      <div class="modal-header">
+        <h3 id="post-detail-title">Post</h3>
+        <button class="modal-close" id="post-detail-close">&times;</button>
+      </div>
+      <div class="post-detail-content" id="post-detail-content"></div>
+    </div>
+  </div>
+
+  <!-- Discover Groups Modal -->
+  <div class="modal" id="discover-modal">
+    <div class="modal-content modal-lg">
+      <div class="modal-header">
+        <h3>Discover Groups</h3>
+        <button class="modal-close" id="discover-close">&times;</button>
+      </div>
+      <div class="discover-content">
+        <div class="discover-categories" id="discover-categories"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Category Template Switcher (in profile view header) -->
+
   <!-- Hidden file input for photo upload -->
   <input type="file" id="photo-upload-input" accept="image/*" style="display:none">
   <input type="file" id="bg-upload-input" accept="image/*" style="display:none">
 
   <script src="js/config.js"></script>
   <script src="js/auth.js"></script>
+  <script src="js/templates/index.js"></script>
+  <script src="js/interests.js"></script>
+  <script src="js/forums.js"></script>
   <script src="js/profile.js"></script>
 
   <script>

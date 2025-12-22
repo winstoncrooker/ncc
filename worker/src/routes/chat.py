@@ -17,6 +17,57 @@ TOGETHER_API_URL = "https://api.together.xyz/v1/chat/completions"
 CHAT_MODEL = "ServiceNow-AI/Apriel-1.6-15b-Thinker"
 DISCOGS_API_URL = "https://api.discogs.com/database/search"
 
+# Category-specific AI prompts
+CATEGORY_AI_PROMPTS = {
+    "vinyl": """You are a vinyl record collection assistant. Help users manage their record collection and write their bio.
+
+ACTIONS: {{ADD:Artist|Album}}, {{REMOVE:Artist|Album}}, {{SHOWCASE:Artist|Album}}
+EXPERTISE: Grading (VG/NM/M), pressings, genres, Discogs integration.
+BIO HELP: Help write bios about their vinyl journey, favorite genres, turntable setup.""",
+
+    "trading-cards": """You are a trading card expert. Help users manage their card collections.
+
+ACTIONS: {{ADD:Set|Card Name}}, {{REMOVE:Set|Card Name}}, {{SHOWCASE:Set|Card Name}}
+EXPERTISE: Pokemon, MTG, Yu-Gi-Oh, Sports cards, grading (PSA/BGS/CGC).
+BIO HELP: Help write bios about their card collecting journey, favorite sets, deck building.""",
+
+    "cars": """You are an automotive enthusiast assistant. Help users document their garage and builds.
+
+ACTIONS: {{ADD:Year|Make Model}}, {{REMOVE:Year|Make Model}}, {{SHOWCASE:Year|Make Model}}
+EXPERTISE: Classics, JDM, muscle cars, builds, mods, valuations.
+BIO HELP: Help write bios about their automotive passion, build history, favorite meets.""",
+
+    "sneakers": """You are a sneaker culture expert. Help users manage their sneaker collection.
+
+ACTIONS: {{ADD:Brand|Model Colorway}}, {{REMOVE:Brand|Model}}, {{SHOWCASE:Brand|Model}}
+EXPERTISE: Jordans, Nike, Adidas, resale market, authentication.
+BIO HELP: Help write bios about their sneaker journey, grails, favorite silhouettes.""",
+
+    "watches": """You are a horology expert. Help users manage their watch collection.
+
+ACTIONS: {{ADD:Brand|Model Reference}}, {{REMOVE:Brand|Model}}, {{SHOWCASE:Brand|Model}}
+EXPERTISE: Luxury, vintage, movements, complications, market values.
+BIO HELP: Help write bios about their horological journey, collecting philosophy.""",
+
+    "comics": """You are a comic book expert. Help users manage their comic collection.
+
+ACTIONS: {{ADD:Publisher|Series Issue}}, {{REMOVE:Publisher|Series Issue}}, {{SHOWCASE:Publisher|Series Issue}}
+EXPERTISE: Marvel, DC, indie, grading (CGC), key issues, first appearances.
+BIO HELP: Help write bios about their reading habits, favorite runs, collecting focus.""",
+
+    "video-games": """You are a video game collector assistant. Help users manage their game library.
+
+ACTIONS: {{ADD:Platform|Title}}, {{REMOVE:Platform|Title}}, {{SHOWCASE:Platform|Title}}
+EXPERTISE: Retro, CIB, sealed games, platforms, valuations.
+BIO HELP: Help write bios about their gaming journey, favorite consoles, now playing.""",
+
+    "coins": """You are a numismatic expert. Help users manage their coin collection.
+
+ACTIONS: {{ADD:Country|Denomination Year}}, {{REMOVE:Country|Denomination Year}}, {{SHOWCASE:Country|Denomination Year}}
+EXPERTISE: US coins, world coins, ancient, grading (PCGS/NGC), bullion.
+BIO HELP: Help write bios about their numismatic interests, collecting focus, favorite coins."""
+}
+
 
 class Album(BaseModel):
     """Album in user's collection"""
@@ -32,6 +83,7 @@ class ChatMessage(BaseModel):
     message: str
     collection: list[Album] = []
     history: list[dict] = []
+    category_slug: Optional[str] = None  # For category-specific context
 
 
 class ChatResponse(BaseModel):
@@ -42,8 +94,8 @@ class ChatResponse(BaseModel):
     albums_to_showcase: list[Album] = []
 
 
-def build_system_prompt(collection: list[Album]) -> str:
-    """Build system prompt with collection context"""
+def build_system_prompt(collection: list[Album], category_slug: Optional[str] = None) -> str:
+    """Build system prompt with collection context and optional category customization"""
 
     collection_list = ""
     if collection:
@@ -51,7 +103,17 @@ def build_system_prompt(collection: list[Album]) -> str:
     else:
         collection_list = "(empty)"
 
-    return f"""You are a helpful vinyl record collection assistant. You help users manage their vinyl collection.
+    # Get category-specific prompt if available
+    category_prompt = CATEGORY_AI_PROMPTS.get(category_slug, CATEGORY_AI_PROMPTS.get("vinyl", ""))
+
+    if category_slug and category_slug != "vinyl" and category_slug in CATEGORY_AI_PROMPTS:
+        # For non-vinyl categories, use the category-specific prompt
+        base_prompt = category_prompt
+    else:
+        # Default vinyl prompt
+        base_prompt = """You are a helpful vinyl record collection assistant. You help users manage their vinyl collection."""
+
+    return f"""{base_prompt}
 
 CURRENT COLLECTION ({len(collection)} albums):
 {collection_list}
@@ -241,7 +303,7 @@ async def chat(request: Request, body: ChatMessage) -> ChatResponse:
 
     # Build messages for API
     messages = [
-        {"role": "system", "content": build_system_prompt(body.collection)}
+        {"role": "system", "content": build_system_prompt(body.collection, body.category_slug)}
     ]
 
     # Add history (last 10 messages)
