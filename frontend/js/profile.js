@@ -394,28 +394,24 @@ const Profile = {
 
     if (!select || !section) return;
 
-    // Hide switcher if user has no categories
-    if (this.userCategories.length === 0) {
+    // Get non-vinyl categories the user has joined
+    const otherCategories = this.userCategories.filter(cat => cat.slug !== 'vinyl');
+
+    // Hide switcher if user has no other categories besides vinyl
+    if (otherCategories.length === 0) {
       section.style.display = 'none';
       return;
     }
 
     section.style.display = 'block';
 
-    // Populate dropdown with vinyl as default option plus all categories
+    // Populate dropdown with vinyl as default option plus other categories
     select.innerHTML = `
       <option value="">🎵 Vinyl Records (Default)</option>
-      ${this.userCategories
-        .filter(cat => cat.slug !== 'vinyl') // Don't duplicate vinyl
-        .map(cat => `
-          <option value="${cat.slug}">${cat.icon || ''} ${cat.name}</option>
-        `).join('')}
+      ${otherCategories.map(cat => `
+        <option value="${cat.slug}">${cat.icon || ''} ${cat.name}</option>
+      `).join('')}
     `;
-
-    // If user has only vinyl category, default to vinyl and show it
-    if (this.userCategories.length === 1 && this.userCategories[0].slug === 'vinyl') {
-      section.style.display = 'none';
-    }
   },
 
   /**
