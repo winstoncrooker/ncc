@@ -11,7 +11,7 @@ from pyodide.ffi import to_js
 router = APIRouter()
 
 TOGETHER_API_URL = "https://api.together.xyz/v1/chat/completions"
-CHAT_MODEL = "servicenow-ai/Apriel-1.6B-16"
+CHAT_MODEL = "ServiceNow-AI/Apriel-1.6-15b-Thinker"
 DISCOGS_API_URL = "https://api.discogs.com/database/search"
 
 
