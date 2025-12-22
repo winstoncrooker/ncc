@@ -736,14 +736,18 @@ const Forums = {
         })
       });
 
-      if (!response.ok) throw new Error('Failed to create post');
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        console.error('Create post error:', response.status, errorData);
+        throw new Error(errorData.detail || 'Failed to create post');
+      }
 
       this.hideCreatePostModal();
       this.loadFeed(true);
 
     } catch (error) {
       console.error('Error creating post:', error);
-      alert('Failed to create post');
+      alert(`Failed to create post: ${error.message}`);
     }
   },
 

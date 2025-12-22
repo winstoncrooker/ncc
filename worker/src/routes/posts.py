@@ -433,6 +433,9 @@ async def create_post(
         if hasattr(result, 'to_py'):
             result = result.to_py()
 
+        if not result:
+            raise HTTPException(status_code=500, detail="Failed to create post - no result returned")
+
         # Update post count if in an interest group
         if body.interest_group_id:
             await env.DB.prepare(
