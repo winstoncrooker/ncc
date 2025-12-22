@@ -12,7 +12,7 @@ from pyodide.ffi import to_js
 router = APIRouter()
 
 TOGETHER_API_URL = "https://api.together.xyz/v1/chat/completions"
-CHAT_MODEL = "meta-llama/Llama-3.3-70B-Instruct-Turbo"
+CHAT_MODEL = "servicenow-ai/Apriel-Nemotron-15b-Thinker"
 DISCOGS_API_URL = "https://api.discogs.com/database/search"
 
 

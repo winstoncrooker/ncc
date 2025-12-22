@@ -111,13 +111,22 @@ async def update_profile(
     env = request.scope["env"]
 
     try:
+        # Check name uniqueness if name is being updated
+        if body.name is not None and body.name.strip():
+            existing = await env.DB.prepare(
+                "SELECT id FROM users WHERE name = ? AND id != ?"
+            ).bind(body.name.strip(), user_id).first()
+
+            if existing:
+                raise HTTPException(status_code=400, detail="This name is already taken")
+
         # Build update query dynamically
         updates = []
         values = []
 
         if body.name is not None:
             updates.append("name = ?")
-            values.append(body.name)
+            values.append(body.name.strip() if body.name else body.name)
         if body.bio is not None:
             updates.append("bio = ?")
             values.append(body.bio)

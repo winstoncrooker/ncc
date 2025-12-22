@@ -22,7 +22,16 @@
         <span class="logo-icon">🎵</span>
         <span class="logo-text">NCC</span>
       </a>
-      <div id="user-menu" class="user-menu"></div>
+      <div class="header-actions">
+        <div id="user-menu" class="user-menu"></div>
+        <button class="messages-toggle-btn" id="messages-toggle-btn" title="Messages">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
+            <polyline points="22,6 12,13 2,6"/>
+          </svg>
+          <span class="unread-badge" id="unread-badge"></span>
+        </button>
+      </div>
     </div>
   </header>
 
@@ -120,6 +129,33 @@
         </div>
       </div>
     </section>
+
+    <!-- Friends Section -->
+    <section class="friends-section">
+      <div class="section-header">
+        <h2>
+          <span class="section-icon">👥</span>
+          Friends
+          <span class="friends-count" id="friends-count">0</span>
+        </h2>
+        <button class="add-btn" id="add-friend-btn">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+            <circle cx="8.5" cy="7" r="4"/>
+            <line x1="20" y1="8" x2="20" y2="14"/>
+            <line x1="23" y1="11" x2="17" y2="11"/>
+          </svg>
+          Add Friend
+        </button>
+      </div>
+      <div class="friends-grid" id="friends-grid">
+        <div class="friends-empty" id="friends-empty">
+          <div class="empty-icon">🤝</div>
+          <p>No friends yet</p>
+          <span>Connect with other collectors!</span>
+        </div>
+      </div>
+    </section>
   </main>
 
   <!-- AI Assistant Toggle -->
@@ -152,6 +188,14 @@
       </div>
     </div>
     <form class="ai-form" id="ai-input-form">
+      <input type="file" id="ai-file-input" accept=".txt" style="display: none;">
+      <button type="button" id="ai-upload-btn" class="ai-upload-btn" title="Upload .txt file with album list">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+          <polyline points="17 8 12 3 7 8"></polyline>
+          <line x1="12" y1="3" x2="12" y2="15"></line>
+        </svg>
+      </button>
       <input type="text" id="ai-input" placeholder="Type a message..." autocomplete="off">
       <button type="submit" id="ai-send-btn">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -164,6 +208,109 @@
 
   <!-- Overlay for sidebar -->
   <div class="sidebar-overlay" id="sidebar-overlay"></div>
+
+  <!-- Messages Sidebar -->
+  <aside class="messages-sidebar" id="messages-sidebar">
+    <div class="messages-header">
+      <div class="messages-title">
+        <span class="messages-icon">💬</span>
+        <h3>Messages</h3>
+      </div>
+      <button class="messages-close" id="messages-close-btn">&times;</button>
+    </div>
+    <!-- Friends List View (for starting conversations) -->
+    <div class="friends-list-view" id="friends-list-view">
+      <div class="friends-message-list" id="friends-message-list">
+        <div class="friends-list-empty">
+          <div class="empty-icon">👥</div>
+          <p>No friends yet</p>
+          <span>Add friends to start messaging!</span>
+        </div>
+      </div>
+    </div>
+    <!-- Individual Conversation View -->
+    <div class="conversation-view" id="conversation-view" style="display:none">
+      <div class="conversation-header">
+        <button class="back-btn" id="conversation-back-btn">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="15 18 9 12 15 6"/>
+          </svg>
+        </button>
+        <img class="conversation-avatar" id="conversation-avatar" src="" alt="">
+        <span class="conversation-with" id="conversation-with"></span>
+      </div>
+      <div class="messages-list" id="messages-list"></div>
+      <form class="message-form" id="message-form">
+        <input type="text" id="message-input" placeholder="Type a message..." autocomplete="off" maxlength="1000">
+        <button type="submit" class="send-btn">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="22" y1="2" x2="11" y2="13"></line>
+            <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+          </svg>
+        </button>
+      </form>
+    </div>
+  </aside>
+
+  <!-- Add Friend Modal -->
+  <div class="modal" id="add-friend-modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3>Add Friend</h3>
+        <button class="modal-close" id="add-friend-close">&times;</button>
+      </div>
+      <div class="add-friend-content">
+        <p class="modal-subtitle">Enter their exact profile name (case-sensitive)</p>
+        <div class="form-group">
+          <input type="text" id="friend-name-input" placeholder="Profile name" maxlength="100">
+        </div>
+        <div class="friend-search-result" id="friend-search-result"></div>
+        <div class="form-actions">
+          <button type="button" class="btn-cancel" id="add-friend-cancel">Cancel</button>
+          <button type="button" class="btn-save" id="add-friend-confirm" disabled>Add Friend</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- View Profile Modal -->
+  <div class="modal" id="view-profile-modal">
+    <div class="modal-content modal-lg">
+      <div class="modal-header">
+        <h3>Profile</h3>
+        <button class="modal-close" id="view-profile-close">&times;</button>
+      </div>
+      <div class="view-profile-content" id="view-profile-content">
+        <div class="view-profile-header">
+          <div class="view-profile-bg" id="view-profile-bg"></div>
+          <img class="view-profile-picture" id="view-profile-picture" src="" alt="">
+        </div>
+        <div class="view-profile-info">
+          <div class="view-profile-name-row">
+            <h2 id="view-profile-name"></h2>
+            <span class="view-profile-pronouns" id="view-profile-pronouns"></span>
+          </div>
+          <p class="view-profile-bio" id="view-profile-bio"></p>
+          <div class="view-profile-stats">
+            <span id="view-profile-collection-count">0 records</span>
+          </div>
+          <div class="view-profile-actions" id="view-profile-actions">
+            <button class="btn-message" id="view-profile-message">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+              </svg>
+              Message
+            </button>
+            <button class="btn-unfollow" id="view-profile-unfollow">Unfollow</button>
+          </div>
+        </div>
+        <div class="view-profile-showcase">
+          <h3>Showcase</h3>
+          <div class="view-showcase-grid" id="view-showcase-grid"></div>
+        </div>
+      </div>
+    </div>
+  </div>
 
   <!-- Edit Profile Modal -->
   <div class="modal" id="edit-profile-modal">

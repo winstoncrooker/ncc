@@ -8,6 +8,15 @@ const Profile = {
   collection: [],
   showcase: [],
   chatHistory: [],
+  friends: [],
+  friendRequests: [],
+  pendingRequestCount: 0,
+  conversations: [],
+  currentConversation: null,
+  currentConversationMessages: [],
+  unreadCount: 0,
+  pollingInterval: null,
+  searchedFriend: null,
 
   /**
    * Initialize the profile page
@@ -30,11 +39,17 @@ const Profile = {
     await Promise.all([
       this.loadProfile(),
       this.loadCollection(),
-      this.loadShowcase()
+      this.loadShowcase(),
+      this.loadFriends(),
+      this.loadFriendRequests(),
+      this.loadUnreadCount()
     ]);
 
     // Render user menu
     this.renderUserMenu();
+
+    // Start polling for updates (messages, friend requests, friends)
+    this.startPolling();
   },
 
   /**
@@ -101,6 +116,18 @@ const Profile = {
     addListener('ai-input-form', 'submit', (e) => {
       e.preventDefault();
       this.sendChatMessage();
+    });
+
+    // AI file upload for bulk album adding
+    addListener('ai-upload-btn', 'click', () => {
+      document.getElementById('ai-file-input')?.click();
+    });
+
+    addListener('ai-file-input', 'change', (e) => {
+      if (e.target.files[0]) {
+        this.handleAlbumFileUpload(e.target.files[0]);
+        e.target.value = ''; // Reset input so same file can be uploaded again
+      }
     });
 
     // Edit Profile
@@ -215,6 +242,40 @@ const Profile = {
     window.addEventListener('auth:expired', () => {
       window.location.href = '/';
     });
+
+    // Friends
+    addListener('add-friend-btn', 'click', () => this.openAddFriendModal());
+    addListener('add-friend-close', 'click', () => this.closeModal('add-friend-modal'));
+    addListener('add-friend-cancel', 'click', () => this.closeModal('add-friend-modal'));
+    addListener('add-friend-confirm', 'click', () => this.confirmAddFriend());
+
+    // Friend name input with debounce
+    let friendSearchTimeout;
+    addListener('friend-name-input', 'input', (e) => {
+      clearTimeout(friendSearchTimeout);
+      const name = e.target.value.trim();
+      if (name.length > 0) {
+        friendSearchTimeout = setTimeout(() => this.searchFriend(name), 300);
+      } else {
+        document.getElementById('friend-search-result').innerHTML = '';
+        document.getElementById('add-friend-confirm').disabled = true;
+        this.searchedFriend = null;
+      }
+    });
+
+    // View Profile modal
+    addListener('view-profile-close', 'click', () => this.closeModal('view-profile-modal'));
+    addListener('view-profile-message', 'click', () => this.messageFromProfile());
+    addListener('view-profile-unfollow', 'click', () => this.unfollowFromProfile());
+
+    // Messages Sidebar
+    addListener('messages-toggle-btn', 'click', () => this.openMessagesSidebar());
+    addListener('messages-close-btn', 'click', () => this.closeMessagesSidebar());
+    addListener('conversation-back-btn', 'click', () => this.backToConversations());
+    addListener('message-form', 'submit', (e) => {
+      e.preventDefault();
+      this.sendMessage();
+    });
   },
 
   /**
@@ -296,18 +357,19 @@ const Profile = {
   renderCollection() {
     const grid = document.getElementById('collection-grid');
     const countEl = document.getElementById('collection-count');
-    const emptyEl = document.getElementById('collection-empty');
 
     countEl.textContent = this.collection.length;
 
     if (this.collection.length === 0) {
-      if (emptyEl) emptyEl.style.display = 'block';
-      grid.innerHTML = '';
-      if (emptyEl) grid.appendChild(emptyEl);
+      grid.innerHTML = `
+        <div class="collection-empty" id="collection-empty">
+          <div class="empty-icon">📀</div>
+          <p>Your collection is empty</p>
+          <span>Use the AI assistant to add albums or search Discogs</span>
+        </div>
+      `;
       return;
     }
-
-    if (emptyEl) emptyEl.style.display = 'none';
 
     grid.innerHTML = this.collection.map(album => `
       <div class="album-card" data-id="${album.id}">
@@ -353,18 +415,17 @@ const Profile = {
    */
   renderShowcase() {
     const grid = document.getElementById('showcase-grid');
-    const emptyEl = document.getElementById('showcase-empty');
 
     if (this.showcase.length === 0) {
-      if (emptyEl) {
-        emptyEl.style.display = 'block';
-        grid.innerHTML = '';
-        grid.appendChild(emptyEl);
-      }
+      grid.innerHTML = `
+        <div class="showcase-empty" id="showcase-empty">
+          <div class="empty-icon">💿</div>
+          <p>No albums in your showcase yet</p>
+          <span>Add up to 8 albums from your collection to feature here</span>
+        </div>
+      `;
       return;
     }
-
-    if (emptyEl) emptyEl.style.display = 'none';
 
     grid.innerHTML = this.showcase.map(album => `
       <div class="album-card showcase-item" data-id="${album.id}">
@@ -827,17 +888,16 @@ const Profile = {
   },
 
   /**
-   * Remove from showcase
+   * Remove from showcase (no confirmation popup)
    */
   async removeFromShowcase(showcaseId) {
-    if (!confirm('Remove this album from your showcase?')) return;
-
     try {
       const response = await Auth.apiRequest(`/api/profile/me/showcase/${showcaseId}`, {
         method: 'DELETE'
       });
 
       if (response.ok) {
+        // Immediately remove from local state and re-render
         this.showcase = this.showcase.filter(s => s.id !== showcaseId);
         this.renderShowcase();
       }
@@ -847,17 +907,16 @@ const Profile = {
   },
 
   /**
-   * Remove from collection
+   * Remove from collection (no confirmation popup)
    */
   async removeFromCollection(albumId) {
-    if (!confirm('Remove this album from your collection?')) return;
-
     try {
       const response = await Auth.apiRequest(`/api/collection/${albumId}`, {
         method: 'DELETE'
       });
 
       if (response.ok) {
+        // Immediately remove from local state and re-render
         this.collection = this.collection.filter(a => a.id !== albumId);
         this.showcase = this.showcase.filter(s => s.collection_id !== albumId);
         this.renderCollection();
@@ -950,6 +1009,109 @@ const Profile = {
     message.textContent = content;
     container.appendChild(message);
     container.scrollTop = container.scrollHeight;
+  },
+
+  /**
+   * Handle .txt file upload for bulk album adding
+   * Expected format: "Artist - Album" per line
+   */
+  async handleAlbumFileUpload(file) {
+    if (!file.name.endsWith('.txt')) {
+      this.addChatMessage('Please upload a .txt file with albums in "Artist - Album" format, one per line.', 'assistant');
+      return;
+    }
+
+    try {
+      const text = await file.text();
+      const lines = text.split('\n').map(line => line.trim()).filter(line => line.length > 0);
+
+      if (lines.length === 0) {
+        this.addChatMessage('The file appears to be empty. Please add albums in "Artist - Album" format, one per line.', 'assistant');
+        return;
+      }
+
+      // Parse albums from the file
+      const albums = [];
+      const invalidLines = [];
+
+      for (const line of lines) {
+        // Skip comment lines
+        if (line.startsWith('#') || line.startsWith('//')) continue;
+
+        // Try to parse "Artist - Album" format
+        const separators = [' - ', ' – ', ' — ', ' : '];
+        let parsed = false;
+
+        for (const sep of separators) {
+          const parts = line.split(sep);
+          if (parts.length >= 2) {
+            const artist = parts[0].trim();
+            const album = parts.slice(1).join(sep).trim();
+            if (artist && album) {
+              albums.push({ artist, album });
+              parsed = true;
+              break;
+            }
+          }
+        }
+
+        if (!parsed) {
+          invalidLines.push(line);
+        }
+      }
+
+      if (albums.length === 0) {
+        this.addChatMessage('No valid albums found. Please use "Artist - Album" format, one per line.', 'assistant');
+        return;
+      }
+
+      // Show user message with summary
+      this.addChatMessage(`Uploading ${albums.length} album(s) from file...`, 'user');
+      this.chatHistory.push({ role: 'user', content: `Add these albums: ${albums.map(a => `${a.artist} - ${a.album}`).join(', ')}` });
+
+      // Build message for AI with album list
+      const albumList = albums.map(a => `${a.artist} - ${a.album}`).join('\n');
+      const message = `Please add these albums to my collection:\n${albumList}`;
+
+      // Send to AI for processing (will enrich with Discogs data)
+      const response = await Auth.apiRequest('/api/chat/', {
+        method: 'POST',
+        body: JSON.stringify({
+          message,
+          collection: this.collection.map(a => ({ artist: a.artist, album: a.album })),
+          history: this.chatHistory.slice(-10)
+        })
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+
+        // Sanitize and add response
+        const cleanResponse = typeof DOMPurify !== 'undefined'
+          ? DOMPurify.sanitize(data.response)
+          : data.response;
+        this.addChatMessage(cleanResponse, 'assistant');
+
+        this.chatHistory.push({ role: 'assistant', content: data.response });
+
+        // Process album additions
+        if (data.albums_to_add?.length > 0) {
+          for (const album of data.albums_to_add) {
+            await this.addAlbumFromChat(album);
+          }
+        }
+
+        // Report any invalid lines
+        if (invalidLines.length > 0) {
+          this.addChatMessage(`Note: ${invalidLines.length} line(s) couldn't be parsed. Make sure to use "Artist - Album" format.`, 'assistant');
+        }
+      } else {
+        this.addChatMessage('Sorry, I had trouble processing the file. Please try again.', 'assistant');
+      }
+    } catch (error) {
+      console.error('File upload error:', error);
+      this.addChatMessage('Error reading file. Please try again.', 'assistant');
+    }
   },
 
   /**
@@ -1057,6 +1219,735 @@ const Profile = {
     const div = document.createElement('div');
     div.textContent = text;
     return div.innerHTML;
+  },
+
+  // ============================================
+  // FRIENDS FUNCTIONALITY
+  // ============================================
+
+  /**
+   * Load friends list
+   */
+  async loadFriends() {
+    try {
+      const response = await Auth.apiRequest('/api/friends/');
+      if (response.ok) {
+        this.friends = await response.json();
+        this.renderFriends();
+      }
+    } catch (error) {
+      console.error('Error loading friends:', error);
+    }
+  },
+
+  /**
+   * Load pending friend requests
+   */
+  async loadFriendRequests() {
+    try {
+      const response = await Auth.apiRequest('/api/friends/requests');
+      if (response.ok) {
+        this.friendRequests = await response.json();
+        this.pendingRequestCount = this.friendRequests.length;
+        this.renderFriendRequests();
+      }
+    } catch (error) {
+      console.error('Error loading friend requests:', error);
+    }
+  },
+
+  /**
+   * Render friend requests section
+   */
+  renderFriendRequests() {
+    let container = document.getElementById('friend-requests-container');
+
+    // Create container if it doesn't exist
+    if (!container) {
+      const friendsSection = document.querySelector('.friends-section');
+      if (!friendsSection) return;
+
+      container = document.createElement('div');
+      container.id = 'friend-requests-container';
+      container.className = 'friend-requests-container';
+      friendsSection.insertBefore(container, document.getElementById('friends-grid'));
+    }
+
+    if (this.friendRequests.length === 0) {
+      container.innerHTML = '';
+      container.style.display = 'none';
+      return;
+    }
+
+    container.style.display = 'block';
+    container.innerHTML = `
+      <h3 class="requests-title">Friend Requests <span class="request-badge">${this.friendRequests.length}</span></h3>
+      <div class="requests-list">
+        ${this.friendRequests.map(req => `
+          <div class="request-card" data-id="${req.id}">
+            <img src="${req.sender_picture || this.getDefaultAvatar(req.sender_name)}"
+                 alt="${req.sender_name}"
+                 class="request-avatar"
+                 onerror="this.src='${this.getDefaultAvatar(req.sender_name)}'">
+            <div class="request-info">
+              <div class="request-name">${this.escapeHtml(req.sender_name || 'Anonymous')}</div>
+              <div class="request-time">${this.formatTime(req.created_at)}</div>
+            </div>
+            <div class="request-actions">
+              <button class="btn-accept" onclick="Profile.acceptRequest(${req.id})">Accept</button>
+              <button class="btn-reject" onclick="Profile.rejectRequest(${req.id})">Reject</button>
+            </div>
+          </div>
+        `).join('')}
+      </div>
+    `;
+  },
+
+  /**
+   * Accept friend request
+   */
+  async acceptRequest(requestId) {
+    try {
+      const response = await Auth.apiRequest(`/api/friends/requests/${requestId}/accept`, {
+        method: 'POST'
+      });
+
+      if (response.ok) {
+        // Remove from local state
+        this.friendRequests = this.friendRequests.filter(r => r.id !== requestId);
+        this.pendingRequestCount = this.friendRequests.length;
+        this.renderFriendRequests();
+
+        // Reload friends list
+        await this.loadFriends();
+      } else {
+        const error = await response.json();
+        alert(error.detail || 'Failed to accept request');
+      }
+    } catch (error) {
+      console.error('Error accepting request:', error);
+      alert('Failed to accept request');
+    }
+  },
+
+  /**
+   * Reject friend request
+   */
+  async rejectRequest(requestId) {
+    try {
+      const response = await Auth.apiRequest(`/api/friends/requests/${requestId}/reject`, {
+        method: 'POST'
+      });
+
+      if (response.ok) {
+        // Remove from local state
+        this.friendRequests = this.friendRequests.filter(r => r.id !== requestId);
+        this.pendingRequestCount = this.friendRequests.length;
+        this.renderFriendRequests();
+      } else {
+        const error = await response.json();
+        alert(error.detail || 'Failed to reject request');
+      }
+    } catch (error) {
+      console.error('Error rejecting request:', error);
+      alert('Failed to reject request');
+    }
+  },
+
+  /**
+   * Render friends grid
+   */
+  renderFriends() {
+    const grid = document.getElementById('friends-grid');
+    const countEl = document.getElementById('friends-count');
+
+    if (countEl) countEl.textContent = this.friends.length;
+
+    if (this.friends.length === 0) {
+      grid.innerHTML = `
+        <div class="friends-empty" id="friends-empty">
+          <div class="empty-icon">👥</div>
+          <p>No friends yet</p>
+          <span>Add friends to connect with other collectors!</span>
+        </div>
+      `;
+      return;
+    }
+
+    grid.innerHTML = this.friends.map(friend => `
+      <div class="friend-card" data-id="${friend.id}" onclick="Profile.viewFriendProfile(${friend.id})">
+        <img src="${friend.picture || this.getDefaultAvatar(friend.name)}"
+             alt="${friend.name || 'Friend'}"
+             class="friend-avatar"
+             onerror="this.src='${this.getDefaultAvatar(friend.name)}'">
+        <div class="friend-name">${this.escapeHtml(friend.name || 'Anonymous')}</div>
+        ${friend.pronouns ? `<div class="friend-pronouns">${this.escapeHtml(friend.pronouns)}</div>` : ''}
+      </div>
+    `).join('');
+  },
+
+  /**
+   * Get default avatar for user
+   */
+  getDefaultAvatar(name) {
+    const initial = (name || 'A')[0].toUpperCase();
+    return `data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect fill='%231a1a1a' width='100' height='100'/><text x='50' y='65' font-size='45' text-anchor='middle' fill='%231db954'>${initial}</text></svg>`;
+  },
+
+  /**
+   * Open add friend modal
+   */
+  openAddFriendModal() {
+    document.getElementById('friend-name-input').value = '';
+    document.getElementById('friend-search-result').innerHTML = '';
+    document.getElementById('add-friend-confirm').disabled = true;
+    this.searchedFriend = null;
+    document.getElementById('add-friend-modal').classList.add('open');
+    document.getElementById('friend-name-input').focus();
+  },
+
+  /**
+   * Search for friend by name
+   */
+  async searchFriend(name) {
+    try {
+      const response = await Auth.apiRequest(`/api/friends/search?name=${encodeURIComponent(name)}`);
+      const resultEl = document.getElementById('friend-search-result');
+      const confirmBtn = document.getElementById('add-friend-confirm');
+
+      if (response.ok) {
+        const user = await response.json();
+
+        if (user) {
+          // Check if already following
+          const alreadyFollowing = this.friends.some(f => f.id === user.id);
+          const isMe = user.id === this.profile?.id;
+
+          this.searchedFriend = isMe || alreadyFollowing ? null : user;
+
+          resultEl.innerHTML = `
+            <div class="friend-preview">
+              <img src="${user.picture || this.getDefaultAvatar(user.name)}"
+                   alt="${user.name}"
+                   onerror="this.src='${this.getDefaultAvatar(user.name)}'">
+              <div class="friend-preview-info">
+                <h4>${this.escapeHtml(user.name || 'Anonymous')}</h4>
+                <p>${user.bio ? this.escapeHtml(user.bio.substring(0, 60)) + '...' : 'No bio'}</p>
+                ${alreadyFollowing ? '<span class="already-following">Already following</span>' : ''}
+                ${isMe ? '<span class="already-following">This is you!</span>' : ''}
+              </div>
+            </div>
+          `;
+
+          confirmBtn.disabled = alreadyFollowing || isMe;
+        } else {
+          resultEl.innerHTML = '<div class="not-found">No user found with that name</div>';
+          confirmBtn.disabled = true;
+          this.searchedFriend = null;
+        }
+      } else {
+        resultEl.innerHTML = '<div class="not-found">Search failed</div>';
+        confirmBtn.disabled = true;
+        this.searchedFriend = null;
+      }
+    } catch (error) {
+      console.error('Error searching friend:', error);
+    }
+  },
+
+  /**
+   * Confirm sending friend request
+   */
+  async confirmAddFriend() {
+    if (!this.searchedFriend) return;
+
+    try {
+      const response = await Auth.apiRequest('/api/friends/request', {
+        method: 'POST',
+        body: JSON.stringify({ name: this.searchedFriend.name })
+      });
+
+      if (response.ok) {
+        // Request sent successfully
+        this.closeModal('add-friend-modal');
+        alert('Friend request sent!');
+      } else {
+        const error = await response.json();
+        alert(error.detail || 'Failed to send request');
+      }
+    } catch (error) {
+      console.error('Error sending request:', error);
+      alert('Failed to send request');
+    }
+  },
+
+  /**
+   * View friend's profile
+   */
+  async viewFriendProfile(userId) {
+    try {
+      const response = await Auth.apiRequest(`/api/friends/user/${userId}`);
+      if (response.ok) {
+        const profile = await response.json();
+        this.renderViewProfile(profile);
+        document.getElementById('view-profile-modal').classList.add('open');
+      }
+    } catch (error) {
+      console.error('Error loading profile:', error);
+    }
+  },
+
+  /**
+   * Current viewed profile (for actions)
+   */
+  viewedProfile: null,
+
+  /**
+   * Render view profile modal
+   */
+  renderViewProfile(profile) {
+    this.viewedProfile = profile;
+
+    // Background
+    const bgEl = document.getElementById('view-profile-bg');
+    if (profile.background_image) {
+      bgEl.style.backgroundImage = `url(${profile.background_image})`;
+    } else {
+      bgEl.style.backgroundImage = '';
+    }
+
+    // Picture
+    document.getElementById('view-profile-picture').src = profile.picture || this.getDefaultAvatar(profile.name);
+
+    // Name
+    document.getElementById('view-profile-name').textContent = profile.name || 'Anonymous';
+
+    // Pronouns
+    const pronounsEl = document.getElementById('view-profile-pronouns');
+    if (profile.pronouns) {
+      pronounsEl.textContent = profile.pronouns;
+      pronounsEl.style.display = 'inline-block';
+    } else {
+      pronounsEl.style.display = 'none';
+    }
+
+    // Bio
+    document.getElementById('view-profile-bio').textContent = profile.bio || '';
+
+    // Collection count
+    document.getElementById('view-profile-collection-count').textContent = `${profile.collection_count || 0} records`;
+
+    // Actions - show different buttons based on relationship
+    const actionsEl = document.getElementById('view-profile-actions');
+    actionsEl.style.display = 'flex';
+
+    if (profile.is_friend) {
+      // Already friends - show Message and Unfriend
+      actionsEl.innerHTML = `
+        <button class="btn-message" id="view-profile-message">Message</button>
+        <button class="btn-unfriend" id="view-profile-unfollow">Unfriend</button>
+      `;
+      document.getElementById('view-profile-message').onclick = () => this.messageFromProfile();
+      document.getElementById('view-profile-unfollow').onclick = () => this.unfollowFromProfile();
+    } else if (profile.request_sent) {
+      // Request pending
+      actionsEl.innerHTML = `
+        <button class="btn-pending" disabled>Request Sent</button>
+      `;
+    } else if (profile.request_received) {
+      // They sent us a request
+      actionsEl.innerHTML = `
+        <button class="btn-accept" onclick="Profile.acceptRequestFromProfile(${profile.request_id})">Accept Request</button>
+        <button class="btn-reject" onclick="Profile.rejectRequestFromProfile(${profile.request_id})">Reject</button>
+      `;
+    } else {
+      // Not friends - show Send Request
+      actionsEl.innerHTML = `
+        <button class="btn-add-friend" onclick="Profile.sendRequestFromProfile()">Send Request</button>
+      `;
+    }
+
+    // Showcase
+    const showcaseGrid = document.getElementById('view-showcase-grid');
+    if (profile.showcase && profile.showcase.length > 0) {
+      showcaseGrid.innerHTML = profile.showcase.map(album => `
+        <div class="showcase-item">
+          <img src="${album.cover || this.getPlaceholderCover(album)}"
+               alt="${album.album}"
+               onerror="this.src='${this.getPlaceholderCover(album)}'">
+        </div>
+      `).join('');
+    } else {
+      showcaseGrid.innerHTML = '<div class="showcase-empty-msg">No albums in showcase</div>';
+    }
+  },
+
+  /**
+   * Message from profile view
+   */
+  messageFromProfile() {
+    if (!this.viewedProfile) return;
+    this.closeModal('view-profile-modal');
+    this.openConversation(
+      this.viewedProfile.id,
+      this.viewedProfile.name || 'Anonymous',
+      this.viewedProfile.picture || ''
+    );
+  },
+
+  /**
+   * Send friend request from profile view
+   */
+  async sendRequestFromProfile() {
+    if (!this.viewedProfile) return;
+
+    try {
+      const response = await Auth.apiRequest('/api/friends/request', {
+        method: 'POST',
+        body: JSON.stringify({ name: this.viewedProfile.name })
+      });
+
+      if (response.ok) {
+        // Update the viewed profile and re-render
+        this.viewedProfile.request_sent = true;
+        this.renderViewProfile(this.viewedProfile);
+      } else {
+        const error = await response.json();
+        alert(error.detail || 'Failed to send request');
+      }
+    } catch (error) {
+      console.error('Error sending request:', error);
+    }
+  },
+
+  /**
+   * Accept friend request from profile view
+   */
+  async acceptRequestFromProfile(requestId) {
+    try {
+      const response = await Auth.apiRequest(`/api/friends/requests/${requestId}/accept`, {
+        method: 'POST'
+      });
+
+      if (response.ok) {
+        // Reload friends and update profile view
+        await this.loadFriends();
+        await this.loadFriendRequests();
+
+        // Update viewed profile to show as friend
+        this.viewedProfile.is_friend = true;
+        this.viewedProfile.request_received = false;
+        this.viewedProfile.request_id = null;
+        this.renderViewProfile(this.viewedProfile);
+      } else {
+        const error = await response.json();
+        alert(error.detail || 'Failed to accept request');
+      }
+    } catch (error) {
+      console.error('Error accepting request:', error);
+    }
+  },
+
+  /**
+   * Reject friend request from profile view
+   */
+  async rejectRequestFromProfile(requestId) {
+    try {
+      const response = await Auth.apiRequest(`/api/friends/requests/${requestId}/reject`, {
+        method: 'POST'
+      });
+
+      if (response.ok) {
+        await this.loadFriendRequests();
+        this.closeModal('view-profile-modal');
+      } else {
+        const error = await response.json();
+        alert(error.detail || 'Failed to reject request');
+      }
+    } catch (error) {
+      console.error('Error rejecting request:', error);
+    }
+  },
+
+  /**
+   * Unfriend from profile view (no confirmation popup)
+   */
+  async unfollowFromProfile() {
+    if (!this.viewedProfile) return;
+
+    try {
+      const response = await Auth.apiRequest(`/api/friends/${this.viewedProfile.id}`, {
+        method: 'DELETE'
+      });
+
+      if (response.ok) {
+        // Immediately remove from local state and re-render
+        this.friends = this.friends.filter(f => f.id !== this.viewedProfile.id);
+        this.renderFriends();
+        this.closeModal('view-profile-modal');
+      }
+    } catch (error) {
+      console.error('Error unfriending:', error);
+    }
+  },
+
+  // ============================================
+  // MESSAGING FUNCTIONALITY
+  // ============================================
+
+  /**
+   * Load unread message count
+   */
+  async loadUnreadCount() {
+    try {
+      const response = await Auth.apiRequest('/api/messages/unread-count');
+      if (response.ok) {
+        const data = await response.json();
+        this.unreadCount = data.count;
+        this.updateUnreadBadge();
+      }
+    } catch (error) {
+      console.error('Error loading unread count:', error);
+    }
+  },
+
+  /**
+   * Update unread badge in header
+   */
+  updateUnreadBadge() {
+    const badge = document.getElementById('unread-badge');
+    if (badge) {
+      if (this.unreadCount > 0) {
+        badge.textContent = this.unreadCount > 99 ? '99+' : this.unreadCount;
+      } else {
+        badge.textContent = '';
+      }
+    }
+  },
+
+  /**
+   * Start polling for updates (messages, friend requests, friends)
+   */
+  startPolling() {
+    // Poll every 5 seconds for live updates
+    this.pollingInterval = setInterval(async () => {
+      // Load friend requests (for live accept notifications)
+      const oldRequestCount = this.pendingRequestCount;
+      await this.loadFriendRequests();
+
+      // If we had pending requests and now we have new friends, someone accepted our request
+      const oldFriendsCount = this.friends.length;
+      await this.loadFriends();
+
+      // If friends count increased, show notification
+      if (this.friends.length > oldFriendsCount) {
+        // Friends list updated - re-render
+        this.renderFriends();
+      }
+
+      // Load unread message count
+      await this.loadUnreadCount();
+
+      // If in a conversation, refresh messages
+      if (this.currentConversation) {
+        await this.loadConversationMessages(this.currentConversation.id);
+      }
+    }, 5000);
+  },
+
+  /**
+   * Open messages sidebar
+   */
+  async openMessagesSidebar() {
+    document.getElementById('messages-sidebar').classList.add('open');
+    document.getElementById('sidebar-overlay').classList.add('show');
+
+    // Show friends list for messaging
+    this.renderFriendsMessageList();
+    this.showFriendsList();
+  },
+
+  /**
+   * Close messages sidebar
+   */
+  closeMessagesSidebar() {
+    document.getElementById('messages-sidebar').classList.remove('open');
+    document.getElementById('sidebar-overlay').classList.remove('show');
+    this.currentConversation = null;
+  },
+
+  /**
+   * Render friends list in messages sidebar
+   */
+  renderFriendsMessageList() {
+    const listEl = document.getElementById('friends-message-list');
+
+    if (this.friends.length === 0) {
+      listEl.innerHTML = `
+        <div class="friends-list-empty">
+          <div class="empty-icon">👥</div>
+          <p>No friends yet</p>
+          <span>Add friends to start messaging!</span>
+        </div>
+      `;
+      return;
+    }
+
+    listEl.innerHTML = this.friends.map(friend => `
+      <div class="friend-message-item"
+           onclick="Profile.openConversation(${friend.id}, '${this.escapeHtml(friend.name || '')}', '${friend.picture || ''}')">
+        <img src="${friend.picture || this.getDefaultAvatar(friend.name)}"
+             alt="${friend.name}"
+             class="avatar"
+             onerror="this.src='${this.getDefaultAvatar(friend.name)}'">
+        <div class="friend-message-info">
+          <div class="friend-message-name">${this.escapeHtml(friend.name || 'Anonymous')}</div>
+          ${friend.pronouns ? `<div class="friend-message-pronouns">${this.escapeHtml(friend.pronouns)}</div>` : ''}
+        </div>
+      </div>
+    `).join('');
+  },
+
+  /**
+   * Format time for display
+   */
+  formatTime(timestamp) {
+    // SQLite timestamps are UTC but don't have 'Z' suffix - add it if missing
+    let ts = timestamp;
+    if (ts && !ts.endsWith('Z') && !ts.includes('+') && !ts.includes('-', 10)) {
+      ts = ts.replace(' ', 'T') + 'Z';
+    }
+    const date = new Date(ts);
+    const now = new Date();
+    const diff = now - date;
+
+    // Less than 24 hours ago
+    if (diff < 86400000) {
+      return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    }
+
+    // Less than 7 days ago
+    if (diff < 604800000) {
+      return date.toLocaleDateString([], { weekday: 'short' });
+    }
+
+    // Otherwise show date
+    return date.toLocaleDateString([], { month: 'short', day: 'numeric' });
+  },
+
+  /**
+   * Show friends list view in messages sidebar
+   */
+  showFriendsList() {
+    document.getElementById('friends-list-view').style.display = 'block';
+    document.getElementById('conversation-view').style.display = 'none';
+  },
+
+  /**
+   * Open a specific conversation
+   */
+  async openConversation(userId, userName, userPicture) {
+    this.currentConversation = { id: userId, name: userName, picture: userPicture };
+
+    // Update header
+    document.getElementById('conversation-avatar').src = userPicture || this.getDefaultAvatar(userName);
+    document.getElementById('conversation-with').textContent = userName || 'Anonymous';
+
+    // Show conversation view
+    document.getElementById('friends-list-view').style.display = 'none';
+    document.getElementById('conversation-view').style.display = 'flex';
+
+    // Make sure sidebar is open
+    document.getElementById('messages-sidebar').classList.add('open');
+    document.getElementById('sidebar-overlay').classList.add('show');
+
+    // Load messages
+    await this.loadConversationMessages(userId);
+  },
+
+  /**
+   * Load messages for a conversation
+   */
+  async loadConversationMessages(userId) {
+    try {
+      const response = await Auth.apiRequest(`/api/messages/conversation/${userId}`);
+      if (response.ok) {
+        this.currentConversationMessages = await response.json();
+        this.renderMessages();
+        // Refresh unread count after reading messages
+        this.loadUnreadCount();
+      }
+    } catch (error) {
+      console.error('Error loading messages:', error);
+    }
+  },
+
+  /**
+   * Render messages in conversation
+   */
+  renderMessages() {
+    const listEl = document.getElementById('messages-list');
+
+    if (this.currentConversationMessages.length === 0) {
+      listEl.innerHTML = '<div class="messages-empty" style="text-align:center;color:#666;padding:40px;">No messages yet. Say hi!</div>';
+      return;
+    }
+
+    listEl.innerHTML = this.currentConversationMessages.map(msg => `
+      <div class="message-bubble ${msg.is_mine ? 'mine' : 'theirs'}">
+        ${this.escapeHtml(msg.content)}
+        <div class="message-time">${this.formatTime(msg.created_at)}</div>
+      </div>
+    `).join('');
+
+    // Scroll to bottom
+    listEl.scrollTop = listEl.scrollHeight;
+  },
+
+  /**
+   * Go back to friends list
+   */
+  backToConversations() {
+    this.currentConversation = null;
+    this.renderFriendsMessageList();
+    this.showFriendsList();
+  },
+
+  /**
+   * Send a message
+   */
+  async sendMessage() {
+    if (!this.currentConversation) return;
+
+    const input = document.getElementById('message-input');
+    const content = input.value.trim();
+    if (!content) return;
+
+    input.value = '';
+
+    try {
+      const response = await Auth.apiRequest('/api/messages/', {
+        method: 'POST',
+        body: JSON.stringify({
+          recipient_id: this.currentConversation.id,
+          content
+        })
+      });
+
+      if (response.ok) {
+        const newMessage = await response.json();
+        this.currentConversationMessages.push(newMessage);
+        this.renderMessages();
+      } else {
+        const error = await response.json();
+        alert(error.detail || 'Failed to send message');
+        input.value = content; // Restore message
+      }
+    } catch (error) {
+      console.error('Error sending message:', error);
+      alert('Failed to send message');
+      input.value = content;
+    }
   }
 };
 
