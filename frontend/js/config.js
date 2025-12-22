@@ -8,10 +8,10 @@ const CONFIG = {
   API_BASE: (() => {
     const hostname = window.location.hostname;
     if (hostname === 'localhost' || hostname === '127.0.0.1') {
-      return 'http://localhost:8787';  // Local wrangler dev
+      return 'http://localhost:8787/api';  // Local wrangler dev
     }
     // Production Worker URL
-    return 'https://vinyl-vault-api.christophercrooker.workers.dev';
+    return 'https://vinyl-vault-api.christophercrooker.workers.dev/api';
   })(),
 
   // Discogs credentials - client-side calls (Worker requests blocked by Cloudflare)
