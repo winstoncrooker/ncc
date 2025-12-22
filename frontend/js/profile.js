@@ -50,6 +50,9 @@ const Profile = {
 
     // Start polling for updates (messages, friend requests, friends)
     this.startPolling();
+
+    // Fill in missing album covers in background
+    this.fillMissingCovers();
   },
 
   /**
@@ -396,6 +399,79 @@ const Profile = {
   },
 
   /**
+   * Add album to collection in alphabetical order and re-render
+   */
+  addAlbumSorted(album) {
+    // Find insertion index for alphabetical order (by artist, then album)
+    const key = `${album.artist.toLowerCase()} ${album.album.toLowerCase()}`;
+    let insertIndex = this.collection.findIndex(a => {
+      const aKey = `${a.artist.toLowerCase()} ${a.album.toLowerCase()}`;
+      return aKey > key;
+    });
+
+    if (insertIndex === -1) {
+      this.collection.push(album);
+    } else {
+      this.collection.splice(insertIndex, 0, album);
+    }
+
+    this.renderCollection();
+  },
+
+  /**
+   * Fill in missing album covers in background (rate limited)
+   */
+  async fillMissingCovers() {
+    // Find albums without covers
+    const missingCovers = this.collection.filter(a => !a.cover);
+
+    if (missingCovers.length === 0) return;
+
+    console.log(`[Covers] Filling ${missingCovers.length} missing covers...`);
+
+    for (const album of missingCovers) {
+      try {
+        // Search Discogs for cover (globally cached)
+        const discogsResponse = await Auth.apiRequest(
+          `/api/discogs/search?artist=${encodeURIComponent(album.artist)}&album=${encodeURIComponent(album.album)}`
+        );
+
+        if (discogsResponse.ok) {
+          const data = await discogsResponse.json();
+
+          if (data.cover) {
+            // Update album in collection
+            album.cover = data.cover;
+            if (data.year && !album.year) album.year = data.year;
+            if (data.id && !album.discogs_id) album.discogs_id = data.id;
+
+            // Update in database
+            await Auth.apiRequest(`/api/collection/${album.id}`, {
+              method: 'PUT',
+              body: JSON.stringify({
+                cover: data.cover,
+                year: data.year || album.year,
+                discogs_id: data.id || album.discogs_id
+              })
+            });
+
+            // Re-render to show new cover
+            this.renderCollection();
+            console.log(`[Covers] Updated: ${album.artist} - ${album.album}`);
+          }
+        }
+      } catch (err) {
+        console.log(`[Covers] Failed: ${album.artist} - ${album.album}`);
+      }
+
+      // Rate limit: 1.2 seconds between requests
+      await new Promise(resolve => setTimeout(resolve, 1200));
+    }
+
+    console.log('[Covers] Done filling missing covers');
+  },
+
+  /**
    * Load showcase
    */
   async loadShowcase() {
@@ -715,8 +791,7 @@ const Profile = {
 
       if (response.ok) {
         const newAlbum = await response.json();
-        this.collection.push(newAlbum);
-        this.renderCollection();
+        this.addAlbumSorted(newAlbum);
         this.closeModal('add-record-modal');
       } else {
         const error = await response.json();
@@ -805,8 +880,7 @@ const Profile = {
 
       if (response.ok) {
         const newAlbum = await response.json();
-        this.collection.push(newAlbum);
-        this.renderCollection();
+        this.addAlbumSorted(newAlbum);
         this.closeModal('add-record-modal');
       } else {
         const error = await response.json();
@@ -1138,7 +1212,12 @@ const Profile = {
         }
       }
 
-      // Render updated collection
+      // Sort collection alphabetically and render
+      this.collection.sort((a, b) => {
+        const aKey = `${a.artist.toLowerCase()} ${a.album.toLowerCase()}`;
+        const bKey = `${b.artist.toLowerCase()} ${b.album.toLowerCase()}`;
+        return aKey.localeCompare(bKey);
+      });
       this.renderCollection();
 
       // Show completion message
@@ -1183,8 +1262,7 @@ const Profile = {
 
       if (response.ok) {
         const newAlbum = await response.json();
-        this.collection.push(newAlbum);
-        this.renderCollection();
+        this.addAlbumSorted(newAlbum);
       }
     } catch (error) {
       console.error('Error adding album from chat:', error);
