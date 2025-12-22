@@ -427,9 +427,45 @@ const Profile = {
 
     if (missingCovers.length === 0) return;
 
-    console.log(`[Covers] Filling ${missingCovers.length} missing covers...`);
+    const total = missingCovers.length;
+    const delayMs = 1200; // 1.2 seconds between requests
+    let completed = 0;
+    let successCount = 0;
 
-    for (const album of missingCovers) {
+    // Show progress bar
+    const progressEl = document.getElementById('cover-progress');
+    const progressText = document.getElementById('cover-progress-text');
+    const progressCount = document.getElementById('cover-progress-count');
+    const progressEta = document.getElementById('cover-progress-eta');
+    const progressFill = document.getElementById('cover-progress-fill');
+
+    if (progressEl) {
+      progressEl.style.display = 'block';
+      progressCount.textContent = `0 / ${total}`;
+      progressFill.style.width = '0%';
+    }
+
+    const formatEta = (seconds) => {
+      if (seconds < 60) return `~${Math.ceil(seconds)}s remaining`;
+      const mins = Math.floor(seconds / 60);
+      const secs = Math.ceil(seconds % 60);
+      return `~${mins}m ${secs}s remaining`;
+    };
+
+    console.log(`[Covers] Filling ${total} missing covers...`);
+
+    for (let i = 0; i < missingCovers.length; i++) {
+      const album = missingCovers[i];
+
+      // Update progress UI
+      if (progressEl) {
+        progressText.textContent = `Fetching: ${album.artist} - ${album.album}`;
+        progressCount.textContent = `${completed} / ${total}`;
+        const remainingSeconds = (total - completed) * (delayMs / 1000);
+        progressEta.textContent = formatEta(remainingSeconds);
+        progressFill.style.width = `${(completed / total) * 100}%`;
+      }
+
       try {
         // Search Discogs for cover (globally cached)
         const discogsResponse = await Auth.apiRequest(
@@ -457,18 +493,36 @@ const Profile = {
 
             // Re-render to show new cover
             this.renderCollection();
+            successCount++;
             console.log(`[Covers] Updated: ${album.artist} - ${album.album}`);
           }
         }
       } catch (err) {
-        console.log(`[Covers] Failed: ${album.artist} - ${album.album}`);
+        console.log(`[Covers] Failed: ${album.artist} - ${album.album}`, err);
       }
 
-      // Rate limit: 1.2 seconds between requests
-      await new Promise(resolve => setTimeout(resolve, 1200));
+      completed++;
+
+      // Rate limit: wait between requests (skip delay on last item)
+      if (i < missingCovers.length - 1) {
+        await new Promise(resolve => setTimeout(resolve, delayMs));
+      }
     }
 
-    console.log('[Covers] Done filling missing covers');
+    // Hide progress bar and show completion
+    if (progressEl) {
+      progressText.textContent = `Done! Updated ${successCount} of ${total} covers`;
+      progressCount.textContent = `${total} / ${total}`;
+      progressEta.textContent = '';
+      progressFill.style.width = '100%';
+
+      // Hide after 3 seconds
+      setTimeout(() => {
+        progressEl.style.display = 'none';
+      }, 3000);
+    }
+
+    console.log(`[Covers] Done filling missing covers (${successCount}/${total})`);
   },
 
   /**

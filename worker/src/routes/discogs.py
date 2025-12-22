@@ -14,6 +14,8 @@ import httpx
 import hashlib
 import json
 import base64
+import js
+from pyodide.ffi import to_js
 
 router = APIRouter()
 
@@ -171,7 +173,7 @@ async def search_album(
     if cached:
         return AlbumSearchResult(**cached, cached=True)
 
-    # Search Discogs
+    # Search Discogs using js.fetch (bypasses Cloudflare blocking)
     try:
         # Get secrets (convert from JsProxy if needed)
         discogs_key = str(env.DISCOGS_KEY) if hasattr(env, 'DISCOGS_KEY') else None
@@ -180,69 +182,63 @@ async def search_album(
         if not discogs_key or not discogs_secret:
             raise HTTPException(status_code=500, detail="Discogs credentials not configured")
 
-        async with httpx.AsyncClient() as client:
-            query = f"{artist} {album}"
-            response = await client.get(
-                f"{DISCOGS_API}/database/search",
-                params={
-                    "q": query,
-                    "type": "release",
-                    "key": discogs_key,
-                    "secret": discogs_secret
-                },
-                headers={"User-Agent": "VinylVault/2.0"},
-                timeout=10.0
+        query = f"{artist} {album}"
+        url = f"{DISCOGS_API}/database/search?q={js.encodeURIComponent(query)}&type=release&key={discogs_key}&secret={discogs_secret}"
+
+        headers = to_js({
+            "User-Agent": "NicheCollectorConnector/1.0 +https://niche-collector.pages.dev"
+        })
+
+        response = await js.fetch(url, to_js({"headers": headers}))
+
+        if response.status != 200:
+            text = await response.text()
+            raise HTTPException(
+                status_code=response.status,
+                detail=f"Discogs API error: {response.status} - {text[:200]}"
             )
 
-            if response.status_code != 200:
-                # Include response body for debugging
-                error_body = response.text[:200] if response.text else "No body"
-                raise HTTPException(
-                    status_code=response.status_code,
-                    detail=f"Discogs API error: {response.status_code} - {error_body}"
-                )
+        data = (await response.json()).to_py()
 
-            data = response.json()
+        if not data.get("results"):
+            raise HTTPException(status_code=404, detail="Album not found")
 
-            if not data.get("results"):
-                raise HTTPException(status_code=404, detail="Album not found")
+        # Find best match
+        results = data["results"]
+        best_match = None
+        artist_lower = artist.lower()
+        album_lower = album.lower()
 
-            # Find best match
-            results = data["results"]
-            best_match = None
-            artist_lower = artist.lower()
-            album_lower = album.lower()
+        for r in results:
+            title_lower = r.get("title", "").lower()
+            if artist_lower in title_lower and album_lower in title_lower:
+                best_match = r
+                break
 
-            for r in results:
-                title_lower = r.get("title", "").lower()
-                if artist_lower in title_lower and album_lower in title_lower:
-                    best_match = r
-                    break
+        if not best_match:
+            best_match = results[0]
 
-            if not best_match:
-                best_match = results[0]
+        # Get cover image
+        cover_url = best_match.get("cover_image") or best_match.get("thumb")
+        local_cover = await cache_image(env, cover_url, cache_key)
 
-            # Get cover image
-            cover_url = best_match.get("cover_image") or best_match.get("thumb")
-            local_cover = await cache_image(env, cover_url, cache_key)
+        # Get price (separate request to avoid rate limits in main search)
+        price = None
+        release_id = best_match.get("id")
 
-            # Get price (separate request to avoid rate limits in main search)
-            price = None
-            release_id = best_match.get("id")
+        result = AlbumSearchResult(
+            id=release_id,
+            title=best_match.get("title"),
+            year=best_match.get("year"),
+            cover=local_cover or cover_url,
+            cover_original=cover_url,
+            price=price
+        )
 
-            result = AlbumSearchResult(
-                id=release_id,
-                title=best_match.get("title"),
-                year=best_match.get("year"),
-                cover=local_cover or cover_url,
-                cover_original=cover_url,
-                price=price
-            )
+        # Cache the result
+        await save_cached_data(env, cache_key, result.model_dump())
 
-            # Cache the result
-            await save_cached_data(env, cache_key, result.model_dump())
-
-            return result
+        return result
 
     except HTTPException:
         raise

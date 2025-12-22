@@ -3,7 +3,7 @@
  * Enables offline support and caching
  */
 
-const CACHE_NAME = 'niche-collector-v14';
+const CACHE_NAME = 'niche-collector-v15';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
