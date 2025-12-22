@@ -12,6 +12,16 @@ router = APIRouter()
 MAX_DEPTH = 3  # Maximum nesting depth
 
 
+def safe_value(val, default=None):
+    """Convert JsNull/JsProxy to Python None, return value otherwise."""
+    if val is None:
+        return default
+    type_str = str(type(val))
+    if 'JsProxy' in type_str or 'JsNull' in type_str:
+        return default
+    return val
+
+
 class CommentAuthor(BaseModel):
     """Comment author info"""
     id: int
@@ -106,14 +116,14 @@ async def get_comments(
                 user_id=row["user_id"],
                 author=CommentAuthor(
                     id=row["user_id"],
-                    name=row.get("author_name"),
-                    picture=row.get("author_picture")
+                    name=safe_value(row.get("author_name")),
+                    picture=safe_value(row.get("author_picture"))
                 ),
-                parent_comment_id=row.get("parent_comment_id"),
+                parent_comment_id=safe_value(row.get("parent_comment_id")),
                 body=row["body"],
-                upvote_count=row.get("upvote_count", 0),
-                downvote_count=row.get("downvote_count", 0),
-                user_vote=row.get("user_vote"),
+                upvote_count=safe_value(row.get("upvote_count"), 0),
+                downvote_count=safe_value(row.get("downvote_count"), 0),
+                user_vote=safe_value(row.get("user_vote")),
                 depth=0,
                 replies=[],
                 created_at=str(row["created_at"])

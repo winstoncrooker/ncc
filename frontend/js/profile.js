@@ -39,15 +39,19 @@ const Profile = {
     this.setupEventListeners();
     this.setupCropperListeners();
 
-    // Load data
+    // Load profile and user categories first (needed for category filtering)
     await Promise.all([
       this.loadProfile(),
-      this.loadCollection(),
-      this.loadShowcase(),
+      this.loadUserCategories(),
       this.loadFriends(),
       this.loadFriendRequests(),
-      this.loadUnreadCount(),
-      this.loadUserCategories()
+      this.loadUnreadCount()
+    ]);
+
+    // Now load collection and showcase with category filter applied
+    await Promise.all([
+      this.loadCollection(),
+      this.loadShowcase()
     ]);
 
     // Render user menu
@@ -1071,11 +1075,16 @@ const Profile = {
   },
 
   /**
-   * Load showcase
+   * Load showcase (filtered by current category if set)
    */
   async loadShowcase() {
     try {
-      const response = await Auth.apiRequest('/api/profile/me/showcase');
+      const categoryId = this.getCurrentCategoryId();
+      const url = categoryId
+        ? `/api/profile/me/showcase?category_id=${categoryId}`
+        : '/api/profile/me/showcase';
+
+      const response = await Auth.apiRequest(url);
       if (response.ok) {
         this.showcase = await response.json();
         this.renderShowcase();

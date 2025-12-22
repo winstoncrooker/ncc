@@ -162,12 +162,20 @@
 .group-item {
   display: flex;
   align-items: center;
-  gap: 10px;
+  justify-content: space-between;
   padding: 10px 12px;
   background: rgba(255, 255, 255, 0.05);
   border-radius: 8px;
   cursor: pointer;
   transition: background 0.2s ease;
+}
+
+.group-main {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  min-width: 0;
 }
 
 .group-item:hover {
@@ -190,6 +198,27 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.leave-btn {
+  background: none;
+  border: none;
+  color: rgba(255, 255, 255, 0.3);
+  font-size: 1.2rem;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 4px;
+  opacity: 0;
+  transition: all 0.2s ease;
+}
+
+.group-item:hover .leave-btn {
+  opacity: 1;
+}
+
+.leave-btn:hover {
+  color: #e63946;
+  background: rgba(230, 57, 70, 0.1);
 }
 
 .discover-btn {
@@ -571,6 +600,20 @@
 
 .reply-btn:hover {
   color: #1db954;
+}
+
+.delete-btn {
+  background: none;
+  border: none;
+  color: rgba(255, 255, 255, 0.4);
+  cursor: pointer;
+  font-size: 0.75rem;
+  padding: 4px 8px;
+  margin-left: 8px;
+}
+
+.delete-btn:hover {
+  color: #e63946;
 }
 
 .reply-form {

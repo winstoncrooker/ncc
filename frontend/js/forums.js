@@ -325,20 +325,34 @@ const Forums = {
         post.user_vote = data.vote_value;
       }
 
-      // Update vote count display
+      // Update vote count display in feed
       const voteCount = document.getElementById(`vote-count-${postId}`);
       if (voteCount) {
         voteCount.textContent = data.upvote_count - data.downvote_count;
       }
 
-      // Update button states
+      // Update button states in feed
       const card = document.querySelector(`[data-post-id="${postId}"]`);
       if (card) {
         const upvoteBtn = card.querySelector('.vote-btn.upvote');
         const downvoteBtn = card.querySelector('.vote-btn.downvote');
 
-        upvoteBtn.classList.toggle('active', data.vote_value === 1);
-        downvoteBtn.classList.toggle('active', data.vote_value === -1);
+        if (upvoteBtn) upvoteBtn.classList.toggle('active', data.vote_value === 1);
+        if (downvoteBtn) downvoteBtn.classList.toggle('active', data.vote_value === -1);
+      }
+
+      // Also update post detail view if open
+      const postPage = document.getElementById('post-page');
+      if (postPage && postPage.style.display !== 'none') {
+        const detailVoteCount = postPage.querySelector('.vote-count');
+        if (detailVoteCount) {
+          detailVoteCount.textContent = data.upvote_count - data.downvote_count;
+        }
+
+        const detailUpvote = postPage.querySelector('.vote-btn.upvote');
+        const detailDownvote = postPage.querySelector('.vote-btn.downvote');
+        if (detailUpvote) detailUpvote.classList.toggle('active', data.vote_value === 1);
+        if (detailDownvote) detailDownvote.classList.toggle('active', data.vote_value === -1);
       }
 
     } catch (error) {
@@ -593,14 +607,26 @@ const Forums = {
   /**
    * Render comments recursively
    */
-  renderComments(comments, depth = 0) {
+  renderComments(comments, depth = 0, currentUserId = null) {
     if (!comments || comments.length === 0) {
       return depth === 0 ? '<p class="no-comments">No comments yet</p>' : '';
+    }
+
+    // Get current user ID from Auth if not passed
+    if (!currentUserId && typeof Auth !== 'undefined') {
+      const token = Auth.getToken();
+      if (token) {
+        try {
+          const payload = JSON.parse(atob(token.split('.')[1]));
+          currentUserId = payload.sub || payload.user_id;
+        } catch (e) {}
+      }
     }
 
     return comments.map(comment => {
       const score = comment.upvote_count - comment.downvote_count;
       const timeAgo = this.formatTimeAgo(comment.created_at);
+      const isOwner = currentUserId && comment.user_id == currentUserId;
 
       return `
         <div class="comment depth-${depth}" data-comment-id="${comment.id}">
@@ -617,13 +643,14 @@ const Forums = {
                 <polyline points="18 15 12 9 6 15"></polyline>
               </svg>
             </button>
-            <span class="vote-count">${score}</span>
+            <span class="vote-count" id="comment-vote-${comment.id}">${score}</span>
             <button class="vote-btn ${comment.user_vote === -1 ? 'active' : ''}" onclick="Forums.voteComment(${comment.id}, -1)">
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <polyline points="6 9 12 15 18 9"></polyline>
               </svg>
             </button>
             ${depth < 2 ? `<button class="reply-btn" onclick="Forums.showReplyForm(${comment.id})">Reply</button>` : ''}
+            ${isOwner ? `<button class="delete-btn" onclick="Forums.deleteComment(${comment.id})">Delete</button>` : ''}
           </div>
           <div class="reply-form" id="reply-form-${comment.id}" style="display:none">
             <textarea placeholder="Reply..." rows="2"></textarea>
@@ -634,7 +661,7 @@ const Forums = {
           </div>
           ${comment.replies && comment.replies.length > 0 ? `
             <div class="comment-replies">
-              ${this.renderComments(comment.replies, depth + 1)}
+              ${this.renderComments(comment.replies, depth + 1, currentUserId)}
             </div>
           ` : ''}
         </div>
@@ -674,7 +701,7 @@ const Forums = {
   },
 
   /**
-   * Vote on comment
+   * Vote on comment with optimistic UI update
    */
   async voteComment(commentId, value) {
     try {
@@ -689,13 +716,62 @@ const Forums = {
 
       if (!response.ok) throw new Error('Vote failed');
 
-      // Reload post to update UI
-      if (this.currentPostId) {
-        this.openPost(this.currentPostId);
+      const data = await response.json();
+
+      // Update UI optimistically
+      const voteCount = document.getElementById(`comment-vote-${commentId}`);
+      if (voteCount) {
+        voteCount.textContent = data.upvote_count - data.downvote_count;
+      }
+
+      // Update button states
+      const comment = document.querySelector(`[data-comment-id="${commentId}"]`);
+      if (comment) {
+        const upvoteBtn = comment.querySelector('.vote-btn:first-child');
+        const downvoteBtn = comment.querySelectorAll('.vote-btn')[1];
+
+        if (upvoteBtn) upvoteBtn.classList.toggle('active', data.vote_value === 1);
+        if (downvoteBtn) downvoteBtn.classList.toggle('active', data.vote_value === -1);
       }
 
     } catch (error) {
       console.error('Error voting on comment:', error);
+    }
+  },
+
+  /**
+   * Delete a comment
+   */
+  async deleteComment(commentId) {
+    if (!confirm('Are you sure you want to delete this comment?')) return;
+
+    try {
+      const response = await fetch(`${API_BASE}/comments/${commentId}`, {
+        method: 'DELETE',
+        headers: Auth.getAuthHeaders()
+      });
+
+      if (!response.ok) throw new Error('Failed to delete comment');
+
+      // Remove comment from DOM
+      const commentEl = document.querySelector(`[data-comment-id="${commentId}"]`);
+      if (commentEl) {
+        commentEl.remove();
+      }
+
+      // Update comment count in header
+      const countEl = document.querySelector('.post-comments h4');
+      if (countEl) {
+        const match = countEl.textContent.match(/\((\d+)\)/);
+        if (match) {
+          const newCount = Math.max(0, parseInt(match[1]) - 1);
+          countEl.textContent = `Comments (${newCount})`;
+        }
+      }
+
+    } catch (error) {
+      console.error('Error deleting comment:', error);
+      alert('Failed to delete comment');
     }
   },
 
@@ -920,9 +996,12 @@ const Forums = {
         const isActive = (interest.interest_group_id && this.currentGroupId === interest.interest_group_id) ||
                          (!interest.interest_group_id && this.currentCategory === interest.category_slug);
         return `
-          <div class="group-item ${isActive ? 'active' : ''}" onclick="Forums.filterByGroup(${interest.interest_group_id || 0}, ${interest.category_id || 0}, '${interest.category_slug || ''}')">
-            <span class="group-icon">${icon}</span>
-            <span class="group-name">${this.escapeHtml(name)}</span>
+          <div class="group-item ${isActive ? 'active' : ''}" data-interest-id="${interest.id}">
+            <div class="group-main" onclick="Forums.filterByGroup(${interest.interest_group_id || 0}, ${interest.category_id || 0}, '${interest.category_slug || ''}')">
+              <span class="group-icon">${icon}</span>
+              <span class="group-name">${this.escapeHtml(name)}</span>
+            </div>
+            <button class="leave-btn" onclick="event.stopPropagation(); Forums.leaveGroup(${interest.id})" title="Leave group">×</button>
           </div>
         `;
       }).join('');
@@ -1121,6 +1200,38 @@ const Forums = {
 
     } catch (error) {
       console.error('Error joining group:', error);
+    }
+  },
+
+  /**
+   * Leave a group/category
+   */
+  async leaveGroup(interestId) {
+    if (!confirm('Are you sure you want to leave this group?')) return;
+
+    try {
+      const response = await fetch(`${API_BASE}/interests/leave/${interestId}`, {
+        method: 'POST',
+        headers: Auth.getAuthHeaders()
+      });
+
+      if (!response.ok) throw new Error('Failed to leave group');
+
+      // Remove from DOM
+      const item = document.querySelector(`[data-interest-id="${interestId}"]`);
+      if (item) item.remove();
+
+      // Refresh sidebar and reset filter if we left the currently filtered group
+      this.loadMyGroups();
+
+      // Also refresh Profile's userCategories
+      if (typeof Profile !== 'undefined') {
+        await Profile.loadUserCategories();
+      }
+
+    } catch (error) {
+      console.error('Error leaving group:', error);
+      alert('Failed to leave group');
     }
   },
 

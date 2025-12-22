@@ -153,22 +153,32 @@ async def update_profile(
 @router.get("/me/showcase")
 async def get_showcase(
     request: Request,
+    category_id: Optional[int] = None,
     user_id: int = Depends(require_auth)
 ) -> list[ShowcaseAlbum]:
     """
     Get user's showcase albums.
-    Returns featured albums for profile display.
+    Returns featured albums for profile display, optionally filtered by category.
     """
     env = request.scope["env"]
 
     try:
-        results = await env.DB.prepare(
-            """SELECT s.id, s.collection_id, s.position, c.artist, c.album, c.cover, c.year
-               FROM showcase_albums s
-               JOIN collections c ON s.collection_id = c.id
-               WHERE s.user_id = ?
-               ORDER BY s.position ASC"""
-        ).bind(user_id).all()
+        if category_id:
+            results = await env.DB.prepare(
+                """SELECT s.id, s.collection_id, s.position, c.artist, c.album, c.cover, c.year
+                   FROM showcase_albums s
+                   JOIN collections c ON s.collection_id = c.id
+                   WHERE s.user_id = ? AND c.category_id = ?
+                   ORDER BY s.position ASC"""
+            ).bind(user_id, category_id).all()
+        else:
+            results = await env.DB.prepare(
+                """SELECT s.id, s.collection_id, s.position, c.artist, c.album, c.cover, c.year
+                   FROM showcase_albums s
+                   JOIN collections c ON s.collection_id = c.id
+                   WHERE s.user_id = ?
+                   ORDER BY s.position ASC"""
+            ).bind(user_id).all()
 
         albums = []
         for row in results.results:
