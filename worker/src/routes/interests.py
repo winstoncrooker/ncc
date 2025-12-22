@@ -63,15 +63,21 @@ async def get_my_interests(
     env = request.scope["env"]
 
     try:
+        # Note: category can come from either ui.category_id (direct category membership)
+        # or from ig.category_id (when user joins a group within a category)
         result = await env.DB.prepare(
-            """SELECT ui.id, ui.category_id, ui.interest_group_id, ui.notify_all,
-                      c.slug as category_slug, c.name as category_name, c.icon as category_icon,
+            """SELECT ui.id, ui.interest_group_id, ui.notify_all,
+                      COALESCE(ui.category_id, ig.category_id) as category_id,
+                      COALESCE(c.slug, gc.slug) as category_slug,
+                      COALESCE(c.name, gc.name) as category_name,
+                      COALESCE(c.icon, gc.icon) as category_icon,
                       ig.slug as group_slug, ig.name as group_name
                FROM user_interests ui
                LEFT JOIN categories c ON ui.category_id = c.id
                LEFT JOIN interest_groups ig ON ui.interest_group_id = ig.id
+               LEFT JOIN categories gc ON ig.category_id = gc.id
                WHERE ui.user_id = ?
-               ORDER BY c.name, ig.name"""
+               ORDER BY COALESCE(c.name, gc.name), ig.name"""
         ).bind(user_id).all()
 
         if hasattr(result, 'to_py'):

@@ -22,6 +22,170 @@ const Profile = {
   currentCategorySlug: null,
   currentCategoryProfile: null,
 
+  // Category-specific terminology
+  categoryTerms: {
+    'vinyl': {
+      itemSingular: 'record',
+      itemPlural: 'records',
+      field1Label: 'Artist',
+      field1Placeholder: 'Artist name',
+      field2Label: 'Album',
+      field2Placeholder: 'Album title',
+      addTitle: 'Add Record',
+      showcaseEmpty: 'No albums in your showcase yet',
+      showcaseHint: 'Add up to 8 albums from your collection to feature here',
+      collectionEmpty: 'Your collection is empty',
+      collectionHint: 'Use the AI assistant to add albums or search Discogs',
+      aiCapabilities: [
+        'Writing your bio',
+        'Adding records to your collection',
+        'Finding albums on Discogs',
+        'Choosing what to showcase'
+      ]
+    },
+    'trading-cards': {
+      itemSingular: 'card',
+      itemPlural: 'cards',
+      field1Label: 'Set/Brand',
+      field1Placeholder: 'e.g. Pokemon Base Set',
+      field2Label: 'Card Name',
+      field2Placeholder: 'Card name',
+      addTitle: 'Add Card',
+      showcaseEmpty: 'No cards in your showcase yet',
+      showcaseHint: 'Add up to 8 cards from your collection to feature here',
+      collectionEmpty: 'Your collection is empty',
+      collectionHint: 'Use the AI assistant to add cards or enter manually',
+      aiCapabilities: [
+        'Writing your bio',
+        'Adding cards to your collection',
+        'Tracking card values and grades',
+        'Building deck lists'
+      ]
+    },
+    'cars': {
+      itemSingular: 'vehicle',
+      itemPlural: 'vehicles',
+      field1Label: 'Make',
+      field1Placeholder: 'e.g. Ford, Toyota',
+      field2Label: 'Model',
+      field2Placeholder: 'e.g. Mustang, Supra',
+      addTitle: 'Add Vehicle',
+      showcaseEmpty: 'No vehicles in your showcase yet',
+      showcaseHint: 'Add up to 8 vehicles from your collection to feature here',
+      collectionEmpty: 'Your garage is empty',
+      collectionHint: 'Use the AI assistant to add vehicles or enter manually',
+      aiCapabilities: [
+        'Writing your bio',
+        'Adding vehicles to your garage',
+        'Tracking mods and builds',
+        'Choosing what to showcase'
+      ]
+    },
+    'sneakers': {
+      itemSingular: 'pair',
+      itemPlural: 'pairs',
+      field1Label: 'Brand',
+      field1Placeholder: 'e.g. Nike, Adidas',
+      field2Label: 'Model/Colorway',
+      field2Placeholder: 'e.g. Air Jordan 1 Chicago',
+      addTitle: 'Add Sneakers',
+      showcaseEmpty: 'No sneakers in your showcase yet',
+      showcaseHint: 'Add up to 8 pairs from your collection to feature here',
+      collectionEmpty: 'Your collection is empty',
+      collectionHint: 'Use the AI assistant to add sneakers or enter manually',
+      aiCapabilities: [
+        'Writing your bio',
+        'Adding kicks to your collection',
+        'Tracking release dates and drops',
+        'Choosing grails to showcase'
+      ]
+    },
+    'watches': {
+      itemSingular: 'watch',
+      itemPlural: 'watches',
+      field1Label: 'Brand',
+      field1Placeholder: 'e.g. Rolex, Omega',
+      field2Label: 'Model',
+      field2Placeholder: 'e.g. Submariner, Speedmaster',
+      addTitle: 'Add Watch',
+      showcaseEmpty: 'No watches in your showcase yet',
+      showcaseHint: 'Add up to 8 watches from your collection to feature here',
+      collectionEmpty: 'Your collection is empty',
+      collectionHint: 'Use the AI assistant to add watches or enter manually',
+      aiCapabilities: [
+        'Writing your bio',
+        'Adding watches to your collection',
+        'Learning about movements and complications',
+        'Choosing timepieces to showcase'
+      ]
+    },
+    'comics': {
+      itemSingular: 'comic',
+      itemPlural: 'comics',
+      field1Label: 'Publisher/Series',
+      field1Placeholder: 'e.g. Marvel, Amazing Spider-Man',
+      field2Label: 'Issue/Title',
+      field2Placeholder: 'e.g. #300, First Appearance',
+      addTitle: 'Add Comic',
+      showcaseEmpty: 'No comics in your showcase yet',
+      showcaseHint: 'Add up to 8 comics from your collection to feature here',
+      collectionEmpty: 'Your collection is empty',
+      collectionHint: 'Use the AI assistant to add comics or enter manually',
+      aiCapabilities: [
+        'Writing your bio',
+        'Adding comics to your long boxes',
+        'Finding key issues and first appearances',
+        'Choosing slabs to showcase'
+      ]
+    },
+    'video-games': {
+      itemSingular: 'game',
+      itemPlural: 'games',
+      field1Label: 'Platform',
+      field1Placeholder: 'e.g. PS5, Nintendo Switch',
+      field2Label: 'Title',
+      field2Placeholder: 'Game title',
+      addTitle: 'Add Game',
+      showcaseEmpty: 'No games in your showcase yet',
+      showcaseHint: 'Add up to 8 games from your collection to feature here',
+      collectionEmpty: 'Your library is empty',
+      collectionHint: 'Use the AI assistant to add games or enter manually',
+      aiCapabilities: [
+        'Writing your bio',
+        'Adding games to your library',
+        'Managing your backlog',
+        'Choosing favorites to showcase'
+      ]
+    },
+    'coins': {
+      itemSingular: 'coin',
+      itemPlural: 'coins',
+      field1Label: 'Country/Type',
+      field1Placeholder: 'e.g. USA, Morgan Dollar',
+      field2Label: 'Year/Denomination',
+      field2Placeholder: 'e.g. 1921, $1',
+      addTitle: 'Add Coin',
+      showcaseEmpty: 'No coins in your showcase yet',
+      showcaseHint: 'Add up to 8 coins from your collection to feature here',
+      collectionEmpty: 'Your collection is empty',
+      collectionHint: 'Use the AI assistant to add coins or enter manually',
+      aiCapabilities: [
+        'Writing your bio',
+        'Adding coins to your collection',
+        'Learning about mint marks and varieties',
+        'Choosing pieces to showcase'
+      ]
+    }
+  },
+
+  /**
+   * Get terminology for current category
+   */
+  getTerms() {
+    const slug = this.currentCategorySlug || 'vinyl';
+    return this.categoryTerms[slug] || this.categoryTerms['vinyl'];
+  },
+
   /**
    * Initialize the profile page
    */
@@ -382,17 +546,24 @@ const Profile = {
       });
 
       this.userCategories = Array.from(categoryMap.values());
-      this.renderCategorySwitcher();
 
-      // Apply UI updates for the first/default category
+      // Load saved category from localStorage (if user was on a category before)
+      const savedCategory = localStorage.getItem('ncc_current_category');
+
+      // Apply UI updates for the saved or first category
       if (this.userCategories.length > 0) {
-        const defaultCategory = this.currentCategorySlug || this.userCategories[0].slug;
+        // Check if saved category is still valid (user still has it)
+        const validSavedCategory = savedCategory && this.userCategories.some(c => c.slug === savedCategory);
+        const defaultCategory = validSavedCategory ? savedCategory : this.userCategories[0].slug;
         this.currentCategorySlug = defaultCategory;
         this.updateUIForCategory(defaultCategory);
       } else {
         // Default to vinyl if no categories joined
         this.updateUIForCategory('vinyl');
       }
+
+      // Render switcher after setting current category
+      this.renderCategorySwitcher();
 
     } catch (error) {
       console.error('Error loading user categories:', error);
@@ -418,16 +589,10 @@ const Profile = {
 
     section.style.display = 'block';
 
-    // Populate dropdown with all user categories
-    select.innerHTML = this.userCategories.map((cat, idx) => `
-      <option value="${cat.slug}" ${idx === 0 ? 'selected' : ''}>${cat.icon || ''} ${cat.name}</option>
+    // Populate dropdown with all user categories, selecting the current one
+    select.innerHTML = this.userCategories.map(cat => `
+      <option value="${cat.slug}" ${cat.slug === this.currentCategorySlug ? 'selected' : ''}>${cat.icon || ''} ${cat.name}</option>
     `).join('');
-
-    // Set current category to first one if not set
-    if (!this.currentCategorySlug && this.userCategories.length > 0) {
-      this.currentCategorySlug = this.userCategories[0].slug;
-      this.updateUIForCategory(this.currentCategorySlug);
-    }
   },
 
   /**
@@ -437,6 +602,9 @@ const Profile = {
     if (!categorySlug) return;
 
     this.currentCategorySlug = categorySlug;
+
+    // Save to localStorage so user returns to this category on page reload
+    localStorage.setItem('ncc_current_category', categorySlug);
 
     try {
       // Load category-specific profile (optional)
@@ -471,15 +639,29 @@ const Profile = {
 
     // Update "Add Record" buttons
     this.updateAddButtons(categorySlug);
+
+    // Update AI chat welcome checklist
+    this.updateAIWelcome();
+  },
+
+  /**
+   * Update AI chat welcome message with category-specific capabilities
+   */
+  updateAIWelcome() {
+    const terms = this.getTerms();
+    const welcomeList = document.querySelector('.ai-welcome ul');
+
+    if (welcomeList && terms.aiCapabilities) {
+      welcomeList.innerHTML = terms.aiCapabilities.map(cap => `<li>${cap}</li>`).join('');
+    }
   },
 
   /**
    * Update Add buttons text based on category
    */
   updateAddButtons(categorySlug) {
-    const nouns = typeof TemplateRegistry !== 'undefined' ?
-      TemplateRegistry.getItemNouns(categorySlug) :
-      { singular: 'Record', plural: 'Records', icon: '💿' };
+    const terms = this.getTerms();
+    const capitalizedSingular = terms.itemSingular.charAt(0).toUpperCase() + terms.itemSingular.slice(1);
 
     // Update showcase add button
     const showcaseBtn = document.getElementById('add-to-showcase-btn');
@@ -489,7 +671,7 @@ const Profile = {
           <line x1="12" y1="5" x2="12" y2="19"></line>
           <line x1="5" y1="12" x2="19" y2="12"></line>
         </svg>
-        Add ${nouns.singular}
+        Add ${capitalizedSingular}
       `;
     }
 
@@ -501,23 +683,34 @@ const Profile = {
           <line x1="12" y1="5" x2="12" y2="19"></line>
           <line x1="5" y1="12" x2="19" y2="12"></line>
         </svg>
-        Add ${nouns.singular}
+        Add ${capitalizedSingular}
       `;
     }
 
     // Update modal title
     const modalTitle = document.querySelector('#add-record-modal h3');
     if (modalTitle) {
-      modalTitle.textContent = `Add ${nouns.singular}`;
+      modalTitle.textContent = terms.addTitle;
     }
+
+    // Update modal field labels and placeholders
+    const artistLabel = document.querySelector('label[for="manual-artist"]');
+    const artistInput = document.getElementById('manual-artist');
+    if (artistLabel) artistLabel.textContent = terms.field1Label + ' *';
+    if (artistInput) artistInput.placeholder = terms.field1Placeholder;
+
+    const albumLabel = document.querySelector('label[for="manual-album"]');
+    const albumInput = document.getElementById('manual-album');
+    if (albumLabel) albumLabel.textContent = terms.field2Label + ' *';
+    if (albumInput) albumInput.placeholder = terms.field2Placeholder;
 
     // Update showcase empty state text
     const showcaseEmpty = document.getElementById('showcase-empty');
     if (showcaseEmpty) {
       showcaseEmpty.innerHTML = `
-        <div class="empty-icon">${nouns.icon}</div>
-        <p>No ${nouns.plural.toLowerCase()} in your showcase yet</p>
-        <span>Add up to 8 ${nouns.plural.toLowerCase()} from your collection to feature here</span>
+        <div class="empty-icon">💿</div>
+        <p>${terms.showcaseEmpty}</p>
+        <span>${terms.showcaseHint}</span>
       `;
     }
 
@@ -525,9 +718,9 @@ const Profile = {
     const collectionEmpty = document.getElementById('collection-empty');
     if (collectionEmpty) {
       collectionEmpty.innerHTML = `
-        <div class="empty-icon">${nouns.icon}</div>
-        <p>Your collection is empty</p>
-        <span>Add your first ${nouns.singular.toLowerCase()} to get started!</span>
+        <div class="empty-icon">📀</div>
+        <p>${terms.collectionEmpty}</p>
+        <span>${terms.collectionHint}</span>
       `;
     }
   },
@@ -635,6 +828,7 @@ const Profile = {
   renderCollection() {
     const grid = document.getElementById('collection-grid');
     const countEl = document.getElementById('collection-count');
+    const terms = this.getTerms();
 
     if (countEl) countEl.textContent = this.collection.length;
     if (!grid) return;
@@ -643,8 +837,8 @@ const Profile = {
       grid.innerHTML = `
         <div class="collection-empty" id="collection-empty">
           <div class="empty-icon">📀</div>
-          <p>Your collection is empty</p>
-          <span>Use the AI assistant to add albums or search Discogs</span>
+          <p>${terms.collectionEmpty}</p>
+          <span>${terms.collectionHint}</span>
         </div>
       `;
       return;
@@ -1099,13 +1293,14 @@ const Profile = {
    */
   renderShowcase() {
     const grid = document.getElementById('showcase-grid');
+    const terms = this.getTerms();
 
     if (this.showcase.length === 0) {
       grid.innerHTML = `
         <div class="showcase-empty" id="showcase-empty">
           <div class="empty-icon">💿</div>
-          <p>No albums in your showcase yet</p>
-          <span>Add up to 8 albums from your collection to feature here</span>
+          <p>${terms.showcaseEmpty}</p>
+          <span>${terms.showcaseHint}</span>
         </div>
       `;
       return;
@@ -2369,7 +2564,7 @@ const Profile = {
   },
 
   /**
-   * View friend's profile
+   * View friend's profile (quick modal view)
    */
   async viewFriendProfile(userId) {
     try {
@@ -2382,6 +2577,229 @@ const Profile = {
     } catch (error) {
       console.error('Error loading profile:', error);
     }
+  },
+
+  /**
+   * State for full page friend profile view
+   */
+  friendProfileState: {
+    userId: null,
+    profile: null,
+    categories: [],
+    currentCategoryId: null,
+    showcase: [],
+    collection: []
+  },
+
+  /**
+   * Open full page friend profile view
+   */
+  async openFriendFullProfile(userId) {
+    // Hide profile view, show friend profile page
+    const profileView = document.getElementById('profile-view');
+    let friendPage = document.getElementById('friend-profile-page');
+
+    // Create friend profile page container if it doesn't exist
+    if (!friendPage) {
+      friendPage = document.createElement('div');
+      friendPage.id = 'friend-profile-page';
+      friendPage.className = 'friend-profile-page';
+      profileView.parentNode.insertBefore(friendPage, profileView.nextSibling);
+    }
+
+    profileView.style.display = 'none';
+    friendPage.style.display = 'block';
+    friendPage.innerHTML = '<div class="friend-profile-loading">Loading profile...</div>';
+
+    try {
+      // Fetch friend's profile, categories in parallel
+      const [profileRes, categoriesRes] = await Promise.all([
+        Auth.apiRequest(`/api/friends/user/${userId}`),
+        Auth.apiRequest(`/api/friends/user/${userId}/categories`)
+      ]);
+
+      if (!profileRes.ok) throw new Error('Failed to load profile');
+
+      const profile = await profileRes.json();
+      const categories = categoriesRes.ok ? await categoriesRes.json() : [];
+
+      // Store state
+      this.friendProfileState = {
+        userId,
+        profile,
+        categories,
+        currentCategoryId: categories.length > 0 ? categories[0].id : null,
+        showcase: [],
+        collection: []
+      };
+
+      // Load category-specific data
+      if (this.friendProfileState.currentCategoryId) {
+        await this.loadFriendCategoryData(userId, this.friendProfileState.currentCategoryId);
+      } else {
+        // Load all data if no categories
+        const [showcaseRes, collectionRes] = await Promise.all([
+          Auth.apiRequest(`/api/friends/user/${userId}/showcase`),
+          Auth.apiRequest(`/api/friends/user/${userId}/collection`)
+        ]);
+        this.friendProfileState.showcase = showcaseRes.ok ? await showcaseRes.json() : [];
+        this.friendProfileState.collection = collectionRes.ok ? await collectionRes.json() : [];
+      }
+
+      this.renderFriendFullProfile();
+
+    } catch (error) {
+      console.error('Error loading friend profile:', error);
+      friendPage.innerHTML = `
+        <div class="friend-profile-error">
+          <button class="back-btn" onclick="Profile.closeFriendFullProfile()">← Back</button>
+          <p>Failed to load profile</p>
+        </div>
+      `;
+    }
+  },
+
+  /**
+   * Load friend's category-specific showcase and collection
+   */
+  async loadFriendCategoryData(userId, categoryId) {
+    try {
+      const [showcaseRes, collectionRes] = await Promise.all([
+        Auth.apiRequest(`/api/friends/user/${userId}/showcase?category_id=${categoryId}`),
+        Auth.apiRequest(`/api/friends/user/${userId}/collection?category_id=${categoryId}`)
+      ]);
+
+      this.friendProfileState.showcase = showcaseRes.ok ? await showcaseRes.json() : [];
+      this.friendProfileState.collection = collectionRes.ok ? await collectionRes.json() : [];
+    } catch (error) {
+      console.error('Error loading friend category data:', error);
+    }
+  },
+
+  /**
+   * Switch friend profile category
+   */
+  async switchFriendCategory(categoryId) {
+    if (!this.friendProfileState.userId) return;
+
+    this.friendProfileState.currentCategoryId = categoryId;
+    await this.loadFriendCategoryData(this.friendProfileState.userId, categoryId);
+    this.renderFriendFullProfile();
+  },
+
+  /**
+   * Render full page friend profile
+   */
+  renderFriendFullProfile() {
+    const { profile, categories, currentCategoryId, showcase, collection } = this.friendProfileState;
+    const friendPage = document.getElementById('friend-profile-page');
+    const currentCategory = categories.find(c => c.id === currentCategoryId);
+
+    friendPage.innerHTML = `
+      <div class="friend-profile-content">
+        <button class="back-btn" onclick="Profile.closeFriendFullProfile()">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M19 12H5M12 19l-7-7 7-7"/>
+          </svg>
+          Back to Profile
+        </button>
+
+        <div class="friend-profile-header" style="${profile.background_image ? `background-image: url(${profile.background_image})` : ''}">
+          <img src="${profile.picture || this.getDefaultAvatar(profile.name)}"
+               alt="${profile.name}"
+               class="friend-profile-picture"
+               onerror="this.src='${this.getDefaultAvatar(profile.name)}'">
+          <div class="friend-profile-info">
+            <h1 class="friend-profile-name">${this.escapeHtml(profile.name || 'Anonymous')}</h1>
+            ${profile.pronouns ? `<span class="friend-profile-pronouns">${this.escapeHtml(profile.pronouns)}</span>` : ''}
+            ${profile.bio ? `<p class="friend-profile-bio">${this.escapeHtml(profile.bio)}</p>` : ''}
+          </div>
+          <div class="friend-profile-actions">
+            ${profile.is_friend ? `
+              <button class="btn-message" onclick="Profile.messageFromFriendProfile()">Message</button>
+            ` : ''}
+          </div>
+        </div>
+
+        ${categories.length > 0 ? `
+          <div class="friend-category-tabs">
+            ${categories.map(cat => `
+              <button class="friend-category-tab ${cat.id === currentCategoryId ? 'active' : ''}"
+                      onclick="Profile.switchFriendCategory(${cat.id})">
+                <span class="category-icon">${cat.icon || ''}</span>
+                <span class="category-name">${cat.name}</span>
+              </button>
+            `).join('')}
+          </div>
+        ` : ''}
+
+        <div class="friend-profile-section">
+          <h2 class="section-title">${currentCategory ? currentCategory.icon + ' ' + currentCategory.name : ''} Showcase</h2>
+          <div class="friend-showcase-grid">
+            ${showcase.length > 0 ? showcase.map(album => `
+              <div class="showcase-item">
+                <img src="${album.cover || this.getPlaceholderCover(album)}"
+                     alt="${album.album}"
+                     onerror="this.src='${this.getPlaceholderCover(album)}'">
+                <div class="showcase-info">
+                  <span class="showcase-album">${this.escapeHtml(album.album)}</span>
+                  <span class="showcase-artist">${this.escapeHtml(album.artist)}</span>
+                </div>
+              </div>
+            `).join('') : '<p class="empty-msg">No items in showcase</p>'}
+          </div>
+        </div>
+
+        <div class="friend-profile-section">
+          <h2 class="section-title">${currentCategory ? currentCategory.icon + ' ' + currentCategory.name : ''} Collection
+            <span class="collection-count">(${collection.length})</span>
+          </h2>
+          <div class="friend-collection-grid">
+            ${collection.length > 0 ? collection.map(album => `
+              <div class="collection-item">
+                <img src="${album.cover || this.getPlaceholderCover(album)}"
+                     alt="${album.album}"
+                     onerror="this.src='${this.getPlaceholderCover(album)}'">
+                <div class="collection-info">
+                  <span class="collection-album">${this.escapeHtml(album.album)}</span>
+                  <span class="collection-artist">${this.escapeHtml(album.artist)}</span>
+                </div>
+              </div>
+            `).join('') : '<p class="empty-msg">No items in collection</p>'}
+          </div>
+        </div>
+      </div>
+    `;
+  },
+
+  /**
+   * Close friend full profile and return to main profile
+   */
+  closeFriendFullProfile() {
+    const profileView = document.getElementById('profile-view');
+    const friendPage = document.getElementById('friend-profile-page');
+
+    if (friendPage) friendPage.style.display = 'none';
+    if (profileView) profileView.style.display = 'block';
+
+    this.friendProfileState = {
+      userId: null,
+      profile: null,
+      categories: [],
+      currentCategoryId: null,
+      showcase: [],
+      collection: []
+    };
+  },
+
+  /**
+   * Message from friend full profile page
+   */
+  messageFromFriendProfile() {
+    if (!this.friendProfileState.profile) return;
+    const { profile } = this.friendProfileState;
+    this.closeFriendFullProfile();
+    this.openConversation(profile.id, profile.name || '', profile.picture || '');
   },
 
   /**
@@ -2422,19 +2840,25 @@ const Profile = {
     document.getElementById('view-profile-bio').textContent = profile.bio || '';
 
     // Collection count
-    document.getElementById('view-profile-collection-count').textContent = `${profile.collection_count || 0} records`;
+    const terms = this.getTerms();
+    document.getElementById('view-profile-collection-count').textContent = `${profile.collection_count || 0} ${terms.itemPlural}`;
 
     // Actions - show different buttons based on relationship
     const actionsEl = document.getElementById('view-profile-actions');
     actionsEl.style.display = 'flex';
 
     if (profile.is_friend) {
-      // Already friends - show Message and Unfriend
+      // Already friends - show Message, View Full Profile, and Unfriend
       actionsEl.innerHTML = `
         <button class="btn-message" id="view-profile-message">Message</button>
+        <button class="btn-view-full" id="view-full-btn">View Full Profile</button>
         <button class="btn-unfriend" id="view-profile-unfollow">Unfriend</button>
       `;
       document.getElementById('view-profile-message').onclick = () => this.messageFromProfile();
+      document.getElementById('view-full-btn').onclick = () => {
+        this.closeModal('view-profile-modal');
+        this.openFriendFullProfile(profile.id);
+      };
       document.getElementById('view-profile-unfollow').onclick = () => this.unfollowFromProfile();
     } else if (profile.request_sent) {
       // Request pending
@@ -2465,7 +2889,8 @@ const Profile = {
         </div>
       `).join('');
     } else {
-      showcaseGrid.innerHTML = '<div class="showcase-empty-msg">No albums in showcase</div>';
+      const showcaseTerms = this.getTerms();
+      showcaseGrid.innerHTML = `<div class="showcase-empty-msg">No ${showcaseTerms.itemPlural} in showcase</div>`;
     }
 
     // Reset collection section
@@ -2527,7 +2952,8 @@ const Profile = {
     const grid = document.getElementById('view-collection-grid');
 
     if (collection.length === 0) {
-      grid.innerHTML = '<div class="showcase-empty-msg">No albums in collection</div>';
+      const collTerms = this.getTerms();
+      grid.innerHTML = `<div class="showcase-empty-msg">No ${collTerms.itemPlural} in collection</div>`;
       return;
     }
 
@@ -2583,10 +3009,11 @@ const Profile = {
     );
 
     if (filtered.length === 0) {
+      const terms = this.getTerms();
       grid.innerHTML = `
         <div class="collection-empty">
           <div class="empty-icon">🔍</div>
-          <p>No albums found matching "${this.escapeHtml(query)}"</p>
+          <p>No ${terms.itemPlural} found matching "${this.escapeHtml(query)}"</p>
         </div>
       `;
       return;

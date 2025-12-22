@@ -621,20 +621,29 @@ async def get_public_profile(
 async def get_user_collection(
     request: Request,
     target_user_id: int,
+    category_id: Optional[int] = None,
     user_id: int = Depends(require_auth)
 ) -> list[dict]:
     """
-    Get a user's full collection.
+    Get a user's full collection, optionally filtered by category.
     """
     env = request.scope["env"]
 
     try:
-        results = await env.DB.prepare(
-            """SELECT id, artist, album, cover, year
-               FROM collections
-               WHERE user_id = ?
-               ORDER BY artist, album"""
-        ).bind(target_user_id).all()
+        if category_id:
+            results = await env.DB.prepare(
+                """SELECT id, artist, album, cover, year
+                   FROM collections
+                   WHERE user_id = ? AND category_id = ?
+                   ORDER BY artist, album"""
+            ).bind(target_user_id, category_id).all()
+        else:
+            results = await env.DB.prepare(
+                """SELECT id, artist, album, cover, year
+                   FROM collections
+                   WHERE user_id = ?
+                   ORDER BY artist, album"""
+            ).bind(target_user_id).all()
 
         collection = []
         for row in results.results:
@@ -651,3 +660,97 @@ async def get_user_collection(
         return collection
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error fetching collection: {str(e)}")
+
+
+@router.get("/user/{target_user_id}/categories")
+async def get_user_categories(
+    request: Request,
+    target_user_id: int,
+    user_id: int = Depends(require_auth)
+) -> list[dict]:
+    """
+    Get categories that a user has joined.
+    """
+    env = request.scope["env"]
+
+    try:
+        # Get unique categories from user's interests
+        results = await env.DB.prepare(
+            """SELECT DISTINCT
+                      COALESCE(ui.category_id, ig.category_id) as category_id,
+                      COALESCE(c.slug, gc.slug) as slug,
+                      COALESCE(c.name, gc.name) as name,
+                      COALESCE(c.icon, gc.icon) as icon
+               FROM user_interests ui
+               LEFT JOIN categories c ON ui.category_id = c.id
+               LEFT JOIN interest_groups ig ON ui.interest_group_id = ig.id
+               LEFT JOIN categories gc ON ig.category_id = gc.id
+               WHERE ui.user_id = ?
+               ORDER BY COALESCE(c.name, gc.name)"""
+        ).bind(target_user_id).all()
+
+        categories = []
+        seen_ids = set()
+        for row in results.results:
+            if hasattr(row, 'to_py'):
+                row = row.to_py()
+            cat_id = to_python_value(row.get("category_id"))
+            if cat_id and cat_id not in seen_ids:
+                seen_ids.add(cat_id)
+                categories.append({
+                    "id": cat_id,
+                    "slug": to_python_value(row.get("slug")),
+                    "name": to_python_value(row.get("name")),
+                    "icon": to_python_value(row.get("icon"))
+                })
+
+        return categories
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error fetching user categories: {str(e)}")
+
+
+@router.get("/user/{target_user_id}/showcase")
+async def get_user_showcase(
+    request: Request,
+    target_user_id: int,
+    category_id: Optional[int] = None,
+    user_id: int = Depends(require_auth)
+) -> list[dict]:
+    """
+    Get a user's showcase, optionally filtered by category.
+    """
+    env = request.scope["env"]
+
+    try:
+        if category_id:
+            results = await env.DB.prepare(
+                """SELECT s.id, c.artist, c.album, c.cover, c.year
+                   FROM showcase_albums s
+                   JOIN collections c ON s.collection_id = c.id
+                   WHERE s.user_id = ? AND c.category_id = ?
+                   ORDER BY s.position ASC"""
+            ).bind(target_user_id, category_id).all()
+        else:
+            results = await env.DB.prepare(
+                """SELECT s.id, c.artist, c.album, c.cover, c.year
+                   FROM showcase_albums s
+                   JOIN collections c ON s.collection_id = c.id
+                   WHERE s.user_id = ?
+                   ORDER BY s.position ASC"""
+            ).bind(target_user_id).all()
+
+        showcase = []
+        for row in results.results:
+            if hasattr(row, 'to_py'):
+                row = row.to_py()
+            showcase.append({
+                "id": row["id"],
+                "artist": row["artist"],
+                "album": row["album"],
+                "cover": to_python_value(row.get("cover")),
+                "year": to_python_value(row.get("year"))
+            })
+
+        return showcase
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error fetching showcase: {str(e)}")

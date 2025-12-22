@@ -2714,3 +2714,358 @@
     display: none;
   }
 }
+
+/* ============================================
+   FRIEND FULL PROFILE PAGE
+   ============================================ */
+
+.friend-profile-page {
+  display: none;
+  padding-top: 70px;
+  min-height: 100vh;
+  background: var(--bg-dark);
+}
+
+.friend-profile-loading,
+.friend-profile-error {
+  text-align: center;
+  padding: 60px 20px;
+  color: var(--text-secondary);
+}
+
+.friend-profile-content {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+.friend-profile-content .back-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  color: var(--text-primary);
+  cursor: pointer;
+  margin-bottom: 20px;
+  transition: all 0.2s;
+}
+
+.friend-profile-content .back-btn:hover {
+  background: var(--bg-hover);
+  border-color: var(--accent);
+}
+
+.friend-profile-header {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  padding: 30px;
+  background: linear-gradient(to bottom, rgba(29, 185, 84, 0.1), var(--bg-card));
+  background-size: cover;
+  background-position: center;
+  border-radius: 16px;
+  margin-bottom: 24px;
+  position: relative;
+}
+
+.friend-profile-header::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  border-radius: 16px;
+  pointer-events: none;
+}
+
+.friend-profile-header > * {
+  position: relative;
+  z-index: 1;
+}
+
+.friend-profile-picture {
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 4px solid var(--accent);
+  flex-shrink: 0;
+}
+
+.friend-profile-info {
+  flex: 1;
+}
+
+.friend-profile-name {
+  font-size: 2rem;
+  font-weight: 700;
+  margin: 0 0 8px 0;
+  color: var(--text-primary);
+}
+
+.friend-profile-pronouns {
+  display: inline-block;
+  padding: 4px 12px;
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 20px;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  margin-bottom: 12px;
+}
+
+.friend-profile-bio {
+  color: var(--text-secondary);
+  font-size: 0.95rem;
+  line-height: 1.5;
+  margin: 0;
+  max-width: 600px;
+}
+
+.friend-profile-actions {
+  display: flex;
+  gap: 12px;
+}
+
+.friend-profile-actions .btn-message {
+  padding: 10px 20px;
+  background: var(--accent);
+  color: #000;
+  border: none;
+  border-radius: 20px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.friend-profile-actions .btn-message:hover {
+  background: var(--accent-dark);
+}
+
+/* Friend Category Tabs */
+.friend-category-tabs {
+  display: flex;
+  gap: 8px;
+  padding: 16px 0;
+  margin-bottom: 24px;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.friend-category-tab {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 20px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 25px;
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.friend-category-tab:hover {
+  background: var(--bg-hover);
+  border-color: var(--accent);
+}
+
+.friend-category-tab.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #000;
+}
+
+.friend-category-tab .category-icon {
+  font-size: 1.2rem;
+}
+
+.friend-category-tab .category-name {
+  font-weight: 500;
+}
+
+/* Friend Profile Sections */
+.friend-profile-section {
+  background: var(--bg-card);
+  border-radius: 12px;
+  padding: 24px;
+  margin-bottom: 24px;
+}
+
+.friend-profile-section .section-title {
+  font-size: 1.25rem;
+  font-weight: 600;
+  margin: 0 0 20px 0;
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.friend-profile-section .collection-count {
+  font-size: 0.9rem;
+  color: var(--text-muted);
+  font-weight: 400;
+}
+
+.friend-profile-section .empty-msg {
+  text-align: center;
+  color: var(--text-muted);
+  padding: 40px 20px;
+}
+
+/* Friend Showcase Grid */
+.friend-showcase-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 16px;
+}
+
+.friend-showcase-grid .showcase-item {
+  position: relative;
+  aspect-ratio: 1;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.friend-showcase-grid .showcase-item img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.friend-showcase-grid .showcase-info {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 8px;
+  background: linear-gradient(transparent, rgba(0, 0, 0, 0.8));
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.friend-showcase-grid .showcase-item:hover .showcase-info {
+  opacity: 1;
+}
+
+.friend-showcase-grid .showcase-album {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #fff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.friend-showcase-grid .showcase-artist {
+  display: block;
+  font-size: 0.65rem;
+  color: rgba(255, 255, 255, 0.7);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Friend Collection Grid */
+.friend-collection-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 20px;
+}
+
+.friend-collection-grid .collection-item {
+  background: var(--bg-dark);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.friend-collection-grid .collection-item img {
+  width: 100%;
+  aspect-ratio: 1;
+  object-fit: cover;
+}
+
+.friend-collection-grid .collection-info {
+  padding: 10px;
+}
+
+.friend-collection-grid .collection-album {
+  display: block;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.friend-collection-grid .collection-artist {
+  display: block;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* View Full Profile button */
+.btn-view-full {
+  padding: 8px 16px;
+  background: transparent;
+  color: var(--accent);
+  border: 1px solid var(--accent);
+  border-radius: 20px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-view-full:hover {
+  background: var(--accent);
+  color: #000;
+}
+
+/* Mobile responsive */
+@media (max-width: 768px) {
+  .friend-profile-header {
+    flex-direction: column;
+    text-align: center;
+    padding: 20px;
+  }
+
+  .friend-profile-picture {
+    width: 100px;
+    height: 100px;
+  }
+
+  .friend-profile-name {
+    font-size: 1.5rem;
+  }
+
+  .friend-profile-actions {
+    justify-content: center;
+  }
+
+  .friend-category-tabs {
+    padding: 12px 0;
+  }
+
+  .friend-category-tab {
+    padding: 10px 16px;
+    font-size: 0.9rem;
+  }
+
+  .friend-showcase-grid {
+    grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+    gap: 12px;
+  }
+
+  .friend-collection-grid {
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    gap: 12px;
+  }
+}

@@ -343,16 +343,20 @@ const Forums = {
 
       // Also update post detail view if open
       const postPage = document.getElementById('post-page');
-      if (postPage && postPage.style.display !== 'none') {
-        const detailVoteCount = postPage.querySelector('.vote-count');
-        if (detailVoteCount) {
-          detailVoteCount.textContent = data.upvote_count - data.downvote_count;
-        }
+      if (postPage && postPage.style.display === 'block') {
+        // Use data attribute to target exact post votes container
+        const postVotes = postPage.querySelector(`.post-votes[data-post-id="${postId}"]`);
+        if (postVotes) {
+          const detailVoteCount = postVotes.querySelector('.vote-count');
+          if (detailVoteCount) {
+            detailVoteCount.textContent = data.upvote_count - data.downvote_count;
+          }
 
-        const detailUpvote = postPage.querySelector('.vote-btn.upvote');
-        const detailDownvote = postPage.querySelector('.vote-btn.downvote');
-        if (detailUpvote) detailUpvote.classList.toggle('active', data.vote_value === 1);
-        if (detailDownvote) detailDownvote.classList.toggle('active', data.vote_value === -1);
+          const detailUpvote = postVotes.querySelector('.vote-btn.upvote');
+          const detailDownvote = postVotes.querySelector('.vote-btn.downvote');
+          if (detailUpvote) detailUpvote.classList.toggle('active', data.vote_value === 1);
+          if (detailDownvote) detailDownvote.classList.toggle('active', data.vote_value === -1);
+        }
       }
 
     } catch (error) {
@@ -498,20 +502,20 @@ const Forums = {
           </div>
 
           <div class="post-full-actions">
-            <div class="post-votes horizontal">
-              <button class="vote-btn upvote ${post.user_vote === 1 ? 'active' : ''}" onclick="Forums.vote(${post.id}, 1)">
+            <div class="post-votes horizontal" data-post-id="${post.id}">
+              <button class="vote-btn upvote ${post.user_vote === 1 ? 'active' : ''}" onclick="event.preventDefault(); Forums.vote(${post.id}, 1)">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                   <polyline points="18 15 12 9 6 15"></polyline>
                 </svg>
               </button>
               <span class="vote-count">${score}</span>
-              <button class="vote-btn downvote ${post.user_vote === -1 ? 'active' : ''}" onclick="Forums.vote(${post.id}, -1)">
+              <button class="vote-btn downvote ${post.user_vote === -1 ? 'active' : ''}" onclick="event.preventDefault(); Forums.vote(${post.id}, -1)">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                   <polyline points="6 9 12 15 18 9"></polyline>
                 </svg>
               </button>
             </div>
-            <button class="action-btn ${post.is_saved ? 'active' : ''}" onclick="Forums.toggleSave(${post.id})">
+            <button class="action-btn ${post.is_saved ? 'active' : ''}" onclick="event.preventDefault(); Forums.toggleSave(${post.id})">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="${post.is_saved ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2">
                 <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/>
               </svg>
@@ -618,15 +622,20 @@ const Forums = {
       if (token) {
         try {
           const payload = JSON.parse(atob(token.split('.')[1]));
-          currentUserId = payload.sub || payload.user_id;
-        } catch (e) {}
+          // Parse as integer to ensure proper comparison with API's numeric user_id
+          const rawId = payload.sub || payload.user_id;
+          currentUserId = parseInt(rawId, 10);
+        } catch (e) {
+          console.error('Error parsing user ID from token:', e);
+        }
       }
     }
 
     return comments.map(comment => {
       const score = comment.upvote_count - comment.downvote_count;
       const timeAgo = this.formatTimeAgo(comment.created_at);
-      const isOwner = currentUserId && comment.user_id == currentUserId;
+      // Use strict equality after ensuring both are numbers
+      const isOwner = currentUserId && parseInt(comment.user_id, 10) === currentUserId;
 
       return `
         <div class="comment depth-${depth}" data-comment-id="${comment.id}">
@@ -638,19 +647,19 @@ const Forums = {
           </div>
           <div class="comment-body">${this.escapeHtml(comment.body)}</div>
           <div class="comment-actions">
-            <button class="vote-btn ${comment.user_vote === 1 ? 'active' : ''}" onclick="Forums.voteComment(${comment.id}, 1)">
+            <button class="vote-btn ${comment.user_vote === 1 ? 'active' : ''}" onclick="event.preventDefault(); event.stopPropagation(); Forums.voteComment(${comment.id}, 1)">
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <polyline points="18 15 12 9 6 15"></polyline>
               </svg>
             </button>
             <span class="vote-count" id="comment-vote-${comment.id}">${score}</span>
-            <button class="vote-btn ${comment.user_vote === -1 ? 'active' : ''}" onclick="Forums.voteComment(${comment.id}, -1)">
+            <button class="vote-btn ${comment.user_vote === -1 ? 'active' : ''}" onclick="event.preventDefault(); event.stopPropagation(); Forums.voteComment(${comment.id}, -1)">
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <polyline points="6 9 12 15 18 9"></polyline>
               </svg>
             </button>
-            ${depth < 2 ? `<button class="reply-btn" onclick="Forums.showReplyForm(${comment.id})">Reply</button>` : ''}
-            ${isOwner ? `<button class="delete-btn" onclick="Forums.deleteComment(${comment.id})">Delete</button>` : ''}
+            ${depth < 2 ? `<button class="reply-btn" onclick="event.stopPropagation(); Forums.showReplyForm(${comment.id})">Reply</button>` : ''}
+            ${isOwner ? `<button class="delete-btn" onclick="event.stopPropagation(); Forums.deleteComment(${comment.id})">Delete</button>` : ''}
           </div>
           <div class="reply-form" id="reply-form-${comment.id}" style="display:none">
             <textarea placeholder="Reply..." rows="2"></textarea>
