@@ -3,7 +3,7 @@
  * Enables offline support and caching
  */
 
-const CACHE_NAME = 'niche-collector-v18';
+const CACHE_NAME = 'niche-collector-v19';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
@@ -12,8 +12,12 @@ const STATIC_ASSETS = [
   '/js/config.js',
   '/js/auth.js',
   '/js/profile.js',
+  '/js/forums.js',
+  '/js/interests.js',
+  '/js/templates/index.js',
   '/css/auth.css',
-  '/css/profile.css'
+  '/css/profile.css',
+  '/css/forums.css'
 ];
 
 // External resources to cache

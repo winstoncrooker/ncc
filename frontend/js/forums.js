@@ -771,13 +771,16 @@ const Forums = {
     content.innerHTML = '<div class="loading">Loading...</div>';
 
     try {
+      console.log('[Forums] Fetching categories from:', `${API_BASE}/categories`);
       const response = await fetch(`${API_BASE}/categories`, {
         headers: Auth.getAuthHeaders()
       });
 
-      if (!response.ok) throw new Error('Failed to load categories');
+      console.log('[Forums] Categories response:', response.status, response.statusText);
+      if (!response.ok) throw new Error(`Failed to load categories: ${response.status}`);
 
       const data = await response.json();
+      console.log('[Forums] Categories data:', data);
 
       // Store categories for later use
       this.discoverCategories = data.categories;
