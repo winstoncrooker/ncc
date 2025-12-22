@@ -94,6 +94,20 @@ const Auth = {
   },
 
   /**
+   * Get auth headers for API requests
+   */
+  getAuthHeaders() {
+    const token = this.getToken();
+    const headers = {
+      'Content-Type': 'application/json'
+    };
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+    return headers;
+  },
+
+  /**
    * Set auth token
    */
   setToken(token) {
