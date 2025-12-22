@@ -1,6 +1,8 @@
 /**
  * Interests namespace - Handles interest selection and onboarding
  */
+const API_BASE = typeof CONFIG !== 'undefined' ? CONFIG.API_BASE : '';
+
 const Interests = {
   // State
   categories: [],

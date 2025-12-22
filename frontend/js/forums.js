@@ -1,5 +1,6 @@
 /**
  * Forums namespace - Handles forum functionality
+ * Note: API_BASE is defined in interests.js which loads before this file
  */
 const Forums = {
   // State
@@ -778,9 +779,12 @@ const Forums = {
 
       const data = await response.json();
 
+      // Store categories for later use
+      this.discoverCategories = data.categories;
+
       content.innerHTML = data.categories.map(cat => `
         <div class="discover-category">
-          <div class="category-header" onclick="Forums.toggleCategoryGroups(${cat.id})">
+          <div class="category-header" onclick="Forums.toggleCategoryGroups('${cat.slug}')">
             <span class="category-icon">${cat.icon}</span>
             <span class="category-name">${cat.name}</span>
             <span class="category-count">${cat.member_count} members</span>
@@ -788,7 +792,7 @@ const Forums = {
               <polyline points="6 9 12 15 18 9"></polyline>
             </svg>
           </div>
-          <div class="category-groups" id="category-groups-${cat.id}" style="display:none"></div>
+          <div class="category-groups" id="category-groups-${cat.slug}" style="display:none"></div>
         </div>
       `).join('');
 

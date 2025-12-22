@@ -2592,3 +2592,97 @@
     max-width: none;
   }
 }
+
+/* ============================================
+   CATEGORY PROFILE SWITCHER
+   ============================================ */
+.category-switcher-section {
+  max-width: 1200px;
+  margin: 0 auto 32px;
+  padding: 0 24px;
+}
+
+.switcher-content {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px 20px;
+  background: var(--bg-card);
+  border-radius: 12px;
+  border: 1px solid var(--border-color);
+}
+
+.switcher-content label {
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+#category-profile-select {
+  flex: 1;
+  max-width: 300px;
+  padding: 10px 16px;
+  background: var(--bg-hover);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  color: var(--text-primary);
+  font-size: 1rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+#category-profile-select:hover {
+  border-color: var(--accent);
+}
+
+#category-profile-select:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(29, 185, 84, 0.15);
+}
+
+#category-profile-select option {
+  background: var(--bg-card);
+  color: var(--text-primary);
+  padding: 8px;
+}
+
+.switcher-hint {
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  margin-left: auto;
+}
+
+/* Category color indicator */
+.category-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 12px;
+  background: rgba(29, 185, 84, 0.15);
+  border-radius: 20px;
+  font-size: 0.85rem;
+  color: var(--accent);
+}
+
+.category-indicator .cat-icon {
+  font-size: 1.1rem;
+}
+
+/* Mobile responsive */
+@media (max-width: 768px) {
+  .switcher-content {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+  }
+
+  #category-profile-select {
+    max-width: none;
+  }
+
+  .switcher-hint {
+    display: none;
+  }
+}

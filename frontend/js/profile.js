@@ -17,6 +17,10 @@ const Profile = {
   unreadCount: 0,
   pollingInterval: null,
   searchedFriend: null,
+  // Category profile state
+  userCategories: [],
+  currentCategorySlug: null,
+  currentCategoryProfile: null,
 
   /**
    * Initialize the profile page
@@ -42,7 +46,8 @@ const Profile = {
       this.loadShowcase(),
       this.loadFriends(),
       this.loadFriendRequests(),
-      this.loadUnreadCount()
+      this.loadUnreadCount(),
+      this.loadUserCategories()
     ]);
 
     // Render user menu
@@ -284,6 +289,11 @@ const Profile = {
       e.preventDefault();
       this.sendMessage();
     });
+
+    // Category profile switcher
+    addListener('category-profile-select', 'change', (e) => {
+      this.switchCategoryProfile(e.target.value);
+    });
   },
 
   /**
@@ -341,6 +351,188 @@ const Profile = {
     // Background
     if (this.profile.background_image) {
       document.getElementById('hero-background').style.backgroundImage = `url(${this.profile.background_image})`;
+    }
+  },
+
+  /**
+   * Load user's joined categories for the profile switcher
+   */
+  async loadUserCategories() {
+    try {
+      const response = await Auth.apiRequest('/api/interests/me');
+      if (!response.ok) return;
+
+      const data = await response.json();
+
+      // Extract unique categories from interests
+      const categoryMap = new Map();
+      data.interests.forEach(interest => {
+        if (interest.category_id && !categoryMap.has(interest.category_id)) {
+          categoryMap.set(interest.category_id, {
+            id: interest.category_id,
+            slug: interest.category_slug,
+            name: interest.category_name,
+            icon: interest.category_icon
+          });
+        }
+      });
+
+      this.userCategories = Array.from(categoryMap.values());
+      this.renderCategorySwitcher();
+
+    } catch (error) {
+      console.error('Error loading user categories:', error);
+    }
+  },
+
+  /**
+   * Render the category profile switcher dropdown
+   */
+  renderCategorySwitcher() {
+    const select = document.getElementById('category-profile-select');
+    const section = document.getElementById('category-switcher-section');
+
+    if (!select || !section) return;
+
+    // Hide switcher if user has no categories
+    if (this.userCategories.length === 0) {
+      section.style.display = 'none';
+      return;
+    }
+
+    section.style.display = 'block';
+
+    // Populate dropdown with vinyl as default option plus all categories
+    select.innerHTML = `
+      <option value="">🎵 Vinyl Records (Default)</option>
+      ${this.userCategories
+        .filter(cat => cat.slug !== 'vinyl') // Don't duplicate vinyl
+        .map(cat => `
+          <option value="${cat.slug}">${cat.icon || ''} ${cat.name}</option>
+        `).join('')}
+    `;
+
+    // If user has only vinyl category, default to vinyl and show it
+    if (this.userCategories.length === 1 && this.userCategories[0].slug === 'vinyl') {
+      section.style.display = 'none';
+    }
+  },
+
+  /**
+   * Switch to a different category profile
+   */
+  async switchCategoryProfile(categorySlug) {
+    // Empty string means default (vinyl/main profile)
+    if (!categorySlug) {
+      this.currentCategorySlug = null;
+      this.currentCategoryProfile = null;
+      // Reload main collection and showcase
+      await Promise.all([
+        this.loadCollection(),
+        this.loadShowcase()
+      ]);
+      this.updateSectionHeaders('vinyl');
+      this.applyCategoryColor('vinyl');
+      return;
+    }
+
+    this.currentCategorySlug = categorySlug;
+
+    try {
+      // Load category-specific profile and items
+      const [profileRes, itemsRes] = await Promise.all([
+        Auth.apiRequest(`/api/profile/categories/${categorySlug}`),
+        Auth.apiRequest(`/api/profile/items?category=${categorySlug}`)
+      ]);
+
+      if (profileRes.ok) {
+        this.currentCategoryProfile = await profileRes.json();
+      }
+
+      if (itemsRes.ok) {
+        const itemsData = await itemsRes.json();
+        this.collection = itemsData.items || [];
+        this.showcase = (itemsData.items || []).filter(item => item.in_showcase);
+        this.renderCollection();
+        this.renderShowcase();
+      }
+
+      // Update section headers based on category
+      this.updateSectionHeaders(categorySlug);
+
+      // Apply category color scheme
+      this.applyCategoryColor(categorySlug);
+
+    } catch (error) {
+      console.error('Error switching category profile:', error);
+    }
+  },
+
+  /**
+   * Apply category-specific color scheme
+   */
+  applyCategoryColor(categorySlug) {
+    const category = this.userCategories.find(c => c.slug === categorySlug);
+
+    // Default colors for each category
+    const categoryColors = {
+      'vinyl': '#1db954',         // Spotify green
+      'trading-cards': '#ff6b35', // Orange
+      'cars': '#e63946',          // Red
+      'sneakers': '#7b2cbf',      // Purple
+      'watches': '#2a9d8f',       // Teal
+      'comics': '#f77f00',        // Amber
+      'video-games': '#4361ee',   // Blue
+      'coins': '#d4a373'          // Gold
+    };
+
+    const color = categoryColors[categorySlug] || '#1db954';
+
+    // Update CSS custom property
+    document.documentElement.style.setProperty('--accent', color);
+
+    // Update accent-dark (slightly darker version)
+    const darkerColor = this.darkenColor(color, 15);
+    document.documentElement.style.setProperty('--accent-dark', darkerColor);
+  },
+
+  /**
+   * Darken a hex color by a percentage
+   */
+  darkenColor(hex, percent) {
+    const num = parseInt(hex.replace('#', ''), 16);
+    const amt = Math.round(2.55 * percent);
+    const R = Math.max((num >> 16) - amt, 0);
+    const G = Math.max((num >> 8 & 0x00FF) - amt, 0);
+    const B = Math.max((num & 0x0000FF) - amt, 0);
+    return '#' + (0x1000000 + R * 0x10000 + G * 0x100 + B).toString(16).slice(1);
+  },
+
+  /**
+   * Update section headers based on current category
+   */
+  updateSectionHeaders(categorySlug) {
+    // Get category info
+    const category = this.userCategories.find(c => c.slug === categorySlug);
+    const sectionNames = typeof TemplateRegistry !== 'undefined' ?
+      TemplateRegistry.getSections(categorySlug) :
+      ['Showcase', 'Collection'];
+
+    // Update showcase section header
+    const showcaseHeader = document.querySelector('.showcase-section h2');
+    if (showcaseHeader) {
+      showcaseHeader.innerHTML = `<span class="section-icon">✨</span> ${sectionNames[0] || 'Showcase'}`;
+    }
+
+    // Update collection section header
+    const collectionHeader = document.querySelector('.collection-section h2');
+    if (collectionHeader && category) {
+      const count = this.collection.length;
+      collectionHeader.innerHTML = `
+        <span class="section-icon">📚</span>
+        ${sectionNames[1] || 'Collection'}
+        <span class="collection-count">${count}</span>
+      `;
     }
   },
 
@@ -1166,7 +1358,8 @@ const Profile = {
         body: JSON.stringify({
           message,
           collection: this.collection.map(a => ({ artist: a.artist, album: a.album })),
-          history: this.chatHistory.slice(-10)
+          history: this.chatHistory.slice(-10),
+          category_slug: this.currentCategorySlug || 'vinyl'
         })
       });
 
