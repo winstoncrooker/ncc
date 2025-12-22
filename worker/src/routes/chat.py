@@ -6,6 +6,8 @@ from fastapi import APIRouter, Request, HTTPException
 from pydantic import BaseModel
 from typing import Optional
 import httpx
+import js
+from pyodide.ffi import to_js
 
 router = APIRouter()
 
@@ -35,6 +37,7 @@ class ChatResponse(BaseModel):
     response: str
     albums_to_add: list[Album] = []
     albums_to_remove: list[Album] = []
+    albums_to_showcase: list[Album] = []
 
 
 def build_system_prompt(collection: list[Album]) -> str:
@@ -48,42 +51,44 @@ def build_system_prompt(collection: list[Album]) -> str:
     else:
         collection_context = "\n\nThe user has not uploaded any albums to their collection yet."
 
-    return f"""You are a helpful vinyl record collection assistant for "Vinyl Vault". You help users manage their record collections.
+    return f"""You are a helpful vinyl record collection assistant for "Niche Collector Connector". You help users manage their record collections and profile showcase.
 
 CRITICAL RULES:
 - Keep responses SHORT and friendly (1-3 sentences max)
 - NEVER guess or assume album/artist names you're unsure about
 - If ANY part of a request is unclear, ASK FOR CLARIFICATION before acting
 
-ADDING ALBUMS - ONLY when user explicitly asks to ADD:
-- Use [ADD_ALBUM: Artist Name - Album Name] tag ONLY when user says "add", "put in", "include", etc.
+ADDING ALBUMS TO COLLECTION - when user asks to ADD:
+- Use [ADD_ALBUM: Artist Name - Album Name] tag when user says "add", "put in", "include", etc.
 - NEVER use ADD_ALBUM when giving recommendations or suggestions
-- If user asks "what should I get?" or "recommend something" - just tell them, do NOT add it
-- Example request: "Add Nevermind" → [ADD_ALBUM: Nirvana - Nevermind]
+- Example: "Add Nevermind" → [ADD_ALBUM: Nirvana - Nevermind]
 
-REMOVING ALBUMS - ONLY when user explicitly asks to REMOVE:
-- Use [REMOVE_ALBUM: Artist Name - Album Name] tag ONLY when user says "remove", "delete", "take out", etc.
+SHOWCASE - when user asks to feature/showcase an album:
+- The showcase is a special featured section on the user's profile (max 8 albums)
+- Use [SHOWCASE: Artist Name - Album Name] tag when user says "showcase", "feature", "put on my profile", etc.
+- If album is NOT in collection, add it first AND showcase it
+- Example: "Showcase Dark Side of the Moon" → [ADD_ALBUM: Pink Floyd - Dark Side of the Moon] [SHOWCASE: Pink Floyd - Dark Side of the Moon]
+- Example (already in collection): "Feature Abbey Road" → [SHOWCASE: The Beatles - Abbey Road]
+- If user says "add X to my showcase" or "add X and showcase it", use BOTH tags
+
+REMOVING ALBUMS - when user asks to REMOVE:
+- Use [REMOVE_ALBUM: Artist Name - Album Name] tag when user says "remove", "delete", "take out", etc.
 - Example: "Remove Abbey Road" → [REMOVE_ALBUM: The Beatles - Abbey Road]
 
 RECOMMENDATIONS:
-- When user asks for recommendations, suggestions, or "what should I get" - just TELL them the recommendation
-- Do NOT use ADD_ALBUM tag for recommendations
-- Example: "What do you recommend?" → "Based on your collection, you might enjoy Led Zeppelin IV!"
-- Only add it if they then say "add that" or "yes add it"
-
-WHEN CONFUSED:
-- ASK for clarification instead of guessing
-- "I'm not sure which album you mean. Could you give me the artist and album name?"
+- When user asks for recommendations - just TELL them, do NOT add it
+- Only add/showcase if they then say "add that" or "yes add it"
 
 Keep your response concise and natural.{collection_context}"""
 
 
-def parse_album_actions(response: str) -> tuple[list[Album], list[Album]]:
-    """Parse AI response for album add/remove actions"""
+def parse_album_actions(response: str) -> tuple[list[Album], list[Album], list[Album]]:
+    """Parse AI response for album add/remove/showcase actions"""
     import re
 
     albums_to_add = []
     albums_to_remove = []
+    albums_to_showcase = []
 
     # Parse additions
     add_pattern = r"\[ADD_ALBUM:\s*(.+?)\s*-\s*(.+?)\]"
@@ -103,7 +108,16 @@ def parse_album_actions(response: str) -> tuple[list[Album], list[Album]]:
             if not re.match(r'^[\s\-\.\,\?\!]+$', artist) and not re.match(r'^[\s\-\.\,\?\!]+$', album):
                 albums_to_remove.append(Album(artist=artist, album=album))
 
-    return albums_to_add, albums_to_remove
+    # Parse showcase
+    showcase_pattern = r"\[SHOWCASE:\s*(.+?)\s*-\s*(.+?)\]"
+    for match in re.finditer(showcase_pattern, response):
+        artist = match.group(1).strip()
+        album = match.group(2).strip()
+        if artist and album and len(artist) > 1 and len(album) > 1:
+            if not re.match(r'^[\s\-\.\,\?\!]+$', artist) and not re.match(r'^[\s\-\.\,\?\!]+$', album):
+                albums_to_showcase.append(Album(artist=artist, album=album))
+
+    return albums_to_add, albums_to_remove, albums_to_showcase
 
 
 async def search_discogs_for_album(artist: str, album: str, discogs_key: str, discogs_secret: str) -> Album:
@@ -112,99 +126,103 @@ async def search_discogs_for_album(artist: str, album: str, discogs_key: str, di
     Intelligently picks the best matching result.
     """
     query = f"{artist} {album}"
+    print(f"[Discogs] Searching for: {query}")
 
     try:
-        async with httpx.AsyncClient() as client:
-            response = await client.get(
-                DISCOGS_API_URL,
-                params={
-                    "q": query,
-                    "type": "release",
-                    "per_page": 10
-                },
-                headers={
-                    "Authorization": f"Discogs key={discogs_key}, secret={discogs_secret}",
-                    "User-Agent": "NicheCollectorConnector/1.0"
-                },
-                timeout=10.0
+        # Use JavaScript fetch to avoid Cloudflare blocking
+        url = f"{DISCOGS_API_URL}?q={js.encodeURIComponent(query)}&type=release&per_page=10"
+
+        headers = to_js({
+            "Authorization": f"Discogs key={discogs_key}, secret={discogs_secret}",
+            "User-Agent": "NicheCollectorConnector/1.0 +https://github.com/winstoncrooker/ncc"
+        })
+
+        response = await js.fetch(url, to_js({"headers": headers}))
+        print(f"[Discogs] Response status: {response.status}")
+
+        if response.status != 200:
+            text = await response.text()
+            print(f"[Discogs] Error response: {text[:200]}")
+            return Album(artist=artist, album=album)
+
+        data = (await response.json()).to_py()
+        results = data.get("results", [])
+        print(f"[Discogs] Found {len(results)} results")
+
+        if not results:
+            print(f"[Discogs] No results for: {query}")
+            return Album(artist=artist, album=album)
+
+        # Score results to find best match
+        best_result = None
+        best_score = -1
+
+        for result in results:
+            score = 0
+            title = result.get("title", "").lower()
+
+            # Check artist match
+            if artist.lower() in title:
+                score += 10
+
+            # Check album match
+            if album.lower() in title:
+                score += 10
+
+            # Prefer results with cover images
+            if result.get("cover_image") and "spacer.gif" not in result.get("cover_image", ""):
+                score += 5
+
+            # Prefer vinyl/LP formats
+            formats = result.get("format", [])
+            if isinstance(formats, list):
+                format_str = " ".join(formats).lower()
+                if "vinyl" in format_str or "lp" in format_str:
+                    score += 3
+                if "album" in format_str:
+                    score += 2
+
+            # Prefer original releases (lower year often means original)
+            year = result.get("year")
+            if year and isinstance(year, (int, str)):
+                try:
+                    year_int = int(year)
+                    if 1950 <= year_int <= 2030:
+                        score += 1
+                except:
+                    pass
+
+            if score > best_score:
+                best_score = score
+                best_result = result
+
+        if best_result:
+            # Get cover - prefer cover_image over thumb
+            cover = best_result.get("cover_image")
+            if not cover or "spacer.gif" in cover:
+                cover = best_result.get("thumb")
+
+            # Get year
+            year = None
+            if best_result.get("year"):
+                try:
+                    year = int(best_result["year"])
+                except:
+                    pass
+
+            print(f"[Discogs] Best match: {best_result.get('title')} (score: {best_score})")
+            print(f"[Discogs] Cover: {cover[:50] if cover else 'None'}...")
+
+            return Album(
+                artist=artist,
+                album=album,
+                cover=cover,
+                year=year,
+                discogs_id=best_result.get("id")
             )
 
-            if response.status_code != 200:
-                # Return basic album if Discogs fails
-                return Album(artist=artist, album=album)
-
-            data = response.json()
-            results = data.get("results", [])
-
-            if not results:
-                return Album(artist=artist, album=album)
-
-            # Score results to find best match
-            best_result = None
-            best_score = -1
-
-            for result in results:
-                score = 0
-                title = result.get("title", "").lower()
-
-                # Check artist match
-                if artist.lower() in title:
-                    score += 10
-
-                # Check album match
-                if album.lower() in title:
-                    score += 10
-
-                # Prefer results with cover images
-                if result.get("cover_image") and "spacer.gif" not in result.get("cover_image", ""):
-                    score += 5
-
-                # Prefer vinyl/LP formats
-                formats = result.get("format", [])
-                if isinstance(formats, list):
-                    format_str = " ".join(formats).lower()
-                    if "vinyl" in format_str or "lp" in format_str:
-                        score += 3
-                    if "album" in format_str:
-                        score += 2
-
-                # Prefer original releases (lower year often means original)
-                year = result.get("year")
-                if year and isinstance(year, (int, str)):
-                    try:
-                        year_int = int(year)
-                        if 1950 <= year_int <= 2030:
-                            score += 1
-                    except:
-                        pass
-
-                if score > best_score:
-                    best_score = score
-                    best_result = result
-
-            if best_result:
-                # Get cover - prefer cover_image over thumb
-                cover = best_result.get("cover_image")
-                if not cover or "spacer.gif" in cover:
-                    cover = best_result.get("thumb")
-
-                # Get year
-                year = None
-                if best_result.get("year"):
-                    try:
-                        year = int(best_result["year"])
-                    except:
-                        pass
-
-                return Album(
-                    artist=artist,
-                    album=album,
-                    cover=cover,
-                    year=year,
-                    discogs_id=best_result.get("id")
-                )
-
-            return Album(artist=artist, album=album)
+        print(f"[Discogs] No good match found for: {query}")
+        return Album(artist=artist, album=album)
 
     except Exception as e:
         print(f"Discogs search error: {e}")
@@ -228,6 +246,7 @@ def clean_response(response: str) -> str:
     # Remove command tags
     cleaned = re.sub(r'\[ADD_ALBUM:\s*.+?\s*-\s*.+?\]', '', cleaned)
     cleaned = re.sub(r'\[REMOVE_ALBUM:\s*.+?\s*-\s*.+?\]', '', cleaned)
+    cleaned = re.sub(r'\[SHOWCASE:\s*.+?\s*-\s*.+?\]', '', cleaned)
     # Clean up whitespace
     cleaned = re.sub(r'\n{3,}', '\n\n', cleaned)
     cleaned = cleaned.strip()
@@ -287,18 +306,34 @@ async def chat(request: Request, body: ChatMessage) -> ChatResponse:
             assistant_message = data["choices"][0]["message"]["content"]
 
             # Parse actions before cleaning
-            albums_to_add, albums_to_remove = parse_album_actions(assistant_message)
+            albums_to_add, albums_to_remove, albums_to_showcase = parse_album_actions(assistant_message)
 
             # Enrich albums with Discogs data (covers, year, etc.)
             enriched_albums = []
+            print(f"[Chat] Albums to enrich: {len(albums_to_add)}")
             for album in albums_to_add:
+                print(f"[Chat] Enriching: {album.artist} - {album.album}")
                 enriched = await search_discogs_for_album(
                     album.artist,
                     album.album,
                     env.DISCOGS_KEY,
                     env.DISCOGS_SECRET
                 )
+                print(f"[Chat] Enriched result has cover: {enriched.cover is not None}")
                 enriched_albums.append(enriched)
+
+            # Enrich showcase albums too
+            enriched_showcase = []
+            print(f"[Chat] Albums to showcase: {len(albums_to_showcase)}")
+            for album in albums_to_showcase:
+                print(f"[Chat] Showcase: {album.artist} - {album.album}")
+                enriched = await search_discogs_for_album(
+                    album.artist,
+                    album.album,
+                    env.DISCOGS_KEY,
+                    env.DISCOGS_SECRET
+                )
+                enriched_showcase.append(enriched)
 
             # Clean response for display
             cleaned_response = clean_response(assistant_message)
@@ -306,7 +341,8 @@ async def chat(request: Request, body: ChatMessage) -> ChatResponse:
             return ChatResponse(
                 response=cleaned_response,
                 albums_to_add=enriched_albums,
-                albums_to_remove=albums_to_remove
+                albums_to_remove=albums_to_remove,
+                albums_to_showcase=enriched_showcase
             )
 
     except HTTPException:

@@ -234,10 +234,33 @@ async def google_callback(request: Request, code: str = None, error: str = None,
 
         if existing:
             user_id = existing["id"]
-            # Update user info if changed
-            await env.DB.prepare(
-                "UPDATE users SET name = ?, picture = ? WHERE id = ?"
-            ).bind(name, picture, user_id).run()
+            # Preserve custom name and picture - don't overwrite user's changes
+            current_name = existing.get("name") or ""
+            current_picture = existing.get("picture") or ""
+
+            # Only use Google's name if user hasn't set one
+            is_custom_name = current_name and current_name != name
+            # Only use Google's picture if user hasn't uploaded a custom one
+            is_custom_picture = current_picture and "googleusercontent.com" not in current_picture
+
+            if is_custom_name and is_custom_picture:
+                # Keep both custom name and picture - no update needed
+                pass
+            elif is_custom_name:
+                # Keep custom name, update picture from Google
+                await env.DB.prepare(
+                    "UPDATE users SET picture = ? WHERE id = ?"
+                ).bind(picture, user_id).run()
+            elif is_custom_picture:
+                # Keep custom picture, update name from Google
+                await env.DB.prepare(
+                    "UPDATE users SET name = ? WHERE id = ?"
+                ).bind(name, user_id).run()
+            else:
+                # No custom data, use Google's
+                await env.DB.prepare(
+                    "UPDATE users SET name = ?, picture = ? WHERE id = ?"
+                ).bind(name, picture, user_id).run()
         else:
             # Check if email already exists (from old password auth)
             email_user = await env.DB.prepare(

@@ -71,13 +71,20 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
+  // Skip navigation requests for Safari compatibility
+  // Safari doesn't allow service workers to return redirected responses
+  if (event.request.mode === 'navigate') {
+    return;
+  }
+
   event.respondWith(
     caches.match(event.request).then((cachedResponse) => {
-      if (cachedResponse) {
+      // Don't return redirected responses (Safari fix)
+      if (cachedResponse && !cachedResponse.redirected) {
         // Return cached response, but also update cache in background
         event.waitUntil(
           fetch(event.request).then((response) => {
-            if (response.ok) {
+            if (response.ok && !response.redirected) {
               caches.open(CACHE_NAME).then((cache) => {
                 cache.put(event.request, response);
               });
@@ -89,8 +96,8 @@ self.addEventListener('fetch', (event) => {
 
       // Not in cache - fetch from network
       return fetch(event.request).then((response) => {
-        // Cache successful responses
-        if (response.ok && response.type === 'basic') {
+        // Cache successful non-redirected responses
+        if (response.ok && response.type === 'basic' && !response.redirected) {
           const responseToCache = response.clone();
           caches.open(CACHE_NAME).then((cache) => {
             cache.put(event.request, responseToCache);

@@ -100,6 +100,7 @@
   right: 0;
   height: 120px;
   background: linear-gradient(transparent, var(--bg-dark));
+  pointer-events: none; /* Don't block clicks on the change bg button */
 }
 
 .change-bg-btn {
@@ -471,6 +472,7 @@
   width: 400px;
   max-width: 100vw;
   height: 100vh;
+  height: 100dvh; /* Dynamic viewport height - adjusts for mobile keyboard */
   background: var(--bg-card);
   border-left: 1px solid var(--border-color);
   z-index: 200;
@@ -480,16 +482,30 @@
   box-shadow: -10px 0 40px rgba(0, 0, 0, 0.5);
 }
 
+/* Mobile: extend background beyond sidebar bounds to cover any gaps */
+@media (max-width: 768px) {
+  .ai-sidebar::before {
+    content: '';
+    position: absolute;
+    top: -100px;
+    left: 0;
+    right: 0;
+    bottom: -100px;
+    background: var(--bg-card);
+    z-index: -1;
+  }
+}
+
 .ai-sidebar.open {
   right: 0;
 }
 
 .sidebar-overlay {
   position: fixed;
-  top: 0;
+  top: -100px;
   left: 0;
   right: 0;
-  bottom: 0;
+  bottom: -100px;
   background: rgba(0, 0, 0, 0.6);
   z-index: 190;
   opacity: 0;
@@ -1083,9 +1099,66 @@
     align-items: flex-start;
   }
 
+  /* AI Sidebar - Full screen on mobile */
   .ai-sidebar {
     width: 100%;
     right: -100%;
+  }
+
+  .ai-sidebar.open {
+    right: 0;
+  }
+
+  .ai-header {
+    padding: 16px;
+    padding-top: max(16px, env(safe-area-inset-top));
+  }
+
+  .ai-chat {
+    padding: 16px;
+    padding-bottom: 8px;
+  }
+
+  .ai-form {
+    padding: 12px 16px;
+    padding-bottom: max(12px, env(safe-area-inset-bottom));
+    gap: 10px;
+  }
+
+  .ai-form input {
+    padding: 12px 16px;
+    font-size: 16px; /* Prevent zoom on iOS */
+  }
+
+  .ai-form button {
+    width: 44px;
+    height: 44px;
+  }
+
+  .ai-message {
+    max-width: 90%;
+    padding: 12px 14px;
+    font-size: 0.95rem;
+  }
+
+  .ai-welcome {
+    padding: 20px 16px;
+  }
+
+  .ai-welcome h4 {
+    font-size: 1.1rem;
+  }
+
+  .ai-welcome ul {
+    max-width: 100%;
+  }
+
+  /* AI Toggle button */
+  .ai-toggle-btn {
+    bottom: max(20px, env(safe-area-inset-bottom));
+    right: 20px;
+    width: 56px;
+    height: 56px;
   }
 
   .form-row {
@@ -1102,6 +1175,47 @@
 
   .collection-grid {
     grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+  }
+
+  /* Modal adjustments for mobile */
+  .modal {
+    padding: 16px;
+    align-items: flex-end;
+  }
+
+  .modal-content {
+    max-height: 90vh;
+    border-radius: 20px 20px 0 0;
+    margin-bottom: 0;
+  }
+
+  .modal-header {
+    padding: 20px;
+  }
+
+  .form-group {
+    padding: 0 20px 16px;
+  }
+
+  .form-actions {
+    padding: 16px 20px;
+    padding-bottom: max(16px, env(safe-area-inset-bottom));
+  }
+
+  /* Cropper modal full screen on mobile */
+  #cropper-modal .modal-content {
+    max-width: 100%;
+    max-height: 100vh;
+    border-radius: 0;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .cropper-container {
+    flex-grow: 1;
+    max-height: none;
+    margin-bottom: 0;
   }
 }
 

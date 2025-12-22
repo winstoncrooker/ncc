@@ -48,6 +48,29 @@ const Profile = {
       else console.warn(`Element #${id} not found`);
     };
 
+    // Handle mobile keyboard - resize AI sidebar when keyboard opens
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener('resize', () => {
+        const sidebar = document.getElementById('ai-sidebar');
+        if (sidebar && sidebar.classList.contains('open')) {
+          // Adjust sidebar height to visible viewport
+          sidebar.style.height = `${window.visualViewport.height}px`;
+          // Scroll input into view
+          const input = document.getElementById('ai-input');
+          if (input && document.activeElement === input) {
+            setTimeout(() => input.scrollIntoView({ block: 'end' }), 100);
+          }
+        }
+      });
+
+      window.visualViewport.addEventListener('scroll', () => {
+        const sidebar = document.getElementById('ai-sidebar');
+        if (sidebar && sidebar.classList.contains('open')) {
+          sidebar.style.transform = `translateY(${window.visualViewport.offsetTop}px)`;
+        }
+      });
+    }
+
     // AI Sidebar
     addListener('ai-toggle-btn', 'click', () => {
       document.getElementById('ai-sidebar')?.classList.add('open');
@@ -55,12 +78,22 @@ const Profile = {
     });
 
     addListener('ai-close-btn', 'click', () => {
-      document.getElementById('ai-sidebar')?.classList.remove('open');
+      const sidebar = document.getElementById('ai-sidebar');
+      if (sidebar) {
+        sidebar.classList.remove('open');
+        sidebar.style.height = '';
+        sidebar.style.transform = '';
+      }
       document.getElementById('sidebar-overlay')?.classList.remove('show');
     });
 
     addListener('sidebar-overlay', 'click', () => {
-      document.getElementById('ai-sidebar')?.classList.remove('open');
+      const sidebar = document.getElementById('ai-sidebar');
+      if (sidebar) {
+        sidebar.classList.remove('open');
+        sidebar.style.height = '';
+        sidebar.style.transform = '';
+      }
       document.getElementById('sidebar-overlay')?.classList.remove('show');
     });
 
@@ -559,10 +592,10 @@ const Profile = {
         // Update UI
         if (this.cropperType === 'profile') {
           document.getElementById('profile-picture').src = data.url;
-          this.profile.picture = data.url;
+          if (this.profile) this.profile.picture = data.url;
         } else {
           document.getElementById('hero-background').style.backgroundImage = `url(${data.url})`;
-          this.profile.background_image = data.url;
+          if (this.profile) this.profile.background_image = data.url;
         }
 
         this.closeCropper();
@@ -875,7 +908,9 @@ const Profile = {
 
         // Process album actions
         if (data.albums_to_add?.length > 0) {
+          console.log('[Chat] Albums to add:', data.albums_to_add);
           for (const album of data.albums_to_add) {
+            console.log('[Chat] Adding album:', album);
             await this.addAlbumFromChat(album);
           }
         }
@@ -883,6 +918,14 @@ const Profile = {
         if (data.albums_to_remove?.length > 0) {
           for (const album of data.albums_to_remove) {
             await this.removeAlbumFromChat(album);
+          }
+        }
+
+        // Process showcase actions
+        if (data.albums_to_showcase?.length > 0) {
+          console.log('[Chat] Albums to showcase:', data.albums_to_showcase);
+          for (const album of data.albums_to_showcase) {
+            await this.showcaseAlbumFromChat(album);
           }
         }
       } else {
@@ -946,6 +989,49 @@ const Profile = {
 
     if (found) {
       await this.removeFromCollection(found.id);
+    }
+  },
+
+  /**
+   * Showcase album from chat
+   */
+  async showcaseAlbumFromChat(album) {
+    // Find the album in collection
+    const found = this.collection.find(a =>
+      a.artist.toLowerCase() === album.artist.toLowerCase() &&
+      a.album.toLowerCase() === album.album.toLowerCase()
+    );
+
+    if (found) {
+      // Check if already in showcase
+      if (this.showcase.find(s => s.collection_id === found.id)) {
+        console.log('[Chat] Album already in showcase:', album.album);
+        return;
+      }
+
+      // Check showcase limit
+      if (this.showcase.length >= 8) {
+        console.log('[Chat] Showcase full, cannot add:', album.album);
+        return;
+      }
+
+      try {
+        const response = await Auth.apiRequest('/api/profile/me/showcase', {
+          method: 'POST',
+          body: JSON.stringify({ collection_id: found.id })
+        });
+
+        if (response.ok) {
+          const newShowcase = await response.json();
+          this.showcase.push(newShowcase);
+          this.renderShowcase();
+          console.log('[Chat] Added to showcase:', album.album);
+        }
+      } catch (error) {
+        console.error('Error adding to showcase from chat:', error);
+      }
+    } else {
+      console.log('[Chat] Album not in collection, cannot showcase:', album.album);
     }
   },
 

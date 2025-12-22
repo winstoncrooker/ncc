@@ -274,6 +274,7 @@ async def delete_album(
 ) -> dict:
     """
     Delete album from user's collection.
+    Also removes from showcase if present.
     Requires authentication.
     """
     env = request.scope["env"]
@@ -287,6 +288,12 @@ async def delete_album(
         if not existing:
             raise HTTPException(status_code=404, detail="Album not found")
 
+        # Delete from showcase first (D1 doesn't enforce foreign keys)
+        await env.DB.prepare(
+            "DELETE FROM showcase_albums WHERE collection_id = ? AND user_id = ?"
+        ).bind(album_id, user_id).run()
+
+        # Delete from collection
         await env.DB.prepare(
             "DELETE FROM collections WHERE id = ? AND user_id = ?"
         ).bind(album_id, user_id).run()
