@@ -270,6 +270,11 @@ const Profile = {
     addListener('view-profile-close', 'click', () => this.closeModal('view-profile-modal'));
     addListener('view-profile-message', 'click', () => this.messageFromProfile());
     addListener('view-profile-unfollow', 'click', () => this.unfollowFromProfile());
+    addListener('view-full-profile-btn', 'click', () => this.loadFullProfile());
+    addListener('view-collection-search', 'input', (e) => this.filterViewCollection(e.target.value));
+
+    // Collection search
+    addListener('collection-search-input', 'input', (e) => this.filterCollection(e.target.value));
 
     // Messages Sidebar
     addListener('messages-toggle-btn', 'click', () => this.openMessagesSidebar());
@@ -383,6 +388,7 @@ const Profile = {
           <p class="album-title">${this.escapeHtml(album.album)}</p>
           <p class="album-artist">${this.escapeHtml(album.artist)}</p>
         </div>
+        ${!album.cover ? `<button class="refresh-btn" onclick="Profile.refreshCover(${album.id})" title="Find cover">↻</button>` : ''}
         <button class="remove-btn" onclick="Profile.removeFromCollection(${album.id})" title="Remove">&times;</button>
       </div>
     `).join('');
@@ -390,7 +396,7 @@ const Profile = {
     // Add click to show in showcase option
     grid.querySelectorAll('.album-card').forEach(card => {
       card.addEventListener('click', (e) => {
-        if (!e.target.closest('.remove-btn')) {
+        if (!e.target.closest('.remove-btn') && !e.target.closest('.refresh-btn')) {
           const id = parseInt(card.dataset.id);
           this.addToShowcase(id);
         }
@@ -523,6 +529,82 @@ const Profile = {
     }
 
     console.log(`[Covers] Done filling missing covers (${successCount}/${total})`);
+  },
+
+  /**
+   * Manually refresh cover for a single album
+   */
+  async refreshCover(albumId) {
+    const album = this.collection.find(a => a.id === albumId);
+    if (!album) return;
+
+    // Find the button and show loading state
+    const btn = document.querySelector(`.album-card[data-id="${albumId}"] .refresh-btn`);
+    if (btn) {
+      btn.classList.add('loading');
+      btn.disabled = true;
+    }
+
+    try {
+      const discogsResponse = await Auth.apiRequest(
+        `/api/discogs/search?artist=${encodeURIComponent(album.artist)}&album=${encodeURIComponent(album.album)}`
+      );
+
+      if (discogsResponse.ok) {
+        const data = await discogsResponse.json();
+
+        if (data.cover) {
+          // Update album in collection
+          album.cover = data.cover;
+          if (data.year && !album.year) album.year = data.year;
+          if (data.id && !album.discogs_id) album.discogs_id = data.id;
+
+          // Update in database
+          await Auth.apiRequest(`/api/collection/${album.id}`, {
+            method: 'PUT',
+            body: JSON.stringify({
+              cover: data.cover,
+              year: data.year || album.year,
+              discogs_id: data.id || album.discogs_id
+            })
+          });
+
+          // Re-render to show new cover
+          this.renderCollection();
+          console.log(`[Cover] Refreshed: ${album.artist} - ${album.album}`);
+        } else {
+          // No cover found
+          if (btn) {
+            btn.classList.remove('loading');
+            btn.textContent = '✗';
+            setTimeout(() => {
+              btn.textContent = '↻';
+              btn.disabled = false;
+            }, 2000);
+          }
+        }
+      } else {
+        // API error
+        if (btn) {
+          btn.classList.remove('loading');
+          btn.textContent = '✗';
+          setTimeout(() => {
+            btn.textContent = '↻';
+            btn.disabled = false;
+          }, 2000);
+        }
+      }
+    } catch (err) {
+      console.error(`[Cover] Failed to refresh: ${album.artist} - ${album.album}`, err);
+      if (btn) {
+        btn.classList.remove('loading');
+        btn.textContent = '✗';
+        setTimeout(() => {
+          btn.textContent = '↻';
+          btn.disabled = false;
+        }, 2000);
+      }
+    }
   },
 
   /**
@@ -1763,6 +1845,143 @@ const Profile = {
     } else {
       showcaseGrid.innerHTML = '<div class="showcase-empty-msg">No albums in showcase</div>';
     }
+
+    // Reset collection section
+    document.getElementById('view-profile-collection').style.display = 'none';
+    document.getElementById('view-full-profile-btn').textContent = 'View Full Profile';
+    document.getElementById('view-collection-search').value = '';
+    this.viewedProfileCollection = null;
+  },
+
+  /**
+   * Load and display full profile with collection
+   */
+  async loadFullProfile() {
+    if (!this.viewedProfile) return;
+
+    const btn = document.getElementById('view-full-profile-btn');
+    const collectionSection = document.getElementById('view-profile-collection');
+
+    // Toggle off if already showing
+    if (collectionSection.style.display !== 'none') {
+      collectionSection.style.display = 'none';
+      btn.textContent = 'View Full Profile';
+      return;
+    }
+
+    btn.textContent = 'Loading...';
+
+    try {
+      // Fetch user's collection
+      const response = await Auth.apiRequest(`/api/friends/user/${this.viewedProfile.id}/collection`);
+
+      if (response.ok) {
+        const collection = await response.json();
+        this.viewedProfileCollection = collection;
+
+        // Update count
+        document.getElementById('view-collection-count').textContent = `(${collection.length})`;
+
+        // Render collection
+        this.renderViewCollection(collection);
+
+        // Show section
+        collectionSection.style.display = 'block';
+        btn.textContent = 'Hide Collection';
+      } else {
+        btn.textContent = 'View Full Profile';
+        console.error('Failed to load collection');
+      }
+    } catch (err) {
+      btn.textContent = 'View Full Profile';
+      console.error('Error loading collection:', err);
+    }
+  },
+
+  /**
+   * Render viewed profile's collection
+   */
+  renderViewCollection(collection) {
+    const grid = document.getElementById('view-collection-grid');
+
+    if (collection.length === 0) {
+      grid.innerHTML = '<div class="showcase-empty-msg">No albums in collection</div>';
+      return;
+    }
+
+    grid.innerHTML = collection.map(album => `
+      <div class="album-card">
+        <img src="${album.cover || this.getPlaceholderCover(album)}"
+             alt="${album.album}"
+             onerror="this.src='${this.getPlaceholderCover(album)}'">
+        <div class="album-info">
+          <p class="album-title">${this.escapeHtml(album.album)}</p>
+          <p class="album-artist">${this.escapeHtml(album.artist)}</p>
+        </div>
+      </div>
+    `).join('');
+  },
+
+  /**
+   * Filter viewed profile's collection
+   */
+  filterViewCollection(query) {
+    if (!this.viewedProfileCollection) return;
+
+    const q = query.toLowerCase().trim();
+
+    if (!q) {
+      this.renderViewCollection(this.viewedProfileCollection);
+      return;
+    }
+
+    const filtered = this.viewedProfileCollection.filter(a =>
+      a.artist.toLowerCase().includes(q) ||
+      a.album.toLowerCase().includes(q)
+    );
+
+    this.renderViewCollection(filtered);
+  },
+
+  /**
+   * Filter own collection
+   */
+  filterCollection(query) {
+    const q = query.toLowerCase().trim();
+    const grid = document.getElementById('collection-grid');
+
+    if (!q) {
+      this.renderCollection();
+      return;
+    }
+
+    const filtered = this.collection.filter(a =>
+      a.artist.toLowerCase().includes(q) ||
+      a.album.toLowerCase().includes(q)
+    );
+
+    if (filtered.length === 0) {
+      grid.innerHTML = `
+        <div class="collection-empty">
+          <div class="empty-icon">🔍</div>
+          <p>No albums found matching "${this.escapeHtml(query)}"</p>
+        </div>
+      `;
+      return;
+    }
+
+    grid.innerHTML = filtered.map(album => `
+      <div class="album-card" data-id="${album.id}">
+        <img src="${album.cover || this.getPlaceholderCover(album)}"
+             alt="${album.album}" loading="lazy"
+             onerror="this.src='${this.getPlaceholderCover(album)}'">
+        <div class="album-info">
+          <p class="album-title">${this.escapeHtml(album.album)}</p>
+          <p class="album-artist">${this.escapeHtml(album.artist)}</p>
+        </div>
+        <button class="remove-btn" onclick="Profile.removeFromCollection(${album.id})" title="Remove">&times;</button>
+      </div>
+    `).join('');
   },
 
   /**

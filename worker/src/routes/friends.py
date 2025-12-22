@@ -615,3 +615,39 @@ async def get_public_profile(
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error fetching profile: {str(e)}")
+
+
+@router.get("/user/{target_user_id}/collection")
+async def get_user_collection(
+    request: Request,
+    target_user_id: int,
+    user_id: int = Depends(require_auth)
+) -> list[dict]:
+    """
+    Get a user's full collection.
+    """
+    env = request.scope["env"]
+
+    try:
+        results = await env.DB.prepare(
+            """SELECT id, artist, album, cover, year
+               FROM collections
+               WHERE user_id = ?
+               ORDER BY artist, album"""
+        ).bind(target_user_id).all()
+
+        collection = []
+        for row in results.results:
+            if hasattr(row, 'to_py'):
+                row = row.to_py()
+            collection.append({
+                "id": row["id"],
+                "artist": row["artist"],
+                "album": row["album"],
+                "cover": to_python_value(row.get("cover")),
+                "year": to_python_value(row.get("year"))
+            })
+
+        return collection
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error fetching collection: {str(e)}")
