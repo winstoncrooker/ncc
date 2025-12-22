@@ -1142,13 +1142,20 @@ const Profile = {
    */
   async sendChatMessage() {
     const input = document.getElementById('ai-input');
+    const sendBtn = document.querySelector('#ai-input-form button[type="submit"]');
     const message = input.value.trim();
     if (!message) return;
 
+    // Disable input while processing
     input.value = '';
+    input.disabled = true;
+    if (sendBtn) sendBtn.disabled = true;
 
     // Add user message to chat
     this.addChatMessage(message, 'user');
+
+    // Show typing indicator
+    this.showTypingIndicator();
 
     // Add to history
     this.chatHistory.push({ role: 'user', content: message });
@@ -1163,6 +1170,9 @@ const Profile = {
         })
       });
 
+      // Remove typing indicator
+      this.hideTypingIndicator();
+
       if (response.ok) {
         const data = await response.json();
 
@@ -1175,18 +1185,28 @@ const Profile = {
         // Add to history
         this.chatHistory.push({ role: 'assistant', content: data.response });
 
-        // Process album actions
+        // Track actions for feedback
+        const actions = [];
+
+        // Process album additions
         if (data.albums_to_add?.length > 0) {
           console.log('[Chat] Albums to add:', data.albums_to_add);
           for (const album of data.albums_to_add) {
-            console.log('[Chat] Adding album:', album);
-            await this.addAlbumFromChat(album);
+            const success = await this.addAlbumFromChat(album);
+            if (success) {
+              actions.push(`Added: ${album.artist} - ${album.album}`);
+            }
           }
         }
 
+        // Process album removals
         if (data.albums_to_remove?.length > 0) {
+          console.log('[Chat] Albums to remove:', data.albums_to_remove);
           for (const album of data.albums_to_remove) {
-            await this.removeAlbumFromChat(album);
+            const success = await this.removeAlbumFromChat(album);
+            if (success) {
+              actions.push(`Removed: ${album.artist} - ${album.album}`);
+            }
           }
         }
 
@@ -1194,16 +1214,77 @@ const Profile = {
         if (data.albums_to_showcase?.length > 0) {
           console.log('[Chat] Albums to showcase:', data.albums_to_showcase);
           for (const album of data.albums_to_showcase) {
-            await this.showcaseAlbumFromChat(album);
+            const success = await this.showcaseAlbumFromChat(album);
+            if (success) {
+              actions.push(`Showcased: ${album.artist} - ${album.album}`);
+            }
           }
         }
+
+        // Show action summary if any actions were performed
+        if (actions.length > 0) {
+          this.showActionFeedback(actions);
+        }
       } else {
-        this.addChatMessage('Sorry, I had trouble processing that. Please try again.', 'assistant');
+        const errorData = await response.json().catch(() => ({}));
+        this.addChatMessage(errorData.detail || 'Sorry, I had trouble processing that. Please try again.', 'assistant');
       }
     } catch (error) {
       console.error('Chat error:', error);
+      this.hideTypingIndicator();
       this.addChatMessage('Sorry, something went wrong. Please try again.', 'assistant');
+    } finally {
+      // Re-enable input
+      input.disabled = false;
+      if (sendBtn) sendBtn.disabled = false;
+      input.focus();
     }
+  },
+
+  /**
+   * Show typing indicator in chat
+   */
+  showTypingIndicator() {
+    const container = document.getElementById('ai-chat-container');
+    const existing = container.querySelector('.typing-indicator');
+    if (existing) return;
+
+    const indicator = document.createElement('div');
+    indicator.className = 'typing-indicator';
+    indicator.innerHTML = '<span></span><span></span><span></span>';
+    container.appendChild(indicator);
+    container.scrollTop = container.scrollHeight;
+  },
+
+  /**
+   * Hide typing indicator
+   */
+  hideTypingIndicator() {
+    const container = document.getElementById('ai-chat-container');
+    const indicator = container.querySelector('.typing-indicator');
+    if (indicator) indicator.remove();
+  },
+
+  /**
+   * Show action feedback toast
+   */
+  showActionFeedback(actions) {
+    // Create or update feedback toast
+    let toast = document.getElementById('action-toast');
+    if (!toast) {
+      toast = document.createElement('div');
+      toast.id = 'action-toast';
+      toast.className = 'action-toast';
+      document.body.appendChild(toast);
+    }
+
+    toast.innerHTML = actions.map(a => `<div class="action-item">${this.escapeHtml(a)}</div>`).join('');
+    toast.classList.add('show');
+
+    // Hide after 3 seconds
+    setTimeout(() => {
+      toast.classList.remove('show');
+    }, 3000);
   },
 
   /**
@@ -1382,9 +1463,21 @@ const Profile = {
 
   /**
    * Add album from chat (includes Discogs cover data)
+   * @returns {Promise<boolean>} true if album was added successfully
    */
   async addAlbumFromChat(album) {
     try {
+      // Check if album already exists (fuzzy match)
+      const exists = this.collection.some(a =>
+        a.artist.toLowerCase().trim() === album.artist.toLowerCase().trim() &&
+        a.album.toLowerCase().trim() === album.album.toLowerCase().trim()
+      );
+
+      if (exists) {
+        console.log('[Chat] Album already in collection:', album.artist, '-', album.album);
+        return false;
+      }
+
       const response = await Auth.apiRequest('/api/collection/', {
         method: 'POST',
         body: JSON.stringify({
@@ -1399,66 +1492,112 @@ const Profile = {
       if (response.ok) {
         const newAlbum = await response.json();
         this.addAlbumSorted(newAlbum);
+        console.log('[Chat] Added album:', album.artist, '-', album.album);
+        return true;
+      } else {
+        console.error('[Chat] Failed to add album:', await response.text());
+        return false;
       }
     } catch (error) {
       console.error('Error adding album from chat:', error);
+      return false;
     }
   },
 
   /**
    * Remove album from chat
+   * @returns {Promise<boolean>} true if album was removed successfully
    */
   async removeAlbumFromChat(album) {
+    // Find album with fuzzy matching
     const found = this.collection.find(a =>
-      a.artist.toLowerCase() === album.artist.toLowerCase() &&
-      a.album.toLowerCase() === album.album.toLowerCase()
+      a.artist.toLowerCase().trim() === album.artist.toLowerCase().trim() &&
+      a.album.toLowerCase().trim() === album.album.toLowerCase().trim()
     );
 
-    if (found) {
+    if (!found) {
+      // Try partial match
+      const partialMatch = this.collection.find(a =>
+        a.artist.toLowerCase().includes(album.artist.toLowerCase()) ||
+        a.album.toLowerCase().includes(album.album.toLowerCase())
+      );
+
+      if (partialMatch) {
+        console.log('[Chat] Partial match found, removing:', partialMatch.artist, '-', partialMatch.album);
+        await this.removeFromCollection(partialMatch.id);
+        return true;
+      }
+
+      console.log('[Chat] Album not found in collection:', album.artist, '-', album.album);
+      return false;
+    }
+
+    try {
       await this.removeFromCollection(found.id);
+      console.log('[Chat] Removed album:', album.artist, '-', album.album);
+      return true;
+    } catch (error) {
+      console.error('Error removing album from chat:', error);
+      return false;
     }
   },
 
   /**
    * Showcase album from chat
+   * @returns {Promise<boolean>} true if album was showcased successfully
    */
   async showcaseAlbumFromChat(album) {
-    // Find the album in collection
-    const found = this.collection.find(a =>
-      a.artist.toLowerCase() === album.artist.toLowerCase() &&
-      a.album.toLowerCase() === album.album.toLowerCase()
+    // Find the album in collection (fuzzy match)
+    let found = this.collection.find(a =>
+      a.artist.toLowerCase().trim() === album.artist.toLowerCase().trim() &&
+      a.album.toLowerCase().trim() === album.album.toLowerCase().trim()
     );
 
-    if (found) {
-      // Check if already in showcase
-      if (this.showcase.find(s => s.collection_id === found.id)) {
-        console.log('[Chat] Album already in showcase:', album.album);
-        return;
-      }
+    // Try partial match if exact match not found
+    if (!found) {
+      found = this.collection.find(a =>
+        a.album.toLowerCase().includes(album.album.toLowerCase()) ||
+        (a.artist.toLowerCase().includes(album.artist.toLowerCase()) &&
+         a.album.toLowerCase().includes(album.album.toLowerCase().split(' ')[0]))
+      );
+    }
 
-      // Check showcase limit
-      if (this.showcase.length >= 8) {
-        console.log('[Chat] Showcase full, cannot add:', album.album);
-        return;
-      }
+    if (!found) {
+      console.log('[Chat] Album not in collection, cannot showcase:', album.artist, '-', album.album);
+      return false;
+    }
 
-      try {
-        const response = await Auth.apiRequest('/api/profile/me/showcase', {
-          method: 'POST',
-          body: JSON.stringify({ collection_id: found.id })
-        });
+    // Check if already in showcase
+    if (this.showcase.find(s => s.collection_id === found.id)) {
+      console.log('[Chat] Album already in showcase:', album.album);
+      return false;
+    }
 
-        if (response.ok) {
-          const newShowcase = await response.json();
-          this.showcase.push(newShowcase);
-          this.renderShowcase();
-          console.log('[Chat] Added to showcase:', album.album);
-        }
-      } catch (error) {
-        console.error('Error adding to showcase from chat:', error);
+    // Check showcase limit
+    if (this.showcase.length >= 8) {
+      console.log('[Chat] Showcase full (max 8), cannot add:', album.album);
+      return false;
+    }
+
+    try {
+      const response = await Auth.apiRequest('/api/profile/me/showcase', {
+        method: 'POST',
+        body: JSON.stringify({ collection_id: found.id })
+      });
+
+      if (response.ok) {
+        const newShowcase = await response.json();
+        this.showcase.push(newShowcase);
+        this.renderShowcase();
+        console.log('[Chat] Added to showcase:', album.artist, '-', album.album);
+        return true;
+      } else {
+        console.error('[Chat] Failed to add to showcase:', await response.text());
+        return false;
       }
-    } else {
-      console.log('[Chat] Album not in collection, cannot showcase:', album.album);
+    } catch (error) {
+      console.error('Error adding to showcase from chat:', error);
+      return false;
     }
   },
 
