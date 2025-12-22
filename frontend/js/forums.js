@@ -353,7 +353,7 @@ const Forums = {
     const content = document.getElementById('post-detail-content');
     const title = document.getElementById('post-detail-title');
 
-    modal.classList.add('active');
+    modal.classList.add('open');
     content.innerHTML = '<div class="loading">Loading...</div>';
 
     try {
@@ -608,7 +608,7 @@ const Forums = {
    * Hide post detail modal
    */
   hidePostDetailModal() {
-    document.getElementById('post-detail-modal').classList.remove('active');
+    document.getElementById('post-detail-modal').classList.remove('open');
     this.currentPostId = null;
   },
 
@@ -634,14 +634,14 @@ const Forums = {
       console.error('Error loading categories:', error);
     }
 
-    modal.classList.add('active');
+    modal.classList.add('open');
   },
 
   /**
    * Hide create post modal
    */
   hideCreatePostModal() {
-    document.getElementById('create-post-modal').classList.remove('active');
+    document.getElementById('create-post-modal').classList.remove('open');
     document.getElementById('create-post-form').reset();
     document.getElementById('post-group').innerHTML = '<option value="">No specific group</option>';
   },
@@ -767,7 +767,7 @@ const Forums = {
     const modal = document.getElementById('discover-modal');
     const content = document.getElementById('discover-categories');
 
-    modal.classList.add('active');
+    modal.classList.add('open');
     content.innerHTML = '<div class="loading">Loading...</div>';
 
     try {
@@ -875,7 +875,7 @@ const Forums = {
    * Hide discover modal
    */
   hideDiscoverModal() {
-    document.getElementById('discover-modal').classList.remove('active');
+    document.getElementById('discover-modal').classList.remove('open');
   },
 
   /**

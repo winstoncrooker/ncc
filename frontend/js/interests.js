@@ -81,7 +81,7 @@ const Interests = {
         </div>
       `).join('');
 
-      modal.classList.add('active');
+      modal.classList.add('open');
 
     } catch (error) {
       console.error('Error loading categories:', error);
@@ -275,7 +275,7 @@ const Interests = {
    * Hide onboarding modal
    */
   hideOnboarding() {
-    document.getElementById('onboarding-modal').classList.remove('active');
+    document.getElementById('onboarding-modal').classList.remove('open');
 
     // Reset state
     this.step = 1;
