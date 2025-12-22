@@ -1067,50 +1067,73 @@ const Profile = {
 
       // Show user message with summary
       this.addChatMessage(`Uploading ${albums.length} album(s) from file...`, 'user');
-      this.chatHistory.push({ role: 'user', content: `Add these albums: ${albums.map(a => `${a.artist} - ${a.album}`).join(', ')}` });
 
-      // Build message for AI with album list
-      const albumList = albums.map(a => `${a.artist} - ${a.album}`).join('\n');
-      const message = `Please add these albums to my collection:\n${albumList}`;
+      // Add albums directly to collection (bypass AI for bulk adds)
+      let added = 0;
+      let skipped = 0;
 
-      // Send to AI for processing (will enrich with Discogs data)
-      const response = await Auth.apiRequest('/api/chat/', {
-        method: 'POST',
-        body: JSON.stringify({
-          message,
-          collection: this.collection.map(a => ({ artist: a.artist, album: a.album })),
-          history: this.chatHistory.slice(-10)
-        })
-      });
+      for (let i = 0; i < albums.length; i++) {
+        const album = albums[i];
 
-      if (response.ok) {
-        const data = await response.json();
+        // Check if already in collection
+        const exists = this.collection.some(a =>
+          a.artist.toLowerCase() === album.artist.toLowerCase() &&
+          a.album.toLowerCase() === album.album.toLowerCase()
+        );
 
-        // Sanitize and add response
-        const cleanResponse = typeof DOMPurify !== 'undefined'
-          ? DOMPurify.sanitize(data.response)
-          : data.response;
-        this.addChatMessage(cleanResponse, 'assistant');
+        if (exists) {
+          skipped++;
+          continue;
+        }
 
-        this.chatHistory.push({ role: 'assistant', content: data.response });
+        try {
+          const response = await Auth.apiRequest('/api/collection/', {
+            method: 'POST',
+            body: JSON.stringify({
+              artist: album.artist,
+              album: album.album
+            })
+          });
 
-        // Process album additions
-        if (data.albums_to_add?.length > 0) {
-          for (const album of data.albums_to_add) {
-            await this.addAlbumFromChat(album);
+          if (response.ok) {
+            const newAlbum = await response.json();
+            this.collection.push(newAlbum);
+            added++;
           }
+        } catch (err) {
+          console.error(`Failed to add: ${album.artist} - ${album.album}`, err);
         }
 
-        // Report any invalid lines
-        if (invalidLines.length > 0) {
-          this.addChatMessage(`Note: ${invalidLines.length} line(s) couldn't be parsed. Make sure to use "Artist - Album" format.`, 'assistant');
+        // Update progress every 10 albums
+        if ((i + 1) % 10 === 0) {
+          this.updateLastChatMessage(`Adding albums... ${i + 1}/${albums.length}`);
         }
-      } else {
-        this.addChatMessage('Sorry, I had trouble processing the file. Please try again.', 'assistant');
       }
+
+      // Render updated collection
+      this.renderCollection();
+
+      // Show completion message
+      let message = `Added ${added} album(s) to your collection.`;
+      if (skipped > 0) message += ` ${skipped} already in collection.`;
+      if (invalidLines.length > 0) message += ` ${invalidLines.length} line(s) couldn't be parsed.`;
+
+      this.addChatMessage(message, 'assistant');
+
     } catch (error) {
       console.error('File upload error:', error);
       this.addChatMessage('Error reading file. Please try again.', 'assistant');
+    }
+  },
+
+  /**
+   * Update the last chat message (for progress updates)
+   */
+  updateLastChatMessage(content) {
+    const container = document.getElementById('ai-chat-container');
+    const messages = container.querySelectorAll('.ai-message.user');
+    if (messages.length > 0) {
+      messages[messages.length - 1].textContent = content;
     }
   },
 
