@@ -82,6 +82,88 @@ const TemplateRegistry = {
       'coins': ['Collection', 'By Era', 'Graded Coins', 'Want List']
     };
     return sectionMap[categorySlug] || ['Collection'];
+  },
+
+  /**
+   * Get category-specific item nouns
+   */
+  getItemNouns(categorySlug) {
+    const nounMap = {
+      'vinyl': { singular: 'Record', plural: 'Records', icon: '💿' },
+      'trading-cards': { singular: 'Card', plural: 'Cards', icon: '🃏' },
+      'cars': { singular: 'Vehicle', plural: 'Vehicles', icon: '🚗' },
+      'sneakers': { singular: 'Pair', plural: 'Pairs', icon: '👟' },
+      'watches': { singular: 'Watch', plural: 'Watches', icon: '⌚' },
+      'comics': { singular: 'Issue', plural: 'Issues', icon: '📚' },
+      'video-games': { singular: 'Game', plural: 'Games', icon: '🎮' },
+      'coins': { singular: 'Coin', plural: 'Coins', icon: '🪙' }
+    };
+    return nounMap[categorySlug] || { singular: 'Item', plural: 'Items', icon: '📦' };
+  },
+
+  /**
+   * Get category-specific AI system prompt
+   */
+  getAIPrompt(categorySlug) {
+    const prompts = {
+      'vinyl': `You are a vinyl record assistant helping a collector manage their vinyl collection.
+You can help with: adding records, getting recommendations, identifying pressings, discussing genres, and music history.
+When suggesting actions, use these formats:
+- To add: {ADD:Artist|Album}
+- To remove: {REMOVE:Artist|Album}
+- To showcase: {SHOWCASE:Artist|Album}
+Keep responses concise and focused on vinyl collecting.`,
+
+      'trading-cards': `You are a trading card expert helping a collector manage their card collection.
+Specialties: Pokemon, MTG, Yu-Gi-Oh, Sports cards, grading (PSA/BGS), meta decks, and card values.
+When suggesting actions, use these formats:
+- To add: {ADD:Set|Card Name}
+- To remove: {REMOVE:Set|Card Name}
+Keep responses concise and focused on card collecting and trading.`,
+
+      'cars': `You are an automotive enthusiast assistant helping a car collector.
+Specialties: Classic cars, JDM, muscle cars, builds, modifications, valuations, and automotive history.
+When suggesting actions, use these formats:
+- To add: {ADD:Year Make Model}
+- To remove: {REMOVE:Year Make Model}
+Keep responses concise and focused on automotive collecting.`,
+
+      'sneakers': `You are a sneaker culture expert helping a sneakerhead manage their collection.
+Specialties: Jordans, Nike, Adidas, Yeezy, resale values, authentication, and release calendars.
+When suggesting actions, use these formats:
+- To add: {ADD:Brand|Model|Colorway}
+- To remove: {REMOVE:Brand|Model}
+Keep responses concise and focused on sneaker culture.`,
+
+      'watches': `You are a horology expert helping a watch collector manage their collection.
+Specialties: Luxury watches, vintage pieces, movements, complications, brand history, and valuations.
+When suggesting actions, use these formats:
+- To add: {ADD:Brand|Model|Reference}
+- To remove: {REMOVE:Brand|Model}
+Keep responses concise and focused on watch collecting.`,
+
+      'comics': `You are a comic book expert helping a collector manage their comic collection.
+Specialties: Marvel, DC, indie publishers, key issues, grading (CGC), and comic history.
+When suggesting actions, use these formats:
+- To add: {ADD:Publisher|Series|Issue}
+- To remove: {REMOVE:Publisher|Series|Issue}
+Keep responses concise and focused on comic collecting.`,
+
+      'video-games': `You are a video game collector assistant helping manage a game collection.
+Specialties: Retro gaming, CIB collecting, sealed games, platform history, and game valuations.
+When suggesting actions, use these formats:
+- To add: {ADD:Platform|Title}
+- To remove: {REMOVE:Platform|Title}
+Keep responses concise and focused on game collecting.`,
+
+      'coins': `You are a numismatic expert helping a coin collector manage their collection.
+Specialties: US coins, world coins, ancient coins, grading (NGC/PCGS), bullion, and coin history.
+When suggesting actions, use these formats:
+- To add: {ADD:Country|Denomination|Year}
+- To remove: {REMOVE:Country|Denomination|Year}
+Keep responses concise and focused on coin collecting.`
+    };
+    return prompts[categorySlug] || prompts['vinyl'];
   }
 };
 

@@ -10,6 +10,16 @@ from .auth import require_auth
 router = APIRouter()
 
 
+def safe_value(val, default=None):
+    """Convert JsNull/JsProxy to Python None, return value otherwise."""
+    if val is None:
+        return default
+    type_str = str(type(val))
+    if 'JsProxy' in type_str or 'JsNull' in type_str:
+        return default
+    return val
+
+
 class UserInterestResponse(BaseModel):
     """User interest membership"""
     id: int
@@ -71,14 +81,14 @@ async def get_my_interests(
         for row in result.get("results", []):
             interests.append(UserInterestResponse(
                 id=row["id"],
-                category_id=row.get("category_id"),
-                category_slug=row.get("category_slug"),
-                category_name=row.get("category_name"),
-                category_icon=row.get("category_icon"),
-                interest_group_id=row.get("interest_group_id"),
-                interest_group_slug=row.get("group_slug"),
-                interest_group_name=row.get("group_name"),
-                notify_all=bool(row.get("notify_all", 1))
+                category_id=safe_value(row.get("category_id")),
+                category_slug=safe_value(row.get("category_slug")),
+                category_name=safe_value(row.get("category_name")),
+                category_icon=safe_value(row.get("category_icon")),
+                interest_group_id=safe_value(row.get("interest_group_id")),
+                interest_group_slug=safe_value(row.get("group_slug")),
+                interest_group_name=safe_value(row.get("group_name")),
+                notify_all=bool(safe_value(row.get("notify_all"), 1))
             ))
 
         return UserInterestsListResponse(
@@ -152,7 +162,7 @@ async def join_interest(
                     category_id=body.category_id,
                     category_slug=category["slug"],
                     category_name=category["name"],
-                    category_icon=category.get("icon"),
+                    category_icon=safe_value(category.get("icon")),
                     notify_all=True
                 )
             )
@@ -209,7 +219,7 @@ async def join_interest(
                     category_id=group["category_id"],
                     category_slug=group["category_slug"],
                     category_name=group["category_name"],
-                    category_icon=group.get("category_icon"),
+                    category_icon=safe_value(group.get("category_icon")),
                     interest_group_id=body.interest_group_id,
                     interest_group_slug=group["slug"],
                     interest_group_name=group["name"],

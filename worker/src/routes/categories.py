@@ -10,6 +10,16 @@ from .auth import get_current_user
 router = APIRouter()
 
 
+def safe_value(val, default=None):
+    """Convert JsNull/JsProxy to Python None, return value otherwise."""
+    if val is None:
+        return default
+    type_str = str(type(val))
+    if 'JsProxy' in type_str or 'JsNull' in type_str:
+        return default
+    return val
+
+
 class InterestGroupResponse(BaseModel):
     """Interest group within a category"""
     id: int
@@ -129,12 +139,12 @@ async def get_category(
                 id=row["id"],
                 slug=row["slug"],
                 name=row["name"],
-                description=row.get("description"),
-                icon=row.get("icon"),
+                description=safe_value(row.get("description")),
+                icon=safe_value(row.get("icon")),
                 level=row["level"],
-                parent_id=row.get("parent_id"),
-                member_count=row.get("member_count", 0),
-                post_count=row.get("post_count", 0)
+                parent_id=safe_value(row.get("parent_id")),
+                member_count=safe_value(row.get("member_count"), 0),
+                post_count=safe_value(row.get("post_count"), 0)
             ))
 
         return CategoryDetailResponse(
@@ -205,12 +215,12 @@ async def get_category_interests(
                 id=row["id"],
                 slug=row["slug"],
                 name=row["name"],
-                description=row.get("description"),
-                icon=row.get("icon"),
+                description=safe_value(row.get("description")),
+                icon=safe_value(row.get("icon")),
                 level=row["level"],
-                parent_id=row.get("parent_id"),
-                member_count=row.get("member_count", 0),
-                post_count=row.get("post_count", 0)
+                parent_id=safe_value(row.get("parent_id")),
+                member_count=safe_value(row.get("member_count"), 0),
+                post_count=safe_value(row.get("post_count"), 0)
             ))
 
         return groups

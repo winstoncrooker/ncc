@@ -1,7 +1,8 @@
 /**
  * Interests namespace - Handles interest selection and onboarding
  */
-const API_BASE = typeof CONFIG !== 'undefined' ? CONFIG.API_BASE : '';
+// API_BASE for forums/interests includes /api (CONFIG.API_BASE is just the worker base URL)
+const API_BASE = (typeof CONFIG !== 'undefined' ? CONFIG.API_BASE : '') + '/api';
 
 const Interests = {
   // State

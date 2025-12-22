@@ -380,8 +380,20 @@ const Profile = {
       this.userCategories = Array.from(categoryMap.values());
       this.renderCategorySwitcher();
 
+      // Apply UI updates for the first/default category
+      if (this.userCategories.length > 0) {
+        const defaultCategory = this.currentCategorySlug || this.userCategories[0].slug;
+        this.currentCategorySlug = defaultCategory;
+        this.updateUIForCategory(defaultCategory);
+      } else {
+        // Default to vinyl if no categories joined
+        this.updateUIForCategory('vinyl');
+      }
+
     } catch (error) {
       console.error('Error loading user categories:', error);
+      // Default to vinyl on error
+      this.updateUIForCategory('vinyl');
     }
   },
 
@@ -394,43 +406,31 @@ const Profile = {
 
     if (!select || !section) return;
 
-    // Get non-vinyl categories the user has joined
-    const otherCategories = this.userCategories.filter(cat => cat.slug !== 'vinyl');
-
-    // Hide switcher if user has no other categories besides vinyl
-    if (otherCategories.length === 0) {
+    // Hide switcher if user has 1 or fewer categories
+    if (this.userCategories.length <= 1) {
       section.style.display = 'none';
       return;
     }
 
     section.style.display = 'block';
 
-    // Populate dropdown with vinyl as default option plus other categories
-    select.innerHTML = `
-      <option value="">🎵 Vinyl Records (Default)</option>
-      ${otherCategories.map(cat => `
-        <option value="${cat.slug}">${cat.icon || ''} ${cat.name}</option>
-      `).join('')}
-    `;
+    // Populate dropdown with all user categories
+    select.innerHTML = this.userCategories.map((cat, idx) => `
+      <option value="${cat.slug}" ${idx === 0 ? 'selected' : ''}>${cat.icon || ''} ${cat.name}</option>
+    `).join('');
+
+    // Set current category to first one if not set
+    if (!this.currentCategorySlug && this.userCategories.length > 0) {
+      this.currentCategorySlug = this.userCategories[0].slug;
+      this.updateUIForCategory(this.currentCategorySlug);
+    }
   },
 
   /**
    * Switch to a different category profile
    */
   async switchCategoryProfile(categorySlug) {
-    // Empty string means default (vinyl/main profile)
-    if (!categorySlug) {
-      this.currentCategorySlug = null;
-      this.currentCategoryProfile = null;
-      // Reload main collection and showcase
-      await Promise.all([
-        this.loadCollection(),
-        this.loadShowcase()
-      ]);
-      this.updateSectionHeaders('vinyl');
-      this.applyCategoryColor('vinyl');
-      return;
-    }
+    if (!categorySlug) return;
 
     this.currentCategorySlug = categorySlug;
 
@@ -451,16 +451,92 @@ const Profile = {
         this.showcase = (itemsData.items || []).filter(item => item.in_showcase);
         this.renderCollection();
         this.renderShowcase();
+      } else {
+        // No items yet for this category
+        this.collection = [];
+        this.showcase = [];
+        this.renderCollection();
+        this.renderShowcase();
       }
 
-      // Update section headers based on category
-      this.updateSectionHeaders(categorySlug);
-
-      // Apply category color scheme
-      this.applyCategoryColor(categorySlug);
+      // Update all UI elements for this category
+      this.updateUIForCategory(categorySlug);
 
     } catch (error) {
       console.error('Error switching category profile:', error);
+    }
+  },
+
+  /**
+   * Update all UI elements for a category
+   */
+  updateUIForCategory(categorySlug) {
+    // Update section headers
+    this.updateSectionHeaders(categorySlug);
+
+    // Apply category color scheme
+    this.applyCategoryColor(categorySlug);
+
+    // Update "Add Record" buttons
+    this.updateAddButtons(categorySlug);
+  },
+
+  /**
+   * Update Add buttons text based on category
+   */
+  updateAddButtons(categorySlug) {
+    const nouns = typeof TemplateRegistry !== 'undefined' ?
+      TemplateRegistry.getItemNouns(categorySlug) :
+      { singular: 'Record', plural: 'Records', icon: '💿' };
+
+    // Update showcase add button
+    const showcaseBtn = document.getElementById('add-to-showcase-btn');
+    if (showcaseBtn) {
+      showcaseBtn.innerHTML = `
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="12" y1="5" x2="12" y2="19"></line>
+          <line x1="5" y1="12" x2="19" y2="12"></line>
+        </svg>
+        Add ${nouns.singular}
+      `;
+    }
+
+    // Update collection add button
+    const collectionBtn = document.getElementById('add-record-btn');
+    if (collectionBtn) {
+      collectionBtn.innerHTML = `
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="12" y1="5" x2="12" y2="19"></line>
+          <line x1="5" y1="12" x2="19" y2="12"></line>
+        </svg>
+        Add ${nouns.singular}
+      `;
+    }
+
+    // Update modal title
+    const modalTitle = document.querySelector('#add-record-modal h3');
+    if (modalTitle) {
+      modalTitle.textContent = `Add ${nouns.singular}`;
+    }
+
+    // Update showcase empty state text
+    const showcaseEmpty = document.getElementById('showcase-empty');
+    if (showcaseEmpty) {
+      showcaseEmpty.innerHTML = `
+        <div class="empty-icon">${nouns.icon}</div>
+        <p>No ${nouns.plural.toLowerCase()} in your showcase yet</p>
+        <span>Add up to 8 ${nouns.plural.toLowerCase()} from your collection to feature here</span>
+      `;
+    }
+
+    // Update collection empty state text
+    const collectionEmpty = document.getElementById('collection-empty');
+    if (collectionEmpty) {
+      collectionEmpty.innerHTML = `
+        <div class="empty-icon">${nouns.icon}</div>
+        <p>Your collection is empty</p>
+        <span>Add your first ${nouns.singular.toLowerCase()} to get started!</span>
+      `;
     }
   },
 
@@ -554,7 +630,8 @@ const Profile = {
     const grid = document.getElementById('collection-grid');
     const countEl = document.getElementById('collection-count');
 
-    countEl.textContent = this.collection.length;
+    if (countEl) countEl.textContent = this.collection.length;
+    if (!grid) return;
 
     if (this.collection.length === 0) {
       grid.innerHTML = `

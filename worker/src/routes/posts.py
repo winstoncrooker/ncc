@@ -12,6 +12,16 @@ from .auth import require_auth
 
 router = APIRouter()
 
+
+def safe_value(val, default=None):
+    """Convert JsNull/JsProxy to Python None, return value otherwise."""
+    if val is None:
+        return default
+    type_str = str(type(val))
+    if 'JsProxy' in type_str or 'JsNull' in type_str:
+        return default
+    return val
+
 # Epoch for hot score calculation (Jan 1, 2024)
 EPOCH = datetime(2024, 1, 1).timestamp()
 
@@ -228,9 +238,10 @@ async def get_feed(
         posts = []
         for row in posts_data:
             images = []
-            if row.get("images"):
+            images_val = safe_value(row.get("images"))
+            if images_val:
                 try:
-                    images = json.loads(row["images"])
+                    images = json.loads(images_val)
                 except Exception:
                     images = []
 
@@ -239,26 +250,26 @@ async def get_feed(
                 user_id=row["user_id"],
                 author=PostAuthor(
                     id=row["user_id"],
-                    name=row.get("author_name"),
-                    picture=row.get("author_picture")
+                    name=safe_value(row.get("author_name")),
+                    picture=safe_value(row.get("author_picture"))
                 ),
                 category_id=row["category_id"],
-                category_slug=row.get("category_slug"),
-                category_name=row.get("category_name"),
-                interest_group_id=row.get("interest_group_id"),
-                interest_group_name=row.get("interest_group_name"),
+                category_slug=safe_value(row.get("category_slug")),
+                category_name=safe_value(row.get("category_name")),
+                interest_group_id=safe_value(row.get("interest_group_id")),
+                interest_group_name=safe_value(row.get("interest_group_name")),
                 post_type=row["post_type"],
                 title=row["title"],
                 body=row["body"],
                 images=images,
-                upvote_count=row.get("upvote_count", 0),
-                downvote_count=row.get("downvote_count", 0),
-                comment_count=row.get("comment_count", 0),
-                hot_score=row.get("hot_score", 0),
-                is_pinned=bool(row.get("is_pinned", 0)),
-                is_locked=bool(row.get("is_locked", 0)),
-                user_vote=row.get("user_vote"),
-                is_saved=bool(row.get("is_saved", 0)),
+                upvote_count=safe_value(row.get("upvote_count"), 0),
+                downvote_count=safe_value(row.get("downvote_count"), 0),
+                comment_count=safe_value(row.get("comment_count"), 0),
+                hot_score=safe_value(row.get("hot_score"), 0),
+                is_pinned=bool(safe_value(row.get("is_pinned"), 0)),
+                is_locked=bool(safe_value(row.get("is_locked"), 0)),
+                user_vote=safe_value(row.get("user_vote")),
+                is_saved=bool(safe_value(row.get("is_saved"), 0)),
                 created_at=str(row["created_at"]),
                 updated_at=str(row["updated_at"])
             ))
@@ -320,9 +331,10 @@ async def get_post(
             raise HTTPException(status_code=404, detail="Post not found")
 
         images = []
-        if result.get("images"):
+        images_val = safe_value(result.get("images"))
+        if images_val:
             try:
-                images = json.loads(result["images"])
+                images = json.loads(images_val)
             except Exception:
                 images = []
 
@@ -331,26 +343,26 @@ async def get_post(
             user_id=result["user_id"],
             author=PostAuthor(
                 id=result["user_id"],
-                name=result.get("author_name"),
-                picture=result.get("author_picture")
+                name=safe_value(result.get("author_name")),
+                picture=safe_value(result.get("author_picture"))
             ),
             category_id=result["category_id"],
-            category_slug=result.get("category_slug"),
-            category_name=result.get("category_name"),
-            interest_group_id=result.get("interest_group_id"),
-            interest_group_name=result.get("interest_group_name"),
+            category_slug=safe_value(result.get("category_slug")),
+            category_name=safe_value(result.get("category_name")),
+            interest_group_id=safe_value(result.get("interest_group_id")),
+            interest_group_name=safe_value(result.get("interest_group_name")),
             post_type=result["post_type"],
             title=result["title"],
             body=result["body"],
             images=images,
-            upvote_count=result.get("upvote_count", 0),
-            downvote_count=result.get("downvote_count", 0),
-            comment_count=result.get("comment_count", 0),
-            hot_score=result.get("hot_score", 0),
-            is_pinned=bool(result.get("is_pinned", 0)),
-            is_locked=bool(result.get("is_locked", 0)),
-            user_vote=result.get("user_vote"),
-            is_saved=bool(result.get("is_saved", 0)),
+            upvote_count=safe_value(result.get("upvote_count"), 0),
+            downvote_count=safe_value(result.get("downvote_count"), 0),
+            comment_count=safe_value(result.get("comment_count"), 0),
+            hot_score=safe_value(result.get("hot_score"), 0),
+            is_pinned=bool(safe_value(result.get("is_pinned"), 0)),
+            is_locked=bool(safe_value(result.get("is_locked"), 0)),
+            user_vote=safe_value(result.get("user_vote")),
+            is_saved=bool(safe_value(result.get("is_saved"), 0)),
             created_at=str(result["created_at"]),
             updated_at=str(result["updated_at"])
         )
@@ -440,18 +452,18 @@ async def create_post(
             user_id=user_id,
             author=PostAuthor(
                 id=user_id,
-                name=author.get("name") if author else None,
-                picture=author.get("picture") if author else None
+                name=safe_value(author.get("name")) if author else None,
+                picture=safe_value(author.get("picture")) if author else None
             ),
             category_id=body.category_id,
             category_slug=category["slug"],
             category_name=category["name"],
-            interest_group_id=body.interest_group_id,
-            interest_group_name=interest_group_name,
+            interest_group_id=body.interest_group_id,  # Already a Python value from Pydantic
+            interest_group_name=interest_group_name,    # Already a Python value
             post_type=body.post_type,
             title=body.title,
             body=body.body,
-            images=body.images,
+            images=body.images or [],
             upvote_count=0,
             downvote_count=0,
             comment_count=0,

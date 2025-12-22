@@ -7,6 +7,8 @@ const Forums = {
   posts: [],
   currentSort: 'hot',
   currentFilter: 'all',
+  currentCategory: null,      // Category slug for filtering
+  currentGroupId: null,       // Interest group ID for filtering
   cursor: null,
   hasMore: false,
   loading: false,
@@ -156,8 +158,16 @@ const Forums = {
         limit: '20'
       });
 
-      if (this.currentFilter) {
+      if (this.currentFilter && this.currentFilter !== 'all') {
         params.append('post_type', this.currentFilter);
+      }
+
+      if (this.currentCategory) {
+        params.append('category', this.currentCategory);
+      }
+
+      if (this.currentGroupId) {
+        params.append('interest_group_id', this.currentGroupId);
       }
 
       if (this.cursor) {
@@ -619,19 +629,37 @@ const Forums = {
     const modal = document.getElementById('create-post-modal');
     const categorySelect = document.getElementById('post-category');
 
-    // Load categories
+    // Load user's joined categories only
     try {
-      const response = await fetch(`${API_BASE}/categories`, {
+      const response = await fetch(`${API_BASE}/interests/me`, {
         headers: Auth.getAuthHeaders()
       });
 
       if (response.ok) {
         const data = await response.json();
-        categorySelect.innerHTML = '<option value="">Select category...</option>' +
-          data.categories.map(c => `<option value="${c.id}">${c.icon} ${c.name}</option>`).join('');
+        // Get unique categories from user's interests
+        const categoryMap = new Map();
+        for (const interest of data.interests) {
+          if (interest.category_id && !categoryMap.has(interest.category_id)) {
+            categoryMap.set(interest.category_id, {
+              id: interest.category_id,
+              slug: interest.category_slug,
+              name: interest.category_name,
+              icon: interest.category_icon || ''
+            });
+          }
+        }
+        const categories = Array.from(categoryMap.values());
+
+        if (categories.length === 0) {
+          categorySelect.innerHTML = '<option value="">Join a category first...</option>';
+        } else {
+          categorySelect.innerHTML = '<option value="">Select category...</option>' +
+            categories.map(c => `<option value="${c.slug}" data-id="${c.id}">${c.icon} ${c.name}</option>`).join('');
+        }
       }
     } catch (error) {
-      console.error('Error loading categories:', error);
+      console.error('Error loading user categories:', error);
     }
 
     modal.classList.add('open');
@@ -677,13 +705,16 @@ const Forums = {
   async handleCreatePost(e) {
     e.preventDefault();
 
-    const categoryId = document.getElementById('post-category').value;
+    const categorySelect = document.getElementById('post-category');
+    const categorySlug = categorySelect.value;
+    const selectedOption = categorySelect.options[categorySelect.selectedIndex];
+    const categoryId = selectedOption?.dataset?.id;
     const groupId = document.getElementById('post-group').value;
     const postType = document.getElementById('post-type').value;
     const title = document.getElementById('post-title').value.trim();
     const body = document.getElementById('post-body').value.trim();
 
-    if (!categoryId || !title || !body) {
+    if (!categorySlug || !categoryId || !title || !body) {
       alert('Please fill in all required fields');
       return;
     }
@@ -736,11 +767,19 @@ const Forums = {
         return;
       }
 
-      container.innerHTML = data.interests.map(interest => {
+      // Add "All Posts" option at the top
+      container.innerHTML = `
+        <div class="group-item ${!this.currentCategory && !this.currentGroupId ? 'active' : ''}" onclick="Forums.filterByGroup(0, 0, null)">
+          <span class="group-icon">📋</span>
+          <span class="group-name">All Posts</span>
+        </div>
+      ` + data.interests.map(interest => {
         const name = interest.interest_group_name || interest.category_name;
         const icon = interest.category_icon || '';
+        const isActive = (interest.interest_group_id && this.currentGroupId === interest.interest_group_id) ||
+                         (!interest.interest_group_id && this.currentCategory === interest.category_slug);
         return `
-          <div class="group-item" onclick="Forums.filterByGroup(${interest.interest_group_id || 0}, ${interest.category_id || 0})">
+          <div class="group-item ${isActive ? 'active' : ''}" onclick="Forums.filterByGroup(${interest.interest_group_id || 0}, ${interest.category_id || 0}, '${interest.category_slug || ''}')">
             <span class="group-icon">${icon}</span>
             <span class="group-name">${this.escapeHtml(name)}</span>
           </div>
@@ -753,11 +792,26 @@ const Forums = {
   },
 
   /**
-   * Filter feed by group
+   * Filter feed by group or category
    */
-  filterByGroup(groupId, categoryId) {
-    // This would filter the feed - simplified for now
-    console.log('Filter by group:', groupId, 'category:', categoryId);
+  filterByGroup(groupId, categoryId, categorySlug) {
+    // Reset filters
+    if (groupId === 0 && categoryId === 0) {
+      this.currentCategory = null;
+      this.currentGroupId = null;
+    } else if (groupId) {
+      this.currentGroupId = groupId;
+      this.currentCategory = null;
+    } else if (categorySlug) {
+      this.currentCategory = categorySlug;
+      this.currentGroupId = null;
+    }
+
+    // Reload feed with new filter
+    this.loadFeed(true);
+
+    // Update active state in sidebar
+    this.loadMyGroups();
   },
 
   /**

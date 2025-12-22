@@ -44,6 +44,13 @@ app.include_router(votes.router, prefix="/api/votes", tags=["votes"])
 app.include_router(category_profiles.router, prefix="/api/profile", tags=["category_profiles"])
 
 
+@app.get("/")
+async def root():
+    """Root redirect - send users to the frontend"""
+    from fastapi.responses import RedirectResponse
+    return RedirectResponse(url="https://niche-collector.pages.dev")
+
+
 @app.get("/api/health")
 async def health_check():
     """Health check endpoint"""

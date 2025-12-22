@@ -11,6 +11,16 @@ from .auth import require_auth, get_current_user
 router = APIRouter()
 
 
+def safe_value(val, default=None):
+    """Convert JsNull/JsProxy to Python None, return value otherwise."""
+    if val is None:
+        return default
+    type_str = str(type(val))
+    if 'JsProxy' in type_str or 'JsNull' in type_str:
+        return default
+    return val
+
+
 class CategoryProfileResponse(BaseModel):
     """Category-specific profile"""
     id: int
@@ -125,9 +135,10 @@ async def get_my_category_profiles(
         profiles = []
         for row in result.get("results", []):
             custom_fields = {}
-            if row.get("custom_fields"):
+            custom_fields_raw = safe_value(row.get("custom_fields"))
+            if custom_fields_raw:
                 try:
-                    custom_fields = json.loads(row["custom_fields"])
+                    custom_fields = json.loads(custom_fields_raw)
                 except Exception:
                     custom_fields = {}
 
@@ -137,13 +148,13 @@ async def get_my_category_profiles(
                 category_id=row["category_id"],
                 category_slug=row["category_slug"],
                 category_name=row["category_name"],
-                category_icon=row.get("category_icon"),
-                display_name=row.get("display_name"),
-                bio=row.get("bio"),
-                avatar=row.get("avatar"),
-                background_image=row.get("background_image"),
+                category_icon=safe_value(row.get("category_icon")),
+                display_name=safe_value(row.get("display_name")),
+                bio=safe_value(row.get("bio")),
+                avatar=safe_value(row.get("avatar")),
+                background_image=safe_value(row.get("background_image")),
                 custom_fields=custom_fields,
-                item_count=row.get("item_count", 0),
+                item_count=safe_value(row.get("item_count"), 0),
                 created_at=str(row["created_at"]),
                 updated_at=str(row["updated_at"])
             ))
@@ -203,7 +214,7 @@ async def get_category_profile(
                 category_id=category["id"],
                 category_slug=category["slug"],
                 category_name=category["name"],
-                category_icon=category.get("icon"),
+                category_icon=safe_value(category.get("icon")),
                 display_name=None,
                 bio=None,
                 avatar=None,
@@ -215,9 +226,10 @@ async def get_category_profile(
             )
 
         custom_fields = {}
-        if profile.get("custom_fields"):
+        custom_fields_raw = safe_value(profile.get("custom_fields"))
+        if custom_fields_raw:
             try:
-                custom_fields = json.loads(profile["custom_fields"])
+                custom_fields = json.loads(custom_fields_raw)
             except Exception:
                 custom_fields = {}
 
@@ -227,13 +239,13 @@ async def get_category_profile(
             category_id=profile["category_id"],
             category_slug=category["slug"],
             category_name=category["name"],
-            category_icon=category.get("icon"),
-            display_name=profile.get("display_name"),
-            bio=profile.get("bio"),
-            avatar=profile.get("avatar"),
-            background_image=profile.get("background_image"),
+            category_icon=safe_value(category.get("icon")),
+            display_name=safe_value(profile.get("display_name")),
+            bio=safe_value(profile.get("bio")),
+            avatar=safe_value(profile.get("avatar")),
+            background_image=safe_value(profile.get("background_image")),
             custom_fields=custom_fields,
-            item_count=profile.get("item_count", 0),
+            item_count=safe_value(profile.get("item_count"), 0),
             created_at=str(profile["created_at"]),
             updated_at=str(profile["updated_at"])
         )
@@ -389,9 +401,10 @@ async def get_user_category_profile(
             raise HTTPException(status_code=404, detail="User has no profile for this category")
 
         custom_fields = {}
-        if profile.get("custom_fields"):
+        custom_fields_raw = safe_value(profile.get("custom_fields"))
+        if custom_fields_raw:
             try:
-                custom_fields = json.loads(profile["custom_fields"])
+                custom_fields = json.loads(custom_fields_raw)
             except Exception:
                 custom_fields = {}
 
@@ -401,13 +414,13 @@ async def get_user_category_profile(
             category_id=profile["category_id"],
             category_slug=category["slug"],
             category_name=category["name"],
-            category_icon=category.get("icon"),
-            display_name=profile.get("display_name"),
-            bio=profile.get("bio"),
-            avatar=profile.get("avatar"),
-            background_image=profile.get("background_image"),
+            category_icon=safe_value(category.get("icon")),
+            display_name=safe_value(profile.get("display_name")),
+            bio=safe_value(profile.get("bio")),
+            avatar=safe_value(profile.get("avatar")),
+            background_image=safe_value(profile.get("background_image")),
             custom_fields=custom_fields,
-            item_count=profile.get("item_count", 0),
+            item_count=safe_value(profile.get("item_count"), 0),
             created_at=str(profile["created_at"]),
             updated_at=str(profile["updated_at"])
         )
@@ -464,9 +477,10 @@ async def get_my_items(
         items = []
         for row in result.get("results", []):
             metadata = {}
-            if row.get("metadata"):
+            metadata_raw = safe_value(row.get("metadata"))
+            if metadata_raw:
                 try:
-                    metadata = json.loads(row["metadata"])
+                    metadata = json.loads(metadata_raw)
                 except Exception:
                     metadata = {}
 
@@ -475,17 +489,17 @@ async def get_my_items(
                 user_id=row["user_id"],
                 category_id=row["category_id"],
                 title=row["title"],
-                subtitle=row.get("subtitle"),
-                description=row.get("description"),
-                cover_image=row.get("cover_image"),
-                year=row.get("year"),
-                external_id=row.get("external_id"),
-                external_source=row.get("external_source"),
-                purchase_price=row.get("purchase_price"),
-                current_value=row.get("current_value"),
-                condition=row.get("condition"),
+                subtitle=safe_value(row.get("subtitle")),
+                description=safe_value(row.get("description")),
+                cover_image=safe_value(row.get("cover_image")),
+                year=safe_value(row.get("year")),
+                external_id=safe_value(row.get("external_id")),
+                external_source=safe_value(row.get("external_source")),
+                purchase_price=safe_value(row.get("purchase_price")),
+                current_value=safe_value(row.get("current_value")),
+                condition=safe_value(row.get("condition")),
                 metadata=metadata,
-                in_showcase=row.get("showcase_id") is not None,
+                in_showcase=safe_value(row.get("showcase_id")) is not None,
                 created_at=str(row["created_at"]),
                 updated_at=str(row["updated_at"])
             ))
@@ -658,9 +672,10 @@ async def update_item(
             updated = updated.to_py()
 
         metadata = {}
-        if updated.get("metadata"):
+        metadata_raw = safe_value(updated.get("metadata"))
+        if metadata_raw:
             try:
-                metadata = json.loads(updated["metadata"])
+                metadata = json.loads(metadata_raw)
             except Exception:
                 metadata = {}
 
@@ -669,17 +684,17 @@ async def update_item(
             user_id=updated["user_id"],
             category_id=updated["category_id"],
             title=updated["title"],
-            subtitle=updated.get("subtitle"),
-            description=updated.get("description"),
-            cover_image=updated.get("cover_image"),
-            year=updated.get("year"),
-            external_id=updated.get("external_id"),
-            external_source=updated.get("external_source"),
-            purchase_price=updated.get("purchase_price"),
-            current_value=updated.get("current_value"),
-            condition=updated.get("condition"),
+            subtitle=safe_value(updated.get("subtitle")),
+            description=safe_value(updated.get("description")),
+            cover_image=safe_value(updated.get("cover_image")),
+            year=safe_value(updated.get("year")),
+            external_id=safe_value(updated.get("external_id")),
+            external_source=safe_value(updated.get("external_source")),
+            purchase_price=safe_value(updated.get("purchase_price")),
+            current_value=safe_value(updated.get("current_value")),
+            condition=safe_value(updated.get("condition")),
             metadata=metadata,
-            in_showcase=updated.get("showcase_id") is not None,
+            in_showcase=safe_value(updated.get("showcase_id")) is not None,
             created_at=str(updated["created_at"]),
             updated_at=str(updated["updated_at"])
         )
