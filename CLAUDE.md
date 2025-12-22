@@ -130,6 +130,18 @@ cd worker
 uv run pywrangler deploy
 ```
 
+### Deploy Frontend to Cloudflare Pages
+```bash
+CLOUDFLARE_ACCOUNT_ID=9afe1741eb5cf958177ce6cc0acdf6fd npx wrangler pages deploy frontend/ --project-name=niche-collector
+```
+
+### After Every Edit
+Always commit, push, and deploy after making changes:
+```bash
+git add -A && git commit -m "Description of changes" && git push
+CLOUDFLARE_ACCOUNT_ID=9afe1741eb5cf958177ce6cc0acdf6fd npx wrangler pages deploy frontend/ --project-name=niche-collector
+```
+
 ### Database Migrations
 ```bash
 # Run migration locally
@@ -204,7 +216,7 @@ wrangler secret put TOGETHER_API_KEY
 | `JWT_SECRET` | Token signing |
 | `DISCOGS_KEY` | Discogs API |
 | `DISCOGS_SECRET` | Discogs API |
-| `TOGETHER_API_KEY` | AI chat (Llama-3.3-70B) |
+| `TOGETHER_API_KEY` | AI chat (Apriel-Nemotron-15b-Thinker) |
 
 ## Features
 
@@ -217,7 +229,8 @@ wrangler secret put TOGETHER_API_KEY
 ### AI Assistant Sidebar
 - Draggable sidebar with chat interface
 - Helps write bios, add records, get recommendations
-- Uses Llama-3.3-70B via Together.ai
+- Supports .txt file upload for bulk album adding
+- Uses Apriel-Nemotron-15b-Thinker via Together.ai
 
 ### Collection Management
 - Manual entry: Artist, album, year, cover URL
