@@ -653,6 +653,7 @@ const Profile = {
           <p class="album-title">${this.escapeHtml(album.album)}</p>
           <p class="album-artist">${this.escapeHtml(album.artist)}</p>
         </div>
+        <button class="image-btn" onclick="Profile.showImageModal(${album.id})" title="Add/change image">📷</button>
         <button class="refresh-btn" onclick="Profile.refreshCover(${album.id})" title="Find cover">↻</button>
         <button class="remove-btn" onclick="Profile.removeFromCollection(${album.id})" title="Remove">&times;</button>
       </div>
@@ -661,7 +662,7 @@ const Profile = {
     // Add click to show in showcase option
     grid.querySelectorAll('.album-card').forEach(card => {
       card.addEventListener('click', (e) => {
-        if (!e.target.closest('.remove-btn') && !e.target.closest('.refresh-btn')) {
+        if (!e.target.closest('.remove-btn') && !e.target.closest('.refresh-btn') && !e.target.closest('.image-btn')) {
           const id = parseInt(card.dataset.id);
           this.addToShowcase(id);
         }
@@ -870,6 +871,193 @@ const Profile = {
         }, 2000);
       }
     }
+  },
+
+  /**
+   * Show image modal for adding/changing album cover
+   */
+  showImageModal(albumId) {
+    const album = this.collection.find(a => a.id === albumId);
+    if (!album) return;
+
+    this.editingImageAlbumId = albumId;
+
+    // Create modal if it doesn't exist
+    let modal = document.getElementById('image-modal');
+    if (!modal) {
+      modal = document.createElement('div');
+      modal.id = 'image-modal';
+      modal.className = 'modal';
+      modal.innerHTML = `
+        <div class="modal-content" style="max-width: 400px;">
+          <button class="modal-close" onclick="Profile.hideImageModal()">&times;</button>
+          <h3>Add/Change Image</h3>
+          <p id="image-modal-item" style="color: #888; margin-bottom: 20px;"></p>
+
+          <div style="margin-bottom: 20px;">
+            <label style="display: block; margin-bottom: 8px; color: #aaa;">Image URL</label>
+            <input type="url" id="image-url-input" placeholder="Paste image URL here..."
+                   style="width: 100%; padding: 12px; background: #2a2a2a; border: 1px solid #444;
+                          border-radius: 8px; color: #fff; box-sizing: border-box;">
+          </div>
+
+          <div style="text-align: center; margin-bottom: 20px; color: #666;">— or —</div>
+
+          <div style="margin-bottom: 20px;">
+            <label style="display: block; margin-bottom: 8px; color: #aaa;">Upload Image</label>
+            <input type="file" id="image-file-input" accept="image/*"
+                   style="width: 100%; padding: 12px; background: #2a2a2a; border: 1px solid #444;
+                          border-radius: 8px; color: #fff; box-sizing: border-box;">
+          </div>
+
+          <div id="image-preview-container" style="margin-bottom: 20px; display: none;">
+            <img id="image-preview" style="max-width: 100%; max-height: 200px; border-radius: 8px;">
+          </div>
+
+          <div style="display: flex; gap: 10px;">
+            <button onclick="Profile.hideImageModal()"
+                    style="flex: 1; padding: 12px; background: #333; border: none; border-radius: 8px;
+                           color: #fff; cursor: pointer;">Cancel</button>
+            <button onclick="Profile.saveImage()" id="save-image-btn"
+                    style="flex: 1; padding: 12px; background: var(--accent-color, #1db954); border: none;
+                           border-radius: 8px; color: #fff; cursor: pointer; font-weight: 600;">Save</button>
+          </div>
+        </div>
+      `;
+      document.body.appendChild(modal);
+
+      // Add event listeners for preview
+      document.getElementById('image-url-input').addEventListener('input', (e) => {
+        this.previewImage(e.target.value);
+      });
+
+      document.getElementById('image-file-input').addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (file) {
+          const reader = new FileReader();
+          reader.onload = (ev) => {
+            this.previewImage(ev.target.result);
+            document.getElementById('image-url-input').value = '';
+          };
+          reader.readAsDataURL(file);
+        }
+      });
+    }
+
+    // Set item name
+    document.getElementById('image-modal-item').textContent = `${album.artist} - ${album.album}`;
+    document.getElementById('image-url-input').value = album.cover || '';
+    document.getElementById('image-file-input').value = '';
+
+    if (album.cover) {
+      this.previewImage(album.cover);
+    } else {
+      document.getElementById('image-preview-container').style.display = 'none';
+    }
+
+    modal.classList.add('open');
+  },
+
+  /**
+   * Preview image in modal
+   */
+  previewImage(src) {
+    const container = document.getElementById('image-preview-container');
+    const preview = document.getElementById('image-preview');
+
+    if (src) {
+      preview.src = src;
+      container.style.display = 'block';
+    } else {
+      container.style.display = 'none';
+    }
+  },
+
+  /**
+   * Hide image modal
+   */
+  hideImageModal() {
+    const modal = document.getElementById('image-modal');
+    if (modal) modal.classList.remove('open');
+    this.editingImageAlbumId = null;
+  },
+
+  /**
+   * Save image to collection item
+   */
+  async saveImage() {
+    if (!this.editingImageAlbumId) return;
+
+    const album = this.collection.find(a => a.id === this.editingImageAlbumId);
+    if (!album) return;
+
+    const urlInput = document.getElementById('image-url-input');
+    const fileInput = document.getElementById('image-file-input');
+    const btn = document.getElementById('save-image-btn');
+
+    let imageUrl = urlInput.value.trim();
+
+    // If file was uploaded, we need to upload it first
+    if (fileInput.files[0]) {
+      btn.textContent = 'Uploading...';
+      btn.disabled = true;
+
+      try {
+        const formData = new FormData();
+        formData.append('file', fileInput.files[0]);
+
+        const uploadResponse = await fetch(`${CONFIG.API_BASE}/api/upload/image`, {
+          method: 'POST',
+          headers: Auth.getAuthHeaders(),
+          body: formData
+        });
+
+        if (uploadResponse.ok) {
+          const data = await uploadResponse.json();
+          imageUrl = data.url;
+        } else {
+          throw new Error('Upload failed');
+        }
+      } catch (err) {
+        console.error('Image upload error:', err);
+        alert('Failed to upload image. Try using an image URL instead.');
+        btn.textContent = 'Save';
+        btn.disabled = false;
+        return;
+      }
+    }
+
+    if (!imageUrl) {
+      alert('Please enter an image URL or upload a file');
+      return;
+    }
+
+    btn.textContent = 'Saving...';
+    btn.disabled = true;
+
+    try {
+      // Update in database
+      const response = await Auth.apiRequest(`/api/collection/${album.id}`, {
+        method: 'PUT',
+        body: JSON.stringify({ cover: imageUrl })
+      });
+
+      if (response.ok) {
+        // Update local data
+        album.cover = imageUrl;
+        this.renderCollection();
+        this.renderShowcase();
+        this.hideImageModal();
+      } else {
+        throw new Error('Failed to save');
+      }
+    } catch (err) {
+      console.error('Save image error:', err);
+      alert('Failed to save image');
+    }
+
+    btn.textContent = 'Save';
+    btn.disabled = false;
   },
 
   /**

@@ -420,15 +420,27 @@ async def create_post(
         # Insert post
         images_json = json.dumps(body.images) if body.images else "[]"
 
-        result = await env.DB.prepare(
-            """INSERT INTO forum_posts
-               (user_id, category_id, interest_group_id, post_type, title, body, images, hot_score)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-               RETURNING id, created_at, updated_at"""
-        ).bind(
-            user_id, body.category_id, body.interest_group_id,
-            body.post_type, body.title, body.body, images_json, hot_score
-        ).first()
+        # Handle optional interest_group_id - D1 doesn't like Python None
+        if body.interest_group_id:
+            result = await env.DB.prepare(
+                """INSERT INTO forum_posts
+                   (user_id, category_id, interest_group_id, post_type, title, body, images, hot_score)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                   RETURNING id, created_at, updated_at"""
+            ).bind(
+                user_id, body.category_id, body.interest_group_id,
+                body.post_type, body.title, body.body, images_json, hot_score
+            ).first()
+        else:
+            result = await env.DB.prepare(
+                """INSERT INTO forum_posts
+                   (user_id, category_id, post_type, title, body, images, hot_score)
+                   VALUES (?, ?, ?, ?, ?, ?, ?)
+                   RETURNING id, created_at, updated_at"""
+            ).bind(
+                user_id, body.category_id,
+                body.post_type, body.title, body.body, images_json, hot_score
+            ).first()
 
         if hasattr(result, 'to_py'):
             result = result.to_py()

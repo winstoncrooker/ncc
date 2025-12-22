@@ -545,6 +545,34 @@
   to { transform: rotate(360deg); }
 }
 
+.album-card .image-btn {
+  position: absolute;
+  bottom: 50px;
+  right: 10px;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(4px);
+  border: none;
+  color: #fff;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  cursor: pointer;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  transition: all 0.2s;
+}
+
+.album-card:hover .image-btn {
+  display: flex;
+}
+
+.album-card .image-btn:hover {
+  background: var(--accent);
+  transform: scale(1.1);
+}
+
 /* ============================================
    AI ASSISTANT
    ============================================ */
