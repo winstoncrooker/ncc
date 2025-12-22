@@ -1003,13 +1003,21 @@ const Profile = {
       btn.disabled = true;
 
       try {
-        const formData = new FormData();
-        formData.append('file', fileInput.files[0]);
+        // Read file as base64
+        const file = fileInput.files[0];
+        const base64 = await new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result);
+          reader.onerror = reject;
+          reader.readAsDataURL(file);
+        });
 
-        const uploadResponse = await fetch(`${CONFIG.API_BASE}/api/upload/image`, {
+        const uploadResponse = await Auth.apiRequest('/api/uploads/image', {
           method: 'POST',
-          headers: Auth.getAuthHeaders(),
-          body: formData
+          body: JSON.stringify({
+            image: base64,
+            type: 'item'
+          })
         });
 
         if (uploadResponse.ok) {

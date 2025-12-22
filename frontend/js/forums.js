@@ -187,11 +187,12 @@ const Forums = {
       this.hasMore = data.has_more;
 
       if (this.posts.length === 0) {
-        feedEmpty.style.display = 'flex';
-        feedContent.innerHTML = '';
-        feedContent.appendChild(feedEmpty);
+        if (feedEmpty) feedEmpty.style.display = 'flex';
+        if (feedContent) {
+          feedContent.innerHTML = '<div class="feed-empty-msg">No posts yet. Be the first to create one!</div>';
+        }
       } else {
-        feedEmpty.style.display = 'none';
+        if (feedEmpty) feedEmpty.style.display = 'none';
         this.renderPosts(reset);
       }
 
@@ -355,16 +356,26 @@ const Forums = {
   },
 
   /**
-   * Open post detail
+   * Open post detail as full page view
    */
   async openPost(postId) {
     this.currentPostId = postId;
-    const modal = document.getElementById('post-detail-modal');
-    const content = document.getElementById('post-detail-content');
-    const title = document.getElementById('post-detail-title');
 
-    modal.classList.add('open');
-    content.innerHTML = '<div class="loading">Loading...</div>';
+    // Hide forums feed, show post detail page
+    const forumsContainer = document.querySelector('.forums-container');
+    let postPage = document.getElementById('post-page');
+
+    // Create post page container if it doesn't exist
+    if (!postPage) {
+      postPage = document.createElement('div');
+      postPage.id = 'post-page';
+      postPage.className = 'post-page';
+      forumsContainer.parentNode.insertBefore(postPage, forumsContainer.nextSibling);
+    }
+
+    forumsContainer.style.display = 'none';
+    postPage.style.display = 'block';
+    postPage.innerHTML = '<div class="post-page-loading">Loading...</div>';
 
     try {
       // Fetch post details
@@ -375,7 +386,6 @@ const Forums = {
       if (!postRes.ok) throw new Error('Failed to load post');
 
       const post = await postRes.json();
-      title.textContent = post.title;
 
       // Fetch comments
       const commentsRes = await fetch(`${API_BASE}/posts/${postId}/comments`, {
@@ -387,12 +397,108 @@ const Forums = {
         comments = await commentsRes.json();
       }
 
-      content.innerHTML = this.renderPostDetail(post, comments);
+      postPage.innerHTML = this.renderPostPage(post, comments);
 
     } catch (error) {
       console.error('Error loading post:', error);
-      content.innerHTML = '<div class="error">Failed to load post</div>';
+      postPage.innerHTML = `
+        <div class="post-page-error">
+          <button class="back-btn" onclick="Forums.closePostPage()">← Back to Forums</button>
+          <p>Failed to load post</p>
+        </div>
+      `;
     }
+  },
+
+  /**
+   * Close post page and return to forums feed
+   */
+  closePostPage() {
+    const forumsContainer = document.querySelector('.forums-container');
+    const postPage = document.getElementById('post-page');
+
+    if (postPage) postPage.style.display = 'none';
+    if (forumsContainer) forumsContainer.style.display = 'flex';
+
+    this.currentPostId = null;
+  },
+
+  /**
+   * Render full page post view
+   */
+  renderPostPage(post, comments) {
+    const score = post.upvote_count - post.downvote_count;
+    const timeAgo = this.formatTimeAgo(post.created_at);
+
+    return `
+      <div class="post-page-content">
+        <button class="back-btn" onclick="Forums.closePostPage()">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M19 12H5M12 19l-7-7 7-7"/>
+          </svg>
+          Back to Forums
+        </button>
+
+        <article class="post-full">
+          <header class="post-full-header">
+            <div class="post-full-meta">
+              <span class="post-category">${post.category_name}</span>
+              ${post.interest_group_name ? `<span class="post-group">${post.interest_group_name}</span>` : ''}
+              <span class="post-type-badge ${post.post_type}">${this.getPostTypeLabel(post.post_type)}</span>
+            </div>
+            <h1 class="post-full-title">${this.escapeHtml(post.title)}</h1>
+            <div class="post-full-author">
+              ${post.author.picture ? `<img src="${post.author.picture}" alt="">` : '<div class="author-placeholder"></div>'}
+              <span class="author-name">${this.escapeHtml(post.author.name || 'Anonymous')}</span>
+              <span class="dot">·</span>
+              <span class="post-time">${timeAgo}</span>
+            </div>
+          </header>
+
+          <div class="post-full-body">
+            ${this.escapeHtml(post.body).replace(/\n/g, '<br>')}
+          </div>
+
+          <div class="post-full-actions">
+            <div class="post-votes horizontal">
+              <button class="vote-btn upvote ${post.user_vote === 1 ? 'active' : ''}" onclick="Forums.vote(${post.id}, 1)">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <polyline points="18 15 12 9 6 15"></polyline>
+                </svg>
+              </button>
+              <span class="vote-count">${score}</span>
+              <button class="vote-btn downvote ${post.user_vote === -1 ? 'active' : ''}" onclick="Forums.vote(${post.id}, -1)">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <polyline points="6 9 12 15 18 9"></polyline>
+                </svg>
+              </button>
+            </div>
+            <button class="action-btn ${post.is_saved ? 'active' : ''}" onclick="Forums.toggleSave(${post.id})">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="${post.is_saved ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2">
+                <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/>
+              </svg>
+              Save
+            </button>
+          </div>
+        </article>
+
+        <section class="comments-section">
+          <h2>Comments (${comments.total_count})</h2>
+
+          <form class="comment-form" onsubmit="Forums.submitComment(event, ${post.id})">
+            <textarea id="new-comment" placeholder="Add a comment..." rows="3"></textarea>
+            <button type="submit" class="btn-primary">Comment</button>
+          </form>
+
+          <div class="comments-list">
+            ${comments.comments.length === 0
+              ? '<p class="no-comments">No comments yet</p>'
+              : this.renderComments(comments.comments)
+            }
+          </div>
+        </section>
+      </div>
+    `;
   },
 
   /**

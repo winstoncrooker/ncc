@@ -41,7 +41,7 @@ async def upload_image(
 
     try:
         # Validate image type
-        if body.type not in ["profile", "background"]:
+        if body.type not in ["profile", "background", "item"]:
             raise HTTPException(status_code=400, detail="Invalid image type")
 
         # Parse base64 data
@@ -98,7 +98,7 @@ async def upload_image(
         scheme = "https" if "workers.dev" in host else "http"
         url = f"{scheme}://{host}/api/uploads/{filename}"
 
-        # Update user profile with new image URL
+        # Update user profile with new image URL (only for profile/background types)
         if body.type == "profile":
             await env.DB.prepare(
                 "UPDATE users SET picture = ? WHERE id = ?"
@@ -107,6 +107,7 @@ async def upload_image(
             await env.DB.prepare(
                 "UPDATE users SET background_image = ? WHERE id = ?"
             ).bind(url, user_id).run()
+        # "item" type images are just uploaded and returned - caller updates the item
 
         return UploadResponse(url=url, type=body.type)
 
