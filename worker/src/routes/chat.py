@@ -50,35 +50,28 @@ def build_system_prompt(collection: list[Album]) -> str:
     else:
         collection_context = "\n\nThe user has not uploaded any albums to their collection yet."
 
-    return f"""You are a helpful vinyl record collection assistant for "Niche Collector Connector". You help users manage their record collections and profile showcase.
+    return f"""You are a vinyl record collection assistant. Help users manage their record collection.
 
-CRITICAL RULES:
-- Keep responses SHORT and friendly (1-3 sentences max)
-- NEVER guess or assume album/artist names you're unsure about
-- If ANY part of a request is unclear, ASK FOR CLARIFICATION before acting
+OUTPUT FORMAT:
+- Put ALL reasoning/thinking inside <think></think> tags
+- Your final response goes OUTSIDE the think tags
+- Keep final response SHORT (1-2 sentences)
 
-ADDING ALBUMS TO COLLECTION - when user asks to ADD:
-- Use [ADD_ALBUM: Artist Name - Album Name] tag when user says "add", "put in", "include", etc.
-- NEVER use ADD_ALBUM when giving recommendations or suggestions
-- Example: "Add Nevermind" → [ADD_ALBUM: Nirvana - Nevermind]
+COMMANDS:
+- Add album: [ADD_ALBUM: Artist - Album]
+- Remove album: [REMOVE_ALBUM: Artist - Album]
+- Showcase album: [SHOWCASE: Artist - Album]
 
-SHOWCASE - when user asks to feature/showcase an album:
-- The showcase is a special featured section on the user's profile (max 8 albums)
-- Use [SHOWCASE: Artist Name - Album Name] tag when user says "showcase", "feature", "put on my profile", etc.
-- If album is NOT in collection, add it first AND showcase it
-- Example: "Showcase Dark Side of the Moon" → [ADD_ALBUM: Pink Floyd - Dark Side of the Moon] [SHOWCASE: Pink Floyd - Dark Side of the Moon]
-- Example (already in collection): "Feature Abbey Road" → [SHOWCASE: The Beatles - Abbey Road]
-- If user says "add X to my showcase" or "add X and showcase it", use BOTH tags
+RULES:
+- Only use commands when user explicitly asks to add/remove/showcase
+- For recommendations, just suggest - don't use ADD_ALBUM
+- If unclear, ask for clarification
 
-REMOVING ALBUMS - when user asks to REMOVE:
-- Use [REMOVE_ALBUM: Artist Name - Album Name] tag when user says "remove", "delete", "take out", etc.
-- Example: "Remove Abbey Road" → [REMOVE_ALBUM: The Beatles - Abbey Road]
+Example response:
+<think>User wants to add Maggot Brain by Funkadelic</think>
+Added to your collection! [ADD_ALBUM: Funkadelic - Maggot Brain]
 
-RECOMMENDATIONS:
-- When user asks for recommendations - just TELL them, do NOT add it
-- Only add/showcase if they then say "add that" or "yes add it"
-
-Keep your response concise and natural.{collection_context}"""
+{collection_context}"""
 
 
 def parse_album_actions(response: str) -> tuple[list[Album], list[Album], list[Album]]:
@@ -229,23 +222,38 @@ async def search_discogs_for_album(artist: str, album: str, discogs_key: str, di
 
 
 def clean_response(response: str) -> str:
-    """Clean up AI response for display"""
+    """Clean up AI response for display, filtering out Thinker model reasoning"""
     import re
 
     cleaned = response
-    # Remove thinking tags
+
+    # Remove thinking tags (various formats)
     cleaned = re.sub(r'<think>[\s\S]*?</think>', '', cleaned, flags=re.IGNORECASE)
     cleaned = re.sub(r'<thinking>[\s\S]*?</thinking>', '', cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(r'<reasoning>[\s\S]*?</reasoning>', '', cleaned, flags=re.IGNORECASE)
     cleaned = re.sub(r'\[think\][\s\S]*?\[/think\]', '', cleaned, flags=re.IGNORECASE)
     cleaned = re.sub(r'\[thinking\][\s\S]*?\[/thinking\]', '', cleaned, flags=re.IGNORECASE)
+
     # Remove internal markers
     cleaned = re.sub(r'\[BEGIN FINAL RESPONSE\]', '', cleaned, flags=re.IGNORECASE)
     cleaned = re.sub(r'\[END FINAL RESPONSE\]', '', cleaned, flags=re.IGNORECASE)
     cleaned = re.sub(r'\[INTERNAL\][\s\S]*?\[/INTERNAL\]', '', cleaned, flags=re.IGNORECASE)
+
+    # Remove reasoning patterns (Thinker models often output this)
+    cleaned = re.sub(r'^.*?The user wants to.*?\n', '', cleaned, flags=re.MULTILINE)
+    cleaned = re.sub(r'^.*?So we need to.*?\n', '', cleaned, flags=re.MULTILINE)
+    cleaned = re.sub(r'^.*?The format:.*?\n', '', cleaned, flags=re.MULTILINE)
+    cleaned = re.sub(r'^.*?The guidelines say.*?\n', '', cleaned, flags=re.MULTILINE)
+    cleaned = re.sub(r'^.*?Looking at.*?\n', '', cleaned, flags=re.MULTILINE)
+    cleaned = re.sub(r'^.*?Let me.*?\n', '', cleaned, flags=re.MULTILINE)
+    cleaned = re.sub(r'^.*?I need to.*?\n', '', cleaned, flags=re.MULTILINE)
+    cleaned = re.sub(r'^.*?First,.*?\n', '', cleaned, flags=re.MULTILINE)
+
     # Remove command tags
     cleaned = re.sub(r'\[ADD_ALBUM:\s*.+?\s*-\s*.+?\]', '', cleaned)
     cleaned = re.sub(r'\[REMOVE_ALBUM:\s*.+?\s*-\s*.+?\]', '', cleaned)
     cleaned = re.sub(r'\[SHOWCASE:\s*.+?\s*-\s*.+?\]', '', cleaned)
+
     # Clean up whitespace
     cleaned = re.sub(r'\n{3,}', '\n\n', cleaned)
     cleaned = cleaned.strip()
