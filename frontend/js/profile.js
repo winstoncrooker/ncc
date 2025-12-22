@@ -32,6 +32,7 @@ const Profile = {
       field2Label: 'Album',
       field2Placeholder: 'Album title',
       addTitle: 'Add Record',
+      emptyIcon: '💿',
       showcaseEmpty: 'No albums in your showcase yet',
       showcaseHint: 'Add up to 8 albums from your collection to feature here',
       collectionEmpty: 'Your collection is empty',
@@ -51,6 +52,7 @@ const Profile = {
       field2Label: 'Card Name',
       field2Placeholder: 'Card name',
       addTitle: 'Add Card',
+      emptyIcon: '🃏',
       showcaseEmpty: 'No cards in your showcase yet',
       showcaseHint: 'Add up to 8 cards from your collection to feature here',
       collectionEmpty: 'Your collection is empty',
@@ -70,6 +72,7 @@ const Profile = {
       field2Label: 'Model',
       field2Placeholder: 'e.g. Mustang, Supra',
       addTitle: 'Add Vehicle',
+      emptyIcon: '🚗',
       showcaseEmpty: 'No vehicles in your showcase yet',
       showcaseHint: 'Add up to 8 vehicles from your collection to feature here',
       collectionEmpty: 'Your garage is empty',
@@ -89,6 +92,7 @@ const Profile = {
       field2Label: 'Model/Colorway',
       field2Placeholder: 'e.g. Air Jordan 1 Chicago',
       addTitle: 'Add Sneakers',
+      emptyIcon: '👟',
       showcaseEmpty: 'No sneakers in your showcase yet',
       showcaseHint: 'Add up to 8 pairs from your collection to feature here',
       collectionEmpty: 'Your collection is empty',
@@ -108,6 +112,7 @@ const Profile = {
       field2Label: 'Model',
       field2Placeholder: 'e.g. Submariner, Speedmaster',
       addTitle: 'Add Watch',
+      emptyIcon: '⌚',
       showcaseEmpty: 'No watches in your showcase yet',
       showcaseHint: 'Add up to 8 watches from your collection to feature here',
       collectionEmpty: 'Your collection is empty',
@@ -127,6 +132,7 @@ const Profile = {
       field2Label: 'Issue/Title',
       field2Placeholder: 'e.g. #300, First Appearance',
       addTitle: 'Add Comic',
+      emptyIcon: '📚',
       showcaseEmpty: 'No comics in your showcase yet',
       showcaseHint: 'Add up to 8 comics from your collection to feature here',
       collectionEmpty: 'Your collection is empty',
@@ -146,6 +152,7 @@ const Profile = {
       field2Label: 'Title',
       field2Placeholder: 'Game title',
       addTitle: 'Add Game',
+      emptyIcon: '🎮',
       showcaseEmpty: 'No games in your showcase yet',
       showcaseHint: 'Add up to 8 games from your collection to feature here',
       collectionEmpty: 'Your library is empty',
@@ -165,6 +172,7 @@ const Profile = {
       field2Label: 'Year/Denomination',
       field2Placeholder: 'e.g. 1921, $1',
       addTitle: 'Add Coin',
+      emptyIcon: '🪙',
       showcaseEmpty: 'No coins in your showcase yet',
       showcaseHint: 'Add up to 8 coins from your collection to feature here',
       collectionEmpty: 'Your collection is empty',
@@ -708,7 +716,7 @@ const Profile = {
     const showcaseEmpty = document.getElementById('showcase-empty');
     if (showcaseEmpty) {
       showcaseEmpty.innerHTML = `
-        <div class="empty-icon">💿</div>
+        <div class="empty-icon">${terms.emptyIcon}</div>
         <p>${terms.showcaseEmpty}</p>
         <span>${terms.showcaseHint}</span>
       `;
@@ -718,7 +726,7 @@ const Profile = {
     const collectionEmpty = document.getElementById('collection-empty');
     if (collectionEmpty) {
       collectionEmpty.innerHTML = `
-        <div class="empty-icon">📀</div>
+        <div class="empty-icon">${terms.emptyIcon}</div>
         <p>${terms.collectionEmpty}</p>
         <span>${terms.collectionHint}</span>
       `;
@@ -836,7 +844,7 @@ const Profile = {
     if (this.collection.length === 0) {
       grid.innerHTML = `
         <div class="collection-empty" id="collection-empty">
-          <div class="empty-icon">📀</div>
+          <div class="empty-icon">${terms.emptyIcon}</div>
           <p>${terms.collectionEmpty}</p>
           <span>${terms.collectionHint}</span>
         </div>
@@ -1298,7 +1306,7 @@ const Profile = {
     if (this.showcase.length === 0) {
       grid.innerHTML = `
         <div class="showcase-empty" id="showcase-empty">
-          <div class="empty-icon">💿</div>
+          <div class="empty-icon">${terms.emptyIcon}</div>
           <p>${terms.showcaseEmpty}</p>
           <span>${terms.showcaseHint}</span>
         </div>
