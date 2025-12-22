@@ -10,7 +10,6 @@ Flow for client-side Discogs (Worker blocked by Cloudflare):
 
 from fastapi import APIRouter, Request, HTTPException
 from pydantic import BaseModel
-import httpx
 import hashlib
 import json
 import base64
@@ -128,22 +127,23 @@ async def cache_image(env, url: str, cache_key: str) -> str | None:
     except Exception:
         pass
 
-    # Download and cache
+    # Download and cache using js.fetch (bypasses Cloudflare blocking)
     try:
-        async with httpx.AsyncClient() as client:
-            response = await client.get(
-                url,
-                headers={"User-Agent": "VinylVault/2.0"},
-                timeout=10.0
+        headers = to_js({
+            "User-Agent": "NicheCollectorConnector/1.0 +https://niche-collector.pages.dev"
+        })
+        response = await js.fetch(url, to_js({"headers": headers}))
+
+        if response.ok:
+            # Get image data as ArrayBuffer
+            array_buffer = await response.arrayBuffer()
+            content_type = f"image/{ext}"
+            await env.CACHE.put(
+                local_path,
+                array_buffer,
+                httpMetadata={"contentType": content_type}
             )
-            if response.status_code == 200:
-                content_type = f"image/{ext}"
-                await env.CACHE.put(
-                    local_path,
-                    response.content,
-                    httpMetadata={"contentType": content_type}
-                )
-                return f"/cache/{local_path}"
+            return f"/cache/{local_path}"
     except Exception:
         pass
 
@@ -262,41 +262,30 @@ async def get_price(request: Request, release_id: int) -> PriceResult:
         return PriceResult(price=None)
 
     try:
-        async with httpx.AsyncClient() as client:
-            # Try price suggestions first
-            response = await client.get(
-                f"{DISCOGS_API}/marketplace/price_suggestions/{release_id}",
-                params={
-                    "key": discogs_key,
-                    "secret": discogs_secret
-                },
-                headers={"User-Agent": "VinylVault/2.0"},
-                timeout=10.0
-            )
+        headers = to_js({
+            "User-Agent": "NicheCollectorConnector/1.0 +https://niche-collector.pages.dev"
+        })
 
-            if response.status_code == 200:
-                data = response.json()
-                if data.get("Very Good Plus (VG+)"):
-                    return PriceResult(price=data["Very Good Plus (VG+)"]["value"])
-                elif data.get("Very Good (VG)"):
-                    return PriceResult(price=data["Very Good (VG)"]["value"])
+        # Try price suggestions first
+        url = f"{DISCOGS_API}/marketplace/price_suggestions/{release_id}?key={discogs_key}&secret={discogs_secret}"
+        response = await js.fetch(url, to_js({"headers": headers}))
 
-            # Fallback: get lowest price from release
-            response = await client.get(
-                f"{DISCOGS_API}/releases/{release_id}",
-                params={
-                    "key": discogs_key,
-                    "secret": discogs_secret
-                },
-                headers={"User-Agent": "VinylVault/2.0"},
-                timeout=10.0
-            )
+        if response.status == 200:
+            data = (await response.json()).to_py()
+            if data.get("Very Good Plus (VG+)"):
+                return PriceResult(price=data["Very Good Plus (VG+)"]["value"])
+            elif data.get("Very Good (VG)"):
+                return PriceResult(price=data["Very Good (VG)"]["value"])
 
-            if response.status_code == 200:
-                data = response.json()
-                return PriceResult(price=data.get("lowest_price"))
+        # Fallback: get lowest price from release
+        url = f"{DISCOGS_API}/releases/{release_id}?key={discogs_key}&secret={discogs_secret}"
+        response = await js.fetch(url, to_js({"headers": headers}))
 
-            return PriceResult(price=None)
+        if response.status == 200:
+            data = (await response.json()).to_py()
+            return PriceResult(price=data.get("lowest_price"))
+
+        return PriceResult(price=None)
 
     except Exception:
         return PriceResult(price=None)
