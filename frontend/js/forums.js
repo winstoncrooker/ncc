@@ -153,6 +153,30 @@ const Forums = {
     const feedEmpty = document.getElementById('feed-empty');
 
     try {
+      // Special handling for "saved" tab
+      if (this.currentSort === 'saved') {
+        const response = await fetch(`${API_BASE}/posts/saved`, {
+          headers: Auth.getAuthHeaders()
+        });
+
+        if (!response.ok) throw new Error('Failed to load saved posts');
+
+        const data = await response.json();
+        this.posts = data.posts || [];
+        this.hasMore = false;
+
+        if (this.posts.length === 0) {
+          if (feedEmpty) feedEmpty.style.display = 'flex';
+          if (feedContent) {
+            feedContent.innerHTML = '<div class="feed-empty-msg">No saved posts yet. Save posts to view them here!</div>';
+          }
+        } else {
+          if (feedEmpty) feedEmpty.style.display = 'none';
+          this.renderPosts(reset);
+        }
+        return;
+      }
+
       const params = new URLSearchParams({
         sort: this.currentSort,
         limit: '20'
@@ -418,7 +442,7 @@ const Forums = {
     const postPage = document.getElementById('post-page');
 
     if (postPage) postPage.style.display = 'none';
-    if (forumsContainer) forumsContainer.style.display = 'flex';
+    if (forumsContainer) forumsContainer.style.display = 'block';
 
     this.currentPostId = null;
   },
@@ -781,24 +805,31 @@ const Forums = {
   },
 
   /**
-   * Load groups for selected category
+   * Load groups for selected category - only show JOINED groups
    */
-  async loadGroupsForCategory(categoryId) {
+  async loadGroupsForCategory(categorySlug) {
     const groupSelect = document.getElementById('post-group');
     groupSelect.innerHTML = '<option value="">No specific group</option>';
 
-    if (!categoryId) return;
+    if (!categorySlug) return;
 
     try {
-      const response = await fetch(`${API_BASE}/categories/${categoryId}`, {
+      // Fetch user's joined interests and filter to only show groups for this category
+      const response = await fetch(`${API_BASE}/interests/me`, {
         headers: Auth.getAuthHeaders()
       });
 
       if (response.ok) {
         const data = await response.json();
-        const groups = data.interest_groups.filter(g => g.level === 1);
-        groupSelect.innerHTML = '<option value="">No specific group</option>' +
-          groups.map(g => `<option value="${g.id}">${g.name}</option>`).join('');
+        // Filter to groups in this category (where interest_group_id exists)
+        const joinedGroups = data.interests.filter(i =>
+          i.category_slug === categorySlug && i.interest_group_id
+        );
+
+        if (joinedGroups.length > 0) {
+          groupSelect.innerHTML = '<option value="">No specific group</option>' +
+            joinedGroups.map(g => `<option value="${g.interest_group_id}">${g.interest_group_name}</option>`).join('');
+        }
       }
     } catch (error) {
       console.error('Error loading groups:', error);
@@ -935,37 +966,92 @@ const Forums = {
     content.innerHTML = '<div class="loading">Loading...</div>';
 
     try {
-      console.log('[Forums] Fetching categories from:', `${API_BASE}/categories`);
-      const response = await fetch(`${API_BASE}/categories`, {
-        headers: Auth.getAuthHeaders()
-      });
+      // Fetch categories and user's joined interests in parallel
+      const [categoriesRes, interestsRes] = await Promise.all([
+        fetch(`${API_BASE}/categories`, { headers: Auth.getAuthHeaders() }),
+        fetch(`${API_BASE}/interests/me`, { headers: Auth.getAuthHeaders() })
+      ]);
 
-      console.log('[Forums] Categories response:', response.status, response.statusText);
-      if (!response.ok) throw new Error(`Failed to load categories: ${response.status}`);
+      if (!categoriesRes.ok) throw new Error(`Failed to load categories: ${categoriesRes.status}`);
 
-      const data = await response.json();
-      console.log('[Forums] Categories data:', data);
+      const categoriesData = await categoriesRes.json();
+      const interestsData = interestsRes.ok ? await interestsRes.json() : { interests: [] };
 
-      // Store categories for later use
-      this.discoverCategories = data.categories;
+      // Build set of joined category slugs (main category memberships)
+      const joinedCategorySlugs = new Set();
+      for (const interest of interestsData.interests) {
+        if (interest.category_slug) {
+          joinedCategorySlugs.add(interest.category_slug);
+        }
+      }
 
-      content.innerHTML = data.categories.map(cat => `
-        <div class="discover-category">
-          <div class="category-header" onclick="Forums.toggleCategoryGroups('${cat.slug}')">
-            <span class="category-icon">${cat.icon}</span>
-            <span class="category-name">${cat.name}</span>
-            <span class="category-count">${cat.member_count} members</span>
-            <svg class="expand-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <polyline points="6 9 12 15 18 9"></polyline>
-            </svg>
+      // Store for later use
+      this.discoverCategories = categoriesData.categories;
+      this.joinedCategorySlugs = joinedCategorySlugs;
+
+      content.innerHTML = categoriesData.categories.map(cat => {
+        const isJoined = joinedCategorySlugs.has(cat.slug);
+        return `
+          <div class="discover-category" data-slug="${cat.slug}">
+            <div class="category-header">
+              <span class="category-icon">${cat.icon}</span>
+              <span class="category-name">${cat.name}</span>
+              <span class="category-count">${cat.member_count} members</span>
+              ${isJoined ? `
+                <button class="expand-btn" onclick="Forums.toggleCategoryGroups('${cat.slug}')">
+                  <svg class="expand-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="6 9 12 15 18 9"></polyline>
+                  </svg>
+                </button>
+              ` : `
+                <button class="join-category-btn" onclick="Forums.joinCategory('${cat.slug}', ${cat.id}, this)">+ Join</button>
+              `}
+            </div>
+            <div class="category-groups" id="category-groups-${cat.slug}" style="display:none"></div>
           </div>
-          <div class="category-groups" id="category-groups-${cat.slug}" style="display:none"></div>
-        </div>
-      `).join('');
+        `;
+      }).join('');
 
     } catch (error) {
       console.error('Error loading categories:', error);
       content.innerHTML = '<div class="error">Failed to load categories</div>';
+    }
+  },
+
+  /**
+   * Join a main category
+   */
+  async joinCategory(categorySlug, categoryId, btn) {
+    try {
+      const response = await fetch(`${API_BASE}/interests/join`, {
+        method: 'POST',
+        headers: {
+          ...Auth.getAuthHeaders(),
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ category_id: categoryId })
+      });
+
+      if (!response.ok) throw new Error('Failed to join category');
+
+      // Update UI - replace + Join with expand button
+      btn.outerHTML = `
+        <button class="expand-btn" onclick="Forums.toggleCategoryGroups('${categorySlug}')">
+          <svg class="expand-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="6 9 12 15 18 9"></polyline>
+          </svg>
+        </button>
+      `;
+
+      // Add to joined set
+      this.joinedCategorySlugs.add(categorySlug);
+
+      // Refresh sidebar
+      this.loadMyGroups();
+
+    } catch (error) {
+      console.error('Error joining category:', error);
+      alert('Failed to join category');
     }
   },
 

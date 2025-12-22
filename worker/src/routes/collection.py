@@ -28,6 +28,7 @@ class Album(BaseModel):
     price: Optional[float] = None
     discogs_id: Optional[int] = None
     year: Optional[int] = None
+    category_id: Optional[int] = None
 
 
 class AlbumCreate(BaseModel):
@@ -39,6 +40,7 @@ class AlbumCreate(BaseModel):
     price: Optional[float] = None
     discogs_id: Optional[int] = None
     year: Optional[int] = None
+    category_id: Optional[int] = None
 
 
 class AlbumUpdate(BaseModel):
@@ -75,21 +77,30 @@ class CollectionStats(BaseModel):
 @router.get("/")
 async def get_collection(
     request: Request,
+    category_id: Optional[int] = None,
     user_id: int = Depends(require_auth)
 ) -> list[Album]:
     """
-    Get user's complete collection.
+    Get user's collection, optionally filtered by category.
     Requires authentication.
     """
     env = request.scope["env"]
 
     try:
-        results = await env.DB.prepare(
-            """SELECT id, artist, album, genre, cover, price, discogs_id, year
-               FROM collections
-               WHERE user_id = ?
-               ORDER BY artist, album"""
-        ).bind(user_id).all()
+        if category_id:
+            results = await env.DB.prepare(
+                """SELECT id, artist, album, genre, cover, price, discogs_id, year, category_id
+                   FROM collections
+                   WHERE user_id = ? AND category_id = ?
+                   ORDER BY artist, album"""
+            ).bind(user_id, category_id).all()
+        else:
+            results = await env.DB.prepare(
+                """SELECT id, artist, album, genre, cover, price, discogs_id, year, category_id
+                   FROM collections
+                   WHERE user_id = ?
+                   ORDER BY artist, album"""
+            ).bind(user_id).all()
 
         albums = []
         for row in results.results:
@@ -104,7 +115,8 @@ async def get_collection(
                 cover=to_python_value(row.get("cover")),
                 price=to_python_value(row.get("price")),
                 discogs_id=to_python_value(row.get("discogs_id")),
-                year=to_python_value(row.get("year"))
+                year=to_python_value(row.get("year")),
+                category_id=to_python_value(row.get("category_id"))
             ))
 
         return albums
@@ -128,11 +140,17 @@ async def add_album(
         raise HTTPException(status_code=400, detail="Artist and album required")
 
     try:
-        # Check for duplicate
-        existing = await env.DB.prepare(
-            """SELECT id FROM collections
-               WHERE user_id = ? AND LOWER(artist) = LOWER(?) AND LOWER(album) = LOWER(?)"""
-        ).bind(user_id, body.artist, body.album).first()
+        # Check for duplicate (within same category if provided)
+        if body.category_id:
+            existing = await env.DB.prepare(
+                """SELECT id FROM collections
+                   WHERE user_id = ? AND LOWER(artist) = LOWER(?) AND LOWER(album) = LOWER(?) AND category_id = ?"""
+            ).bind(user_id, body.artist, body.album, body.category_id).first()
+        else:
+            existing = await env.DB.prepare(
+                """SELECT id FROM collections
+                   WHERE user_id = ? AND LOWER(artist) = LOWER(?) AND LOWER(album) = LOWER(?)"""
+            ).bind(user_id, body.artist, body.album).first()
 
         if existing:
             raise HTTPException(status_code=400, detail="Album already in collection")
@@ -157,11 +175,14 @@ async def add_album(
         if body.year is not None:
             fields.append("year")
             values.append(body.year)
+        if body.category_id is not None:
+            fields.append("category_id")
+            values.append(body.category_id)
 
         placeholders = ", ".join(["?" for _ in fields])
         field_names = ", ".join(fields)
 
-        print(f"[Collection] Adding album: {body.artist} - {body.album}")
+        print(f"[Collection] Adding album: {body.artist} - {body.album} (category: {body.category_id})")
         print(f"[Collection] Fields: {field_names}, Values: {values}")
 
         result = await env.DB.prepare(
@@ -179,7 +200,8 @@ async def add_album(
             cover=body.cover,
             price=body.price,
             discogs_id=body.discogs_id,
-            year=body.year
+            year=body.year,
+            category_id=body.category_id
         )
     except HTTPException:
         raise

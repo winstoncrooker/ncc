@@ -1142,3 +1142,43 @@
   padding: 60px 20px;
   font-size: 1rem;
 }
+
+/* ============================================
+   Join Category Button in Discover Modal
+   ============================================ */
+
+.join-category-btn {
+  background: transparent;
+  border: 1px solid #1db954;
+  color: #1db954;
+  padding: 6px 14px;
+  border-radius: 20px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.join-category-btn:hover {
+  background: #1db954;
+  color: #000;
+}
+
+.expand-btn {
+  background: transparent;
+  border: none;
+  color: rgba(255, 255, 255, 0.5);
+  padding: 8px;
+  cursor: pointer;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.expand-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+}

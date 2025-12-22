@@ -435,29 +435,17 @@ const Profile = {
     this.currentCategorySlug = categorySlug;
 
     try {
-      // Load category-specific profile and items
-      const [profileRes, itemsRes] = await Promise.all([
-        Auth.apiRequest(`/api/profile/categories/${categorySlug}`),
-        Auth.apiRequest(`/api/profile/items?category=${categorySlug}`)
-      ]);
-
+      // Load category-specific profile (optional)
+      const profileRes = await Auth.apiRequest(`/api/profile/categories/${categorySlug}`);
       if (profileRes.ok) {
         this.currentCategoryProfile = await profileRes.json();
       }
 
-      if (itemsRes.ok) {
-        const itemsData = await itemsRes.json();
-        this.collection = itemsData.items || [];
-        this.showcase = (itemsData.items || []).filter(item => item.in_showcase);
-        this.renderCollection();
-        this.renderShowcase();
-      } else {
-        // No items yet for this category
-        this.collection = [];
-        this.showcase = [];
-        this.renderCollection();
-        this.renderShowcase();
-      }
+      // Load collection filtered by category (uses the updated loadCollection method)
+      await this.loadCollection();
+
+      // Reload showcase for this category
+      await this.loadShowcase();
 
       // Update all UI elements for this category
       this.updateUIForCategory(categorySlug);
@@ -609,11 +597,25 @@ const Profile = {
   },
 
   /**
-   * Load user collection
+   * Get current category ID from slug
+   */
+  getCurrentCategoryId() {
+    if (!this.currentCategorySlug || !this.userCategories.length) return null;
+    const category = this.userCategories.find(c => c.slug === this.currentCategorySlug);
+    return category ? category.id : null;
+  },
+
+  /**
+   * Load user collection (filtered by current category if set)
    */
   async loadCollection() {
     try {
-      const response = await Auth.apiRequest('/api/collection/');
+      const categoryId = this.getCurrentCategoryId();
+      const url = categoryId
+        ? `/api/collection/?category_id=${categoryId}`
+        : '/api/collection/';
+
+      const response = await Auth.apiRequest(url);
       if (response.ok) {
         this.collection = await response.json();
         this.renderCollection();
@@ -1376,13 +1378,15 @@ const Profile = {
     }
 
     try {
+      const categoryId = this.getCurrentCategoryId();
       const response = await Auth.apiRequest('/api/collection/', {
         method: 'POST',
         body: JSON.stringify({
           artist,
           album,
           year: year ? parseInt(year) : null,
-          cover: cover || null
+          cover: cover || null,
+          category_id: categoryId
         })
       });
 
@@ -1470,9 +1474,13 @@ const Profile = {
    */
   async addFromDiscogs(albumData) {
     try {
+      const categoryId = this.getCurrentCategoryId();
       const response = await Auth.apiRequest('/api/collection/', {
         method: 'POST',
-        body: JSON.stringify(albumData)
+        body: JSON.stringify({
+          ...albumData,
+          category_id: categoryId
+        })
       });
 
       if (response.ok) {
@@ -1865,6 +1873,7 @@ const Profile = {
 
         // Add to collection
         try {
+          const categoryId = this.getCurrentCategoryId();
           const response = await Auth.apiRequest('/api/collection/', {
             method: 'POST',
             body: JSON.stringify({
@@ -1872,7 +1881,8 @@ const Profile = {
               album: album.album,
               cover: cover,
               year: year,
-              discogs_id: discogs_id
+              discogs_id: discogs_id,
+              category_id: categoryId
             })
           });
 
@@ -1940,6 +1950,7 @@ const Profile = {
         return false;
       }
 
+      const categoryId = this.getCurrentCategoryId();
       const response = await Auth.apiRequest('/api/collection/', {
         method: 'POST',
         body: JSON.stringify({
@@ -1947,7 +1958,8 @@ const Profile = {
           album: album.album,
           cover: album.cover || null,
           year: album.year || null,
-          discogs_id: album.discogs_id || null
+          discogs_id: album.discogs_id || null,
+          category_id: categoryId
         })
       });
 

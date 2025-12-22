@@ -295,6 +295,89 @@ async def get_feed(
         raise HTTPException(status_code=500, detail=f"Error fetching feed: {str(e)}")
 
 
+@router.get("/saved")
+async def get_saved_posts(
+    request: Request,
+    user_id: int = Depends(require_auth)
+) -> FeedResponse:
+    """Get all posts saved by the user."""
+    env = request.scope["env"]
+
+    try:
+        result = await env.DB.prepare(
+            """SELECT p.id, p.user_id, p.category_id, p.interest_group_id, p.post_type,
+                      p.title, p.body, p.images, p.upvote_count, p.downvote_count,
+                      p.comment_count, p.hot_score, p.is_pinned, p.is_locked,
+                      p.created_at, p.updated_at,
+                      u.name as author_name, u.picture as author_picture,
+                      c.slug as category_slug, c.name as category_name,
+                      ig.name as interest_group_name,
+                      v.value as user_vote,
+                      1 as is_saved
+               FROM saved_posts sp
+               JOIN forum_posts p ON sp.post_id = p.id
+               JOIN users u ON p.user_id = u.id
+               JOIN categories c ON p.category_id = c.id
+               LEFT JOIN interest_groups ig ON p.interest_group_id = ig.id
+               LEFT JOIN votes v ON v.post_id = p.id AND v.user_id = ?
+               WHERE sp.user_id = ?
+               ORDER BY sp.created_at DESC"""
+        ).bind(user_id, user_id).all()
+
+        if hasattr(result, 'to_py'):
+            result = result.to_py()
+
+        rows = result.get("results", [])
+
+        posts = []
+        for row in rows:
+            images = []
+            images_val = safe_value(row.get("images"))
+            if images_val:
+                try:
+                    images = json.loads(images_val)
+                except Exception:
+                    images = []
+
+            posts.append(PostResponse(
+                id=row["id"],
+                user_id=row["user_id"],
+                author=PostAuthor(
+                    id=row["user_id"],
+                    name=safe_value(row.get("author_name")),
+                    picture=safe_value(row.get("author_picture"))
+                ),
+                category_id=row["category_id"],
+                category_slug=safe_value(row.get("category_slug")),
+                category_name=safe_value(row.get("category_name")),
+                interest_group_id=safe_value(row.get("interest_group_id")),
+                interest_group_name=safe_value(row.get("interest_group_name")),
+                post_type=row["post_type"],
+                title=row["title"],
+                body=row["body"],
+                images=images,
+                upvote_count=safe_value(row.get("upvote_count"), 0),
+                downvote_count=safe_value(row.get("downvote_count"), 0),
+                comment_count=safe_value(row.get("comment_count"), 0),
+                hot_score=safe_value(row.get("hot_score"), 0),
+                is_pinned=bool(safe_value(row.get("is_pinned"), 0)),
+                is_locked=bool(safe_value(row.get("is_locked"), 0)),
+                user_vote=safe_value(row.get("user_vote")),
+                is_saved=True,
+                created_at=str(row["created_at"]),
+                updated_at=str(row["updated_at"])
+            ))
+
+        return FeedResponse(
+            posts=posts,
+            cursor=None,
+            has_more=False
+        )
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error fetching saved posts: {str(e)}")
+
+
 @router.get("/{post_id}")
 async def get_post(
     request: Request,

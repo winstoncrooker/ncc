@@ -204,12 +204,19 @@ async def create_comment(
 
                 current_id = parent_check.get("parent_comment_id") if parent_check else None
 
-        # Insert comment
-        result = await env.DB.prepare(
-            """INSERT INTO forum_comments (post_id, user_id, parent_comment_id, body)
-               VALUES (?, ?, ?, ?)
-               RETURNING id, created_at"""
-        ).bind(post_id, user_id, body.parent_comment_id, body.body).first()
+        # Insert comment - D1 doesn't handle None well, use separate queries
+        if body.parent_comment_id:
+            result = await env.DB.prepare(
+                """INSERT INTO forum_comments (post_id, user_id, parent_comment_id, body)
+                   VALUES (?, ?, ?, ?)
+                   RETURNING id, created_at"""
+            ).bind(post_id, user_id, body.parent_comment_id, body.body).first()
+        else:
+            result = await env.DB.prepare(
+                """INSERT INTO forum_comments (post_id, user_id, body)
+                   VALUES (?, ?, ?)
+                   RETURNING id, created_at"""
+            ).bind(post_id, user_id, body.body).first()
 
         if hasattr(result, 'to_py'):
             result = result.to_py()
