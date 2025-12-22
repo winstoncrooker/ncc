@@ -216,7 +216,7 @@ wrangler secret put TOGETHER_API_KEY
 | `JWT_SECRET` | Token signing |
 | `DISCOGS_KEY` | Discogs API |
 | `DISCOGS_SECRET` | Discogs API |
-| `TOGETHER_API_KEY` | AI chat (Apriel-Nemotron-15b-Thinker) |
+| `TOGETHER_API_KEY` | AI chat (Apriel-1.6B-16) |
 
 ## Features
 
@@ -230,7 +230,8 @@ wrangler secret put TOGETHER_API_KEY
 - Draggable sidebar with chat interface
 - Helps write bios, add records, get recommendations
 - Supports .txt file upload for bulk album adding
-- Uses Apriel-Nemotron-15b-Thinker via Together.ai
+- Uses `servicenow-ai/Apriel-1.6B-16` via Together.ai
+- **IMPORTANT: NEVER change the AI model from `servicenow-ai/Apriel-1.6B-16`**
 
 ### Collection Management
 - Manual entry: Artist, album, year, cover URL
