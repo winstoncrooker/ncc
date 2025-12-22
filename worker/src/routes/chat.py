@@ -50,25 +50,27 @@ def build_system_prompt(collection: list[Album]) -> str:
     else:
         collection_context = "\n\nThe user has not uploaded any albums to their collection yet."
 
-    return f"""You are a vinyl record collection assistant. Help users manage their record collection.
+    return f"""You are a vinyl record collection assistant.
 
-OUTPUT FORMAT:
-- Put ALL reasoning/thinking inside <think></think> tags
-- Your final response goes OUTSIDE the think tags
-- Keep final response SHORT (1-2 sentences)
+STRICT OUTPUT FORMAT - You MUST follow this exactly:
+1. Do any thinking silently
+2. Output ONLY this format:
 
-COMMANDS:
-- Add album: [ADD_ALBUM: Artist - Album]
-- Remove album: [REMOVE_ALBUM: Artist - Album]
-- Showcase album: [SHOWCASE: Artist - Album]
+FINAL_ANSWER:
+[Your 1-2 sentence response here, with any command tags]
+
+COMMANDS (include in FINAL_ANSWER when user requests):
+- Add: [ADD_ALBUM: Artist - Album]
+- Remove: [REMOVE_ALBUM: Artist - Album]
+- Showcase: [SHOWCASE: Artist - Album]
 
 RULES:
-- Only use commands when user explicitly asks to add/remove/showcase
-- For recommendations, just suggest - don't use ADD_ALBUM
-- If unclear, ask for clarification
+- Only use commands when user explicitly asks
+- For recommendations, suggest without ADD_ALBUM
+- Keep responses under 2 sentences
 
-Example response:
-<think>User wants to add Maggot Brain by Funkadelic</think>
+Example:
+FINAL_ANSWER:
 Added to your collection! [ADD_ALBUM: Funkadelic - Maggot Brain]
 
 {collection_context}"""
@@ -222,40 +224,64 @@ async def search_discogs_for_album(artist: str, album: str, discogs_key: str, di
 
 
 def clean_response(response: str) -> str:
-    """Clean up AI response for display, filtering out Thinker model reasoning"""
+    """
+    Extract ONLY the FINAL_ANSWER content, stripping all reasoning/thinking.
+    This is mandatory server-side filtering for clean UX.
+    """
     import re
 
-    cleaned = response
+    # Log raw output for debugging (optional - can be removed in production)
+    print(f"[Chat] Raw model output length: {len(response)}")
 
-    # Remove thinking tags (various formats)
+    # Strategy 1: Extract FINAL_ANSWER block if present
+    final_match = re.search(r'FINAL_ANSWER:\s*\n?([\s\S]*?)(?:$|\n\n(?=[A-Z]))', response, re.IGNORECASE)
+    if final_match:
+        cleaned = final_match.group(1).strip()
+    else:
+        # Strategy 2: Try to find content after common reasoning patterns end
+        # Look for the last meaningful sentence that isn't reasoning
+        cleaned = response
+
+    # Remove ALL thinking/reasoning blocks (multiple formats)
     cleaned = re.sub(r'<think>[\s\S]*?</think>', '', cleaned, flags=re.IGNORECASE)
     cleaned = re.sub(r'<thinking>[\s\S]*?</thinking>', '', cleaned, flags=re.IGNORECASE)
     cleaned = re.sub(r'<reasoning>[\s\S]*?</reasoning>', '', cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(r'<internal>[\s\S]*?</internal>', '', cleaned, flags=re.IGNORECASE)
     cleaned = re.sub(r'\[think\][\s\S]*?\[/think\]', '', cleaned, flags=re.IGNORECASE)
     cleaned = re.sub(r'\[thinking\][\s\S]*?\[/thinking\]', '', cleaned, flags=re.IGNORECASE)
 
-    # Remove internal markers
-    cleaned = re.sub(r'\[BEGIN FINAL RESPONSE\]', '', cleaned, flags=re.IGNORECASE)
-    cleaned = re.sub(r'\[END FINAL RESPONSE\]', '', cleaned, flags=re.IGNORECASE)
-    cleaned = re.sub(r'\[INTERNAL\][\s\S]*?\[/INTERNAL\]', '', cleaned, flags=re.IGNORECASE)
+    # Remove common reasoning sentence patterns
+    reasoning_patterns = [
+        r'^.*?The user wants to.*?[\.\n]',
+        r'^.*?So we need to.*?[\.\n]',
+        r'^.*?The format.*?[\.\n]',
+        r'^.*?The guidelines.*?[\.\n]',
+        r'^.*?Looking at.*?[\.\n]',
+        r'^.*?Let me.*?[\.\n]',
+        r'^.*?I need to.*?[\.\n]',
+        r'^.*?First,.*?[\.\n]',
+        r'^.*?I should.*?[\.\n]',
+        r'^.*?This means.*?[\.\n]',
+        r'^.*?Based on.*?[\.\n]',
+        r'^.*?According to.*?[\.\n]',
+        r'^.*?The collection.*?contains.*?[\.\n]',
+        r'^.*?There\'s no.*?[\.\n]',
+        r'^.*?We need to.*?[\.\n]',
+    ]
+    for pattern in reasoning_patterns:
+        cleaned = re.sub(pattern, '', cleaned, flags=re.MULTILINE | re.IGNORECASE)
 
-    # Remove reasoning patterns (Thinker models often output this)
-    cleaned = re.sub(r'^.*?The user wants to.*?\n', '', cleaned, flags=re.MULTILINE)
-    cleaned = re.sub(r'^.*?So we need to.*?\n', '', cleaned, flags=re.MULTILINE)
-    cleaned = re.sub(r'^.*?The format:.*?\n', '', cleaned, flags=re.MULTILINE)
-    cleaned = re.sub(r'^.*?The guidelines say.*?\n', '', cleaned, flags=re.MULTILINE)
-    cleaned = re.sub(r'^.*?Looking at.*?\n', '', cleaned, flags=re.MULTILINE)
-    cleaned = re.sub(r'^.*?Let me.*?\n', '', cleaned, flags=re.MULTILINE)
-    cleaned = re.sub(r'^.*?I need to.*?\n', '', cleaned, flags=re.MULTILINE)
-    cleaned = re.sub(r'^.*?First,.*?\n', '', cleaned, flags=re.MULTILINE)
+    # Remove any "FINAL_ANSWER:" prefix that might remain
+    cleaned = re.sub(r'^FINAL_ANSWER:\s*', '', cleaned, flags=re.IGNORECASE)
 
-    # Remove command tags
+    # Remove command tags from display (they're parsed separately)
     cleaned = re.sub(r'\[ADD_ALBUM:\s*.+?\s*-\s*.+?\]', '', cleaned)
     cleaned = re.sub(r'\[REMOVE_ALBUM:\s*.+?\s*-\s*.+?\]', '', cleaned)
     cleaned = re.sub(r'\[SHOWCASE:\s*.+?\s*-\s*.+?\]', '', cleaned)
 
     # Clean up whitespace
-    cleaned = re.sub(r'\n{3,}', '\n\n', cleaned)
+    cleaned = re.sub(r'\n{2,}', '\n', cleaned)
+    cleaned = re.sub(r'\s{2,}', ' ', cleaned)
     cleaned = cleaned.strip()
 
     if not cleaned or len(cleaned) < 5:
