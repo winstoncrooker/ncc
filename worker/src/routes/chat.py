@@ -5,7 +5,6 @@ Together.ai Chat API proxy for AI collection assistant
 from fastapi import APIRouter, Request, HTTPException
 from pydantic import BaseModel
 from typing import Optional
-import httpx
 import js
 from pyodide.ffi import to_js
 
@@ -281,69 +280,71 @@ async def chat(request: Request, body: ChatMessage) -> ChatResponse:
     messages.append({"role": "user", "content": body.message})
 
     try:
-        async with httpx.AsyncClient() as client:
-            response = await client.post(
-                TOGETHER_API_URL,
-                headers={
-                    "Authorization": f"Bearer {env.TOGETHER_API_KEY}",
-                    "Content-Type": "application/json"
-                },
-                json={
-                    "model": CHAT_MODEL,
-                    "messages": messages,
-                    "max_tokens": 256,
-                    "temperature": 0.2
-                },
-                timeout=30.0
+        # Use js.fetch to avoid Cloudflare blocking
+        headers = to_js({
+            "Authorization": f"Bearer {env.TOGETHER_API_KEY}",
+            "Content-Type": "application/json"
+        })
+
+        body = to_js({
+            "model": CHAT_MODEL,
+            "messages": messages,
+            "max_tokens": 256,
+            "temperature": 0.2
+        })
+
+        response = await js.fetch(TOGETHER_API_URL, to_js({
+            "method": "POST",
+            "headers": headers,
+            "body": js.JSON.stringify(body)
+        }))
+
+        if response.status != 200:
+            error_text = await response.text()
+            raise HTTPException(status_code=response.status, detail=f"API error: {error_text[:200]}")
+
+        data = (await response.json()).to_py()
+        assistant_message = data["choices"][0]["message"]["content"]
+
+        # Parse actions before cleaning
+        albums_to_add, albums_to_remove, albums_to_showcase = parse_album_actions(assistant_message)
+
+        # Enrich albums with Discogs data (covers, year, etc.)
+        enriched_albums = []
+        print(f"[Chat] Albums to enrich: {len(albums_to_add)}")
+        for album in albums_to_add:
+            print(f"[Chat] Enriching: {album.artist} - {album.album}")
+            enriched = await search_discogs_for_album(
+                album.artist,
+                album.album,
+                env.DISCOGS_KEY,
+                env.DISCOGS_SECRET
             )
+            print(f"[Chat] Enriched result has cover: {enriched.cover is not None}")
+            enriched_albums.append(enriched)
 
-            if response.status_code != 200:
-                error_data = response.json() if response.content else {}
-                error_msg = error_data.get("error", {}).get("message", f"API error: {response.status_code}")
-                raise HTTPException(status_code=response.status_code, detail=error_msg)
-
-            data = response.json()
-            assistant_message = data["choices"][0]["message"]["content"]
-
-            # Parse actions before cleaning
-            albums_to_add, albums_to_remove, albums_to_showcase = parse_album_actions(assistant_message)
-
-            # Enrich albums with Discogs data (covers, year, etc.)
-            enriched_albums = []
-            print(f"[Chat] Albums to enrich: {len(albums_to_add)}")
-            for album in albums_to_add:
-                print(f"[Chat] Enriching: {album.artist} - {album.album}")
-                enriched = await search_discogs_for_album(
-                    album.artist,
-                    album.album,
-                    env.DISCOGS_KEY,
-                    env.DISCOGS_SECRET
-                )
-                print(f"[Chat] Enriched result has cover: {enriched.cover is not None}")
-                enriched_albums.append(enriched)
-
-            # Enrich showcase albums too
-            enriched_showcase = []
-            print(f"[Chat] Albums to showcase: {len(albums_to_showcase)}")
-            for album in albums_to_showcase:
-                print(f"[Chat] Showcase: {album.artist} - {album.album}")
-                enriched = await search_discogs_for_album(
-                    album.artist,
-                    album.album,
-                    env.DISCOGS_KEY,
-                    env.DISCOGS_SECRET
-                )
-                enriched_showcase.append(enriched)
-
-            # Clean response for display
-            cleaned_response = clean_response(assistant_message)
-
-            return ChatResponse(
-                response=cleaned_response,
-                albums_to_add=enriched_albums,
-                albums_to_remove=albums_to_remove,
-                albums_to_showcase=enriched_showcase
+        # Enrich showcase albums too
+        enriched_showcase = []
+        print(f"[Chat] Albums to showcase: {len(albums_to_showcase)}")
+        for album in albums_to_showcase:
+            print(f"[Chat] Showcase: {album.artist} - {album.album}")
+            enriched = await search_discogs_for_album(
+                album.artist,
+                album.album,
+                env.DISCOGS_KEY,
+                env.DISCOGS_SECRET
             )
+            enriched_showcase.append(enriched)
+
+        # Clean response for display
+        cleaned_response = clean_response(assistant_message)
+
+        return ChatResponse(
+            response=cleaned_response,
+            albums_to_add=enriched_albums,
+            albums_to_remove=albums_to_remove,
+            albums_to_showcase=enriched_showcase
+        )
 
     except HTTPException:
         raise
