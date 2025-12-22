@@ -1068,12 +1068,15 @@ const Profile = {
       // Show user message with summary
       this.addChatMessage(`Uploading ${albums.length} album(s) from file...`, 'user');
 
-      // Add albums directly to collection (bypass AI for bulk adds)
+      // Add albums directly to collection with Discogs enrichment
       let added = 0;
       let skipped = 0;
 
       for (let i = 0; i < albums.length; i++) {
         const album = albums[i];
+
+        // Update progress
+        this.updateLastChatMessage(`Adding albums... ${i + 1}/${albums.length} (${album.artist} - ${album.album})`);
 
         // Check if already in collection
         const exists = this.collection.some(a =>
@@ -1086,12 +1089,37 @@ const Profile = {
           continue;
         }
 
+        // Search Discogs for cover art (globally cached)
+        let cover = null;
+        let year = null;
+        let discogs_id = null;
+
+        try {
+          const discogsResponse = await Auth.apiRequest(
+            `/api/discogs/search?artist=${encodeURIComponent(album.artist)}&album=${encodeURIComponent(album.album)}`
+          );
+
+          if (discogsResponse.ok) {
+            const discogsData = await discogsResponse.json();
+            cover = discogsData.cover || null;
+            year = discogsData.year || null;
+            discogs_id = discogsData.id || null;
+          }
+        } catch (err) {
+          // Discogs failed, continue without cover
+          console.log(`Discogs lookup failed for: ${album.artist} - ${album.album}`);
+        }
+
+        // Add to collection
         try {
           const response = await Auth.apiRequest('/api/collection/', {
             method: 'POST',
             body: JSON.stringify({
               artist: album.artist,
-              album: album.album
+              album: album.album,
+              cover: cover,
+              year: year,
+              discogs_id: discogs_id
             })
           });
 
@@ -1104,9 +1132,9 @@ const Profile = {
           console.error(`Failed to add: ${album.artist} - ${album.album}`, err);
         }
 
-        // Update progress every 10 albums
-        if ((i + 1) % 10 === 0) {
-          this.updateLastChatMessage(`Adding albums... ${i + 1}/${albums.length}`);
+        // Rate limit: wait 1.2 seconds between Discogs requests (50/min to be safe)
+        if (i < albums.length - 1) {
+          await new Promise(resolve => setTimeout(resolve, 1200));
         }
       }
 
