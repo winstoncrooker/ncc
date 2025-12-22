@@ -520,10 +520,14 @@
   border-radius: 50%;
   cursor: pointer;
   font-size: 1.2rem;
-  display: flex;
+  display: none;
   align-items: center;
   justify-content: center;
   transition: all 0.2s ease;
+}
+
+.album-card:hover .refresh-btn {
+  display: flex;
 }
 
 .album-card .refresh-btn:hover {

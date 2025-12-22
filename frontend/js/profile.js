@@ -388,7 +388,7 @@ const Profile = {
           <p class="album-title">${this.escapeHtml(album.album)}</p>
           <p class="album-artist">${this.escapeHtml(album.artist)}</p>
         </div>
-        ${!album.cover ? `<button class="refresh-btn" onclick="Profile.refreshCover(${album.id})" title="Find cover">↻</button>` : ''}
+        <button class="refresh-btn" onclick="Profile.refreshCover(${album.id})" title="Find cover">↻</button>
         <button class="remove-btn" onclick="Profile.removeFromCollection(${album.id})" title="Remove">&times;</button>
       </div>
     `).join('');
@@ -1979,7 +1979,7 @@ const Profile = {
           <p class="album-title">${this.escapeHtml(album.album)}</p>
           <p class="album-artist">${this.escapeHtml(album.artist)}</p>
         </div>
-        ${!album.cover ? `<button class="refresh-btn" onclick="Profile.refreshCover(${album.id})" title="Find cover">↻</button>` : ''}
+        <button class="refresh-btn" onclick="Profile.refreshCover(${album.id})" title="Find cover">↻</button>
         <button class="remove-btn" onclick="Profile.removeFromCollection(${album.id})" title="Remove">&times;</button>
       </div>
     `).join('');
