@@ -63,10 +63,23 @@ async def is_token_blacklisted(env, token: str) -> bool:
     """Check if a token is in the blacklist"""
     try:
         token_hash = hash_token(token)
+        print(f"[Auth] Checking blacklist for hash: {token_hash[:20]}...")
         result = await env.DB.prepare(
             "SELECT id FROM token_blacklist WHERE token_hash = ?"
         ).bind(token_hash).first()
-        return result is not None
+        print(f"[Auth] Blacklist result: {result}, type: {type(result).__name__}, is None: {result is None}")
+
+        # Handle D1's JsNull - it's not Python None
+        if result is None:
+            return False
+        # Convert JsProxy if needed
+        if hasattr(result, 'to_py'):
+            result = result.to_py()
+            print(f"[Auth] After to_py: {result}")
+        # If result is empty dict or None after conversion, not blacklisted
+        if not result:
+            return False
+        return True
     except Exception as e:
         # If blacklist check fails, allow the request (fail open)
         print(f"[Auth] Blacklist check failed: {e}")
@@ -101,10 +114,18 @@ async def get_current_user(
     Get current user ID from JWT token.
     Returns None if no valid token provided.
     """
+    # Debug: Log raw authorization header
+    raw_auth = request.headers.get("authorization", "MISSING")
+    print(f"[Auth] Raw Authorization header: {raw_auth[:60]}..." if len(raw_auth) > 60 else f"[Auth] Raw Authorization header: {raw_auth}")
+
     if not credentials:
+        print("[Auth] No credentials provided by HTTPBearer")
         return None
 
     env = request.scope["env"]
+    token = credentials.credentials
+    print(f"[Auth] Token from HTTPBearer: {token[:30]}...")
+
     try:
         # Get secret - ensure it's a string
         secret = str(env.JWT_SECRET) if hasattr(env, 'JWT_SECRET') else None
@@ -112,24 +133,29 @@ async def get_current_user(
             print("[Auth] JWT_SECRET not found in env!")
             raise HTTPException(status_code=500, detail="Server configuration error")
 
+        print(f"[Auth] Secret type: {type(secret).__name__}, length: {len(secret)}, first 5 chars: {secret[:5]}")
+
         # Check if token is blacklisted
         if await is_token_blacklisted(env, credentials.credentials):
             print("[Auth] Token is blacklisted!")
             raise HTTPException(status_code=401, detail="Token has been revoked")
 
+        # Decode the token
+        print(f"[Auth] Attempting jwt.decode...")
         payload = jwt.decode(
-            credentials.credentials,
+            token,
             secret,
             algorithms=["HS256"]
         )
         user_id = int(payload["sub"])  # Convert back from string
+        print(f"[Auth] Token valid for user_id: {user_id}")
         return user_id
     except jwt.ExpiredSignatureError:
         print("[Auth] Token expired!")
         raise HTTPException(status_code=401, detail="Token expired")
     except jwt.InvalidTokenError as e:
-        print(f"[Auth] Invalid token: {e}")
-        raise HTTPException(status_code=401, detail="Invalid token")
+        print(f"[Auth] Invalid token error: {type(e).__name__}: {e}")
+        raise HTTPException(status_code=401, detail=f"Invalid token: {str(e)}")
 
 
 async def require_auth(
@@ -333,7 +359,9 @@ async def google_callback(request: Request, code: str = None, error: str = None,
         jwt_secret = str(env.JWT_SECRET) if hasattr(env, 'JWT_SECRET') else None
         if not jwt_secret:
             raise HTTPException(status_code=500, detail="JWT_SECRET not configured")
+        print(f"[Auth] Creating token with secret type: {type(jwt_secret).__name__}, length: {len(jwt_secret)}, first 5 chars: {jwt_secret[:5]}")
         token = create_token(user_id, email, jwt_secret)
+        print(f"[Auth] Created token: {token[:30]}...")
 
         # Redirect to frontend with token
         # Frontend will extract token from URL and store it
@@ -349,6 +377,16 @@ async def google_callback(request: Request, code: str = None, error: str = None,
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"OAuth error: {str(e)}")
+
+
+@router.get("/debug")
+async def debug_auth(request: Request):
+    """Debug endpoint to see what headers are received"""
+    auth_header = request.headers.get("authorization", "NOT PRESENT")
+    return {
+        "authorization_header": auth_header[:50] + "..." if len(auth_header) > 50 else auth_header,
+        "all_headers": dict(request.headers)
+    }
 
 
 @router.get("/me")
