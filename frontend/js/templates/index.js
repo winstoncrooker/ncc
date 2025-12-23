@@ -71,17 +71,18 @@ const TemplateRegistry = {
    * Get category-specific section names
    */
   getSections(categorySlug) {
+    // [0] = Showcase section name, [1] = Collection section name
     const sectionMap = {
       'vinyl': ['Showcase', 'Collection', 'Turntable Setup', 'Genre Breakdown'],
-      'trading-cards': ['Featured Cards', 'Deck Lists', 'Binder', 'Trade List'],
-      'cars': ['Garage', 'Build Specs', 'Mod History', 'Meets'],
-      'sneakers': ['Shoe Rack', 'Grails', 'Size Info', 'For Trade'],
-      'watches': ['Collection', 'SOTC', 'Wrist Check', 'Wishlist'],
+      'trading-cards': ['Featured Cards', 'Binder', 'Deck Lists', 'Trade List'],
+      'cars': ['Finest Machines', 'Garage', 'Build Specs', 'Mod History'],
+      'sneakers': ['Grails', 'Shoe Rack', 'Size Info', 'For Trade'],
+      'watches': ['Centerpieces', 'Timepieces', 'Wrist Check', 'Wishlist'],
       'comics': ['Featured Issues', 'Long Boxes', 'Reading List', 'Pull List'],
-      'video-games': ['Library', 'Now Playing', 'Backlog', 'Wishlist'],
+      'video-games': ['Playing Now', 'Library', 'Backlog', 'Wishlist'],
       'coins': ['Collection', 'By Era', 'Graded Coins', 'Want List']
     };
-    return sectionMap[categorySlug] || ['Collection'];
+    return sectionMap[categorySlug] || ['Showcase', 'Collection'];
   },
 
   /**

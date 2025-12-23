@@ -986,8 +986,12 @@ const Forums = {
 
       const data = await response.json();
 
-      if (data.interests.length === 0) {
-        container.innerHTML = '<div class="groups-empty">Join groups to see them here</div>';
+      // Filter to only show main categories (not sub-groups) in sidebar
+      // Sub-groups still affect what posts user sees, but don't clutter the sidebar
+      const mainCategories = data.interests.filter(i => !i.interest_group_id);
+
+      if (mainCategories.length === 0) {
+        container.innerHTML = '<div class="groups-empty">Join categories to see them here</div>';
         return;
       }
 
@@ -997,18 +1001,17 @@ const Forums = {
           <span class="group-icon">📋</span>
           <span class="group-name">All Posts</span>
         </div>
-      ` + data.interests.map(interest => {
-        const name = interest.interest_group_name || interest.category_name;
+      ` + mainCategories.map(interest => {
+        const name = interest.category_name;
         const icon = interest.category_icon || '';
-        const isActive = (interest.interest_group_id && this.currentGroupId === interest.interest_group_id) ||
-                         (!interest.interest_group_id && this.currentCategory === interest.category_slug);
+        const isActive = this.currentCategory === interest.category_slug;
         return `
           <div class="group-item ${isActive ? 'active' : ''}" data-interest-id="${interest.id}">
-            <div class="group-main" onclick="Forums.filterByGroup(${interest.interest_group_id || 0}, ${interest.category_id || 0}, '${interest.category_slug || ''}')">
+            <div class="group-main" onclick="Forums.filterByGroup(0, ${interest.category_id || 0}, '${interest.category_slug || ''}')">
               <span class="group-icon">${icon}</span>
               <span class="group-name">${this.escapeHtml(name)}</span>
             </div>
-            <button class="leave-btn" onclick="event.stopPropagation(); Forums.leaveGroup(${interest.id})" title="Leave group">×</button>
+            <button class="leave-btn" onclick="event.stopPropagation(); Forums.leaveGroup(${interest.id})" title="Leave category">×</button>
           </div>
         `;
       }).join('');
