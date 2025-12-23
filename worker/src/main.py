@@ -9,7 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 import asgi
 
 from routes import discogs, chat, auth, collection, profile, upload, friends, messages
-from routes import categories, interests, posts, comments, votes, category_profiles
+from routes import categories, interests, posts, comments, votes, category_profiles, admin
 
 # Create FastAPI app
 app = FastAPI(
@@ -42,6 +42,7 @@ app.include_router(posts.router, prefix="/api/posts", tags=["posts"])
 app.include_router(comments.router, prefix="/api", tags=["comments"])
 app.include_router(votes.router, prefix="/api/votes", tags=["votes"])
 app.include_router(category_profiles.router, prefix="/api/profile", tags=["category_profiles"])
+app.include_router(admin.router, prefix="/api/admin", tags=["admin"])
 
 
 @app.get("/")

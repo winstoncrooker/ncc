@@ -234,6 +234,11 @@ const Profile = {
 
     // Fill in missing album covers in background
     this.fillMissingCovers();
+
+    // Restore saved main tab (Profile/Forums)
+    if (typeof Forums !== 'undefined') {
+      Forums.restoreSavedTab();
+    }
   },
 
   /**
@@ -451,7 +456,6 @@ const Profile = {
     addListener('view-profile-close', 'click', () => this.closeModal('view-profile-modal'));
     addListener('view-profile-message', 'click', () => this.messageFromProfile());
     addListener('view-profile-unfollow', 'click', () => this.unfollowFromProfile());
-    addListener('view-full-profile-btn', 'click', () => this.loadFullProfile());
     addListener('view-collection-search', 'input', (e) => this.filterViewCollection(e.target.value));
 
     // Collection search
@@ -877,6 +881,7 @@ const Profile = {
       return;
     }
 
+    const isVinyl = this.currentCategory === 'vinyl';
     grid.innerHTML = this.collection.map(album => `
       <div class="album-card" data-id="${album.id}">
         <img src="${album.cover || this.getPlaceholderCover(album)}"
@@ -887,7 +892,7 @@ const Profile = {
           <p class="album-artist">${this.escapeHtml(album.artist)}</p>
         </div>
         <button class="image-btn" onclick="Profile.showImageModal(${album.id})" title="Add/change image">📷</button>
-        <button class="refresh-btn" onclick="Profile.refreshCover(${album.id})" title="Find cover">↻</button>
+        ${isVinyl ? `<button class="refresh-btn" onclick="Profile.refreshCover(${album.id})" title="Find cover">↻</button>` : ''}
         <button class="remove-btn" onclick="Profile.removeFromCollection(${album.id})" title="Remove">&times;</button>
       </div>
     `).join('');
@@ -1597,6 +1602,28 @@ const Profile = {
     document.getElementById('manual-cover').value = '';
     document.getElementById('search-results').innerHTML = '';
     document.getElementById('discogs-query').value = '';
+
+    // Only show Discogs search tab for vinyl category
+    const isVinyl = this.currentCategory === 'vinyl';
+    const discogsTab = document.querySelector('#add-record-modal .tab-btn[data-tab="search"]');
+    const discogsContent = document.getElementById('tab-search');
+
+    if (discogsTab) {
+      discogsTab.style.display = isVinyl ? '' : 'none';
+    }
+
+    // If not vinyl, ensure manual tab is active
+    if (!isVinyl) {
+      const manualTab = document.querySelector('#add-record-modal .tab-btn[data-tab="manual"]');
+      const manualContent = document.getElementById('tab-manual');
+
+      document.querySelectorAll('#add-record-modal .tab-btn').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('#add-record-modal .tab-content').forEach(c => c.classList.remove('active'));
+
+      if (manualTab) manualTab.classList.add('active');
+      if (manualContent) manualContent.classList.add('active');
+    }
+
     document.getElementById('add-record-modal').classList.add('open');
   },
 
@@ -2928,10 +2955,7 @@ const Profile = {
       showcaseGrid.innerHTML = `<div class="showcase-empty-msg">No ${showcaseTerms.itemPlural} in showcase</div>`;
     }
 
-    // Reset collection section
-    document.getElementById('view-profile-collection').style.display = 'none';
-    document.getElementById('view-full-profile-btn').textContent = 'View Full Profile';
-    document.getElementById('view-collection-search').value = '';
+    // Reset collection state
     this.viewedProfileCollection = null;
   },
 
@@ -3054,6 +3078,7 @@ const Profile = {
       return;
     }
 
+    const isVinyl = this.currentCategory === 'vinyl';
     grid.innerHTML = filtered.map(album => `
       <div class="album-card" data-id="${album.id}">
         <img src="${album.cover || this.getPlaceholderCover(album)}"
@@ -3063,7 +3088,7 @@ const Profile = {
           <p class="album-title">${this.escapeHtml(album.album)}</p>
           <p class="album-artist">${this.escapeHtml(album.artist)}</p>
         </div>
-        <button class="refresh-btn" onclick="Profile.refreshCover(${album.id})" title="Find cover">↻</button>
+        ${isVinyl ? `<button class="refresh-btn" onclick="Profile.refreshCover(${album.id})" title="Find cover">↻</button>` : ''}
         <button class="remove-btn" onclick="Profile.removeFromCollection(${album.id})" title="Remove">&times;</button>
       </div>
     `).join('');

@@ -13,6 +13,7 @@ from pydantic import BaseModel
 import hashlib
 import json
 import base64
+import urllib.parse
 import js
 from pyodide.ffi import to_js
 
@@ -176,14 +177,22 @@ async def search_album(
     # Search Discogs using js.fetch (bypasses Cloudflare blocking)
     try:
         # Get secrets (convert from JsProxy if needed)
-        discogs_key = str(env.DISCOGS_KEY) if hasattr(env, 'DISCOGS_KEY') else None
-        discogs_secret = str(env.DISCOGS_SECRET) if hasattr(env, 'DISCOGS_SECRET') else None
+        discogs_key = None
+        discogs_secret = None
+        try:
+            if hasattr(env, 'DISCOGS_KEY'):
+                discogs_key = str(env.DISCOGS_KEY)
+            if hasattr(env, 'DISCOGS_SECRET'):
+                discogs_secret = str(env.DISCOGS_SECRET)
+        except Exception:
+            pass
 
         if not discogs_key or not discogs_secret:
             raise HTTPException(status_code=500, detail="Discogs credentials not configured")
 
         query = f"{artist} {album}"
-        url = f"{DISCOGS_API}/database/search?q={js.encodeURIComponent(query)}&type=release&key={discogs_key}&secret={discogs_secret}"
+        encoded_query = urllib.parse.quote(query, safe='')
+        url = f"{DISCOGS_API}/database/search?q={encoded_query}&type=release&key={discogs_key}&secret={discogs_secret}"
 
         headers = to_js({
             "User-Agent": "NicheCollectorConnector/1.0 +https://niche-collector.pages.dev"

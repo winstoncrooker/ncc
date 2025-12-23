@@ -113,6 +113,9 @@ const Forums = {
    * Switch main tabs (Profile/Forums)
    */
   switchMainTab(tab) {
+    // Save to localStorage for persistence
+    localStorage.setItem('ncc_active_tab', tab);
+
     // Update tab buttons
     document.querySelectorAll('.main-tab-btn').forEach(btn => {
       btn.classList.toggle('active', btn.dataset.tab === tab);
@@ -127,6 +130,16 @@ const Forums = {
     if (tab === 'forums') {
       this.loadFeed(true);
       this.loadMyGroups();
+    }
+  },
+
+  /**
+   * Restore saved tab on page load
+   */
+  restoreSavedTab() {
+    const savedTab = localStorage.getItem('ncc_active_tab');
+    if (savedTab && (savedTab === 'profile' || savedTab === 'forums')) {
+      this.switchMainTab(savedTab);
     }
   },
 
