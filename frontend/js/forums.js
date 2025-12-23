@@ -29,14 +29,17 @@ const Forums = {
   bindEvents() {
     // Main tab switching
     document.querySelectorAll('.main-tab-btn').forEach(btn => {
-      btn.addEventListener('click', (e) => this.switchMainTab(e.target.dataset.tab));
+      btn.addEventListener('click', (e) => {
+        const tab = e.currentTarget.dataset.tab;
+        if (tab) this.switchMainTab(tab);
+      });
     });
 
     // Feed tabs (hot/new/top)
     document.querySelectorAll('.feed-tab').forEach(btn => {
       btn.addEventListener('click', (e) => {
-        const sort = e.target.dataset.sort;
-        this.setSort(sort);
+        const sort = e.currentTarget.dataset.sort;
+        if (sort) this.setSort(sort);
       });
     });
 
