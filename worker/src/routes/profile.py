@@ -213,9 +213,9 @@ async def add_to_showcase(
     env = request.scope["env"]
 
     try:
-        # Verify album belongs to user
+        # Verify album belongs to user and get its category
         album = await env.DB.prepare(
-            "SELECT id, artist, album, cover, year FROM collections WHERE id = ? AND user_id = ?"
+            "SELECT id, artist, album, cover, year, category_id FROM collections WHERE id = ? AND user_id = ?"
         ).bind(body.collection_id, user_id).first()
 
         if album and hasattr(album, 'to_py'):
@@ -224,16 +224,26 @@ async def add_to_showcase(
         if not album:
             raise HTTPException(status_code=404, detail="Album not found in your collection")
 
-        # Check showcase limit
-        count = await env.DB.prepare(
-            "SELECT COUNT(*) as count FROM showcase_albums WHERE user_id = ?"
-        ).bind(user_id).first()
+        # Get the category_id for this item
+        category_id = album.get("category_id")
+
+        # Check showcase limit PER CATEGORY (8 per category)
+        if category_id:
+            count = await env.DB.prepare(
+                """SELECT COUNT(*) as count FROM showcase_albums s
+                   JOIN collections c ON s.collection_id = c.id
+                   WHERE s.user_id = ? AND c.category_id = ?"""
+            ).bind(user_id, category_id).first()
+        else:
+            count = await env.DB.prepare(
+                "SELECT COUNT(*) as count FROM showcase_albums WHERE user_id = ?"
+            ).bind(user_id).first()
 
         if count and hasattr(count, 'to_py'):
             count = count.to_py()
 
         if count and count["count"] >= 8:
-            raise HTTPException(status_code=400, detail="Showcase limit reached (max 8 albums)")
+            raise HTTPException(status_code=400, detail="Showcase limit reached (max 8 items per category)")
 
         # Check if already in showcase
         existing = await env.DB.prepare(

@@ -50,16 +50,31 @@ async def list_users(
             admin_check = admin_check.to_py()
 
         if not admin_check:
-            raise HTTPException(status_code=403, detail="Admin access required")
+            raise HTTPException(status_code=403, detail="Admin access required - user not found")
 
-        email = (admin_check.get("email") or "").lower()
-        if email not in [e.lower() for e in ADMIN_EMAILS]:
-            raise HTTPException(status_code=403, detail="Admin access required")
+        # Get email safely using dict access
+        email = None
+        if isinstance(admin_check, dict):
+            email = admin_check.get("email")
+        elif hasattr(admin_check, '__getitem__'):
+            try:
+                email = admin_check["email"]
+            except (KeyError, TypeError):
+                pass
+
+        if not email:
+            raise HTTPException(status_code=403, detail="Admin access required - no email")
+
+        email_lower = email.lower().strip()
+        admin_emails_lower = [e.lower().strip() for e in ADMIN_EMAILS]
+
+        if email_lower not in admin_emails_lower:
+            raise HTTPException(status_code=403, detail="Admin access required - not authorized")
 
     except HTTPException:
         raise
-    except Exception:
-        raise HTTPException(status_code=403, detail="Admin access required")
+    except Exception as e:
+        raise HTTPException(status_code=403, detail=f"Admin access required - error: {str(e)}")
 
     try:
         result = await env.DB.prepare(

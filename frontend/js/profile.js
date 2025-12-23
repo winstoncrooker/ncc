@@ -881,7 +881,7 @@ const Profile = {
       return;
     }
 
-    const isVinyl = this.currentCategory === 'vinyl';
+    const isVinyl = this.currentCategorySlug === 'vinyl';
     grid.innerHTML = this.collection.map(album => `
       <div class="album-card" data-id="${album.id}">
         <img src="${album.cover || this.getPlaceholderCover(album)}"
@@ -1604,7 +1604,7 @@ const Profile = {
     document.getElementById('discogs-query').value = '';
 
     // Only show Discogs search tab for vinyl category
-    const isVinyl = this.currentCategory === 'vinyl';
+    const isVinyl = this.currentCategorySlug === 'vinyl';
     const discogsTab = document.querySelector('#add-record-modal .tab-btn[data-tab="search"]');
     const discogsContent = document.getElementById('tab-search');
 
@@ -2657,8 +2657,9 @@ const Profile = {
    * Open full page friend profile view
    */
   async openFriendFullProfile(userId) {
-    // Hide profile view, show friend profile page
+    // Hide both views, show friend profile page
     const profileView = document.getElementById('profile-view');
+    const forumsView = document.getElementById('forums-view');
     let friendPage = document.getElementById('friend-profile-page');
 
     // Create friend profile page container if it doesn't exist
@@ -2669,7 +2670,9 @@ const Profile = {
       profileView.parentNode.insertBefore(friendPage, profileView.nextSibling);
     }
 
+    // Hide both tab views
     profileView.style.display = 'none';
+    if (forumsView) forumsView.style.display = 'none';
     friendPage.style.display = 'block';
     friendPage.innerHTML = '<div class="friend-profile-loading">Loading profile...</div>';
 
@@ -2835,14 +2838,24 @@ const Profile = {
   },
 
   /**
-   * Close friend full profile and return to main profile
+   * Close friend full profile and return to correct tab view
    */
   closeFriendFullProfile() {
     const profileView = document.getElementById('profile-view');
+    const forumsView = document.getElementById('forums-view');
     const friendPage = document.getElementById('friend-profile-page');
 
     if (friendPage) friendPage.style.display = 'none';
-    if (profileView) profileView.style.display = 'block';
+
+    // Restore the correct view based on saved tab state
+    const activeTab = localStorage.getItem('ncc_active_tab') || 'profile';
+    if (activeTab === 'forums' && forumsView) {
+      if (profileView) profileView.style.display = 'none';
+      forumsView.style.display = 'block';
+    } else {
+      if (profileView) profileView.style.display = 'block';
+      if (forumsView) forumsView.style.display = 'none';
+    }
 
     this.friendProfileState = {
       userId: null,
@@ -3078,7 +3091,7 @@ const Profile = {
       return;
     }
 
-    const isVinyl = this.currentCategory === 'vinyl';
+    const isVinyl = this.currentCategorySlug === 'vinyl';
     grid.innerHTML = filtered.map(album => `
       <div class="album-card" data-id="${album.id}">
         <img src="${album.cover || this.getPlaceholderCover(album)}"
