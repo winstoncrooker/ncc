@@ -88,14 +88,20 @@ async def list_users(
 
         rows = result.get("results", [])
 
+        def to_python(val):
+            """Convert JsNull to None"""
+            if val is None or (hasattr(val, '__class__') and 'JsNull' in str(type(val))):
+                return None
+            return val
+
         users = []
         for row in rows:
             users.append(UserListItem(
                 id=row["id"],
-                email=row.get("email"),
-                name=row.get("name"),
-                picture=row.get("picture"),
-                created_at=str(row.get("created_at")) if row.get("created_at") else None
+                email=to_python(row.get("email")),
+                name=to_python(row.get("name")),
+                picture=to_python(row.get("picture")),
+                created_at=str(row.get("created_at")) if to_python(row.get("created_at")) else None
             ))
 
         return UserListResponse(
