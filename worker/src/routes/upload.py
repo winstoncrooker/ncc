@@ -41,7 +41,7 @@ async def upload_image(
 
     try:
         # Validate image type
-        if body.type not in ["profile", "background", "item"]:
+        if body.type not in ["profile", "background", "item", "post", "comment"]:
             raise HTTPException(status_code=400, detail="Invalid image type")
 
         # Parse base64 data

@@ -13,6 +13,8 @@ const Forums = {
   hasMore: false,
   loading: false,
   currentPostId: null,
+  pendingPostImages: [],      // Images to upload with new post
+  pendingCommentImages: [],   // Images to upload with new comment
 
   /**
    * Initialize forums
@@ -98,6 +100,12 @@ const Forums = {
     const feedContent = document.getElementById('feed-content');
     if (feedContent) {
       feedContent.addEventListener('scroll', () => this.handleScroll());
+    }
+
+    // Post image upload
+    const postImageInput = document.getElementById('post-image-input');
+    if (postImageInput) {
+      postImageInput.addEventListener('change', (e) => this.handlePostImageSelect(e));
     }
   },
 
@@ -441,6 +449,13 @@ const Forums = {
 
       postPage.innerHTML = this.renderPostPage(post, comments);
 
+      // Clear pending comment images and bind event listener
+      this.pendingCommentImages = [];
+      const commentImageInput = document.getElementById('comment-image-input');
+      if (commentImageInput) {
+        commentImageInput.addEventListener('change', (e) => this.handleCommentImageSelect(e));
+      }
+
     } catch (error) {
       console.error('Error loading post:', error);
       postPage.innerHTML = `
@@ -501,6 +516,16 @@ const Forums = {
             ${this.escapeHtml(post.body).replace(/\n/g, '<br>')}
           </div>
 
+          ${post.images && post.images.length > 0 ? `
+            <div class="post-images">
+              ${post.images.map(url => `
+                <a href="${url}" target="_blank" class="post-image-link">
+                  <img src="${url}" alt="Post image" loading="lazy">
+                </a>
+              `).join('')}
+            </div>
+          ` : ''}
+
           <div class="post-full-actions">
             <div class="post-votes horizontal" data-post-id="${post.id}">
               <button class="vote-btn upvote ${post.user_vote === 1 ? 'active' : ''}" onclick="event.preventDefault(); Forums.vote(${post.id}, 1)">
@@ -529,6 +554,18 @@ const Forums = {
 
           <form class="comment-form" onsubmit="Forums.submitComment(event, ${post.id})">
             <textarea id="new-comment" placeholder="Add a comment..." rows="3"></textarea>
+            <div class="comment-image-upload">
+              <input type="file" id="comment-image-input" accept="image/*" multiple style="display: none;">
+              <button type="button" class="btn-upload-small" onclick="document.getElementById('comment-image-input').click()">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                  <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                  <polyline points="21 15 16 10 5 21"></polyline>
+                </svg>
+                Add Image
+              </button>
+              <div class="image-previews" id="comment-image-previews"></div>
+            </div>
             <button type="submit" class="btn-primary">Comment</button>
           </form>
 
@@ -637,6 +674,15 @@ const Forums = {
       // Use strict equality after ensuring both are numbers
       const isOwner = currentUserId && parseInt(comment.user_id, 10) === currentUserId;
 
+      // Render comment images if any
+      const commentImages = comment.images && comment.images.length > 0
+        ? `<div class="comment-images">${comment.images.map(url => `
+            <a href="${url}" target="_blank" class="comment-image-link">
+              <img src="${url}" alt="Comment image" loading="lazy">
+            </a>
+          `).join('')}</div>`
+        : '';
+
       return `
         <div class="comment depth-${depth}" data-comment-id="${comment.id}">
           <div class="comment-header">
@@ -646,6 +692,7 @@ const Forums = {
             <span class="comment-time">${timeAgo}</span>
           </div>
           <div class="comment-body">${this.escapeHtml(comment.body)}</div>
+          ${commentImages}
           <div class="comment-actions">
             <button class="vote-btn ${comment.user_vote === 1 ? 'active' : ''}" onclick="event.preventDefault(); event.stopPropagation(); Forums.voteComment(${comment.id}, 1)">
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -688,24 +735,44 @@ const Forums = {
 
     if (!body) return;
 
+    const submitBtn = e.target.querySelector('button[type="submit"]');
+    const originalText = submitBtn.textContent;
+    submitBtn.textContent = 'Posting...';
+    submitBtn.disabled = true;
+
     try {
+      // Upload any pending images first
+      const imageUrls = [];
+      for (const img of this.pendingCommentImages) {
+        try {
+          const url = await this.uploadImage(img.dataUrl, 'comment');
+          imageUrls.push(url);
+        } catch (uploadError) {
+          console.error('Error uploading image:', uploadError);
+        }
+      }
+
       const response = await fetch(`${API_BASE}/posts/${postId}/comments`, {
         method: 'POST',
         headers: {
           ...Auth.getAuthHeaders(),
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({ body })
+        body: JSON.stringify({ body, images: imageUrls })
       });
 
       if (!response.ok) throw new Error('Failed to submit comment');
 
       textarea.value = '';
+      this.pendingCommentImages = [];
       // Reload post to show new comment
       this.openPost(postId);
 
     } catch (error) {
       console.error('Error submitting comment:', error);
+    } finally {
+      submitBtn.textContent = originalText;
+      submitBtn.disabled = false;
     }
   },
 
@@ -885,6 +952,10 @@ const Forums = {
     document.getElementById('create-post-modal').classList.remove('open');
     document.getElementById('create-post-form').reset();
     document.getElementById('post-group').innerHTML = '<option value="">No specific group</option>';
+    // Clear pending images
+    this.pendingPostImages = [];
+    const previews = document.getElementById('post-image-previews');
+    if (previews) previews.innerHTML = '';
   },
 
   /**
@@ -939,7 +1010,23 @@ const Forums = {
       return;
     }
 
+    const submitBtn = document.querySelector('#create-post-form button[type="submit"]');
+    const originalText = submitBtn.textContent;
+    submitBtn.textContent = 'Creating...';
+    submitBtn.disabled = true;
+
     try {
+      // Upload any pending images first
+      const imageUrls = [];
+      for (const img of this.pendingPostImages) {
+        try {
+          const url = await this.uploadImage(img.dataUrl, 'post');
+          imageUrls.push(url);
+        } catch (uploadError) {
+          console.error('Error uploading image:', uploadError);
+        }
+      }
+
       const response = await fetch(`${API_BASE}/posts`, {
         method: 'POST',
         headers: {
@@ -952,7 +1039,7 @@ const Forums = {
           post_type: postType,
           title,
           body,
-          images: []
+          images: imageUrls
         })
       });
 
@@ -968,7 +1055,144 @@ const Forums = {
     } catch (error) {
       console.error('Error creating post:', error);
       alert(`Failed to create post: ${error.message}`);
+    } finally {
+      submitBtn.textContent = originalText;
+      submitBtn.disabled = false;
     }
+  },
+
+  /**
+   * Handle image selection for post
+   */
+  handlePostImageSelect(e) {
+    const files = Array.from(e.target.files);
+    if (files.length === 0) return;
+
+    // Limit to 4 images
+    const remaining = 4 - this.pendingPostImages.length;
+    const toAdd = files.slice(0, remaining);
+
+    toAdd.forEach(file => {
+      if (file.size > 5 * 1024 * 1024) {
+        alert(`Image ${file.name} is too large (max 5MB)`);
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        this.pendingPostImages.push({
+          file,
+          dataUrl: event.target.result
+        });
+        this.renderPostImagePreviews();
+      };
+      reader.readAsDataURL(file);
+    });
+
+    // Clear input
+    e.target.value = '';
+  },
+
+  /**
+   * Render post image previews
+   */
+  renderPostImagePreviews() {
+    const container = document.getElementById('post-image-previews');
+    if (!container) return;
+
+    container.innerHTML = this.pendingPostImages.map((img, idx) => `
+      <div class="image-preview">
+        <img src="${img.dataUrl}" alt="Preview">
+        <button type="button" class="remove-image" onclick="Forums.removePostImage(${idx})">&times;</button>
+      </div>
+    `).join('');
+  },
+
+  /**
+   * Remove a pending post image
+   */
+  removePostImage(index) {
+    this.pendingPostImages.splice(index, 1);
+    this.renderPostImagePreviews();
+  },
+
+  /**
+   * Upload an image to R2 storage
+   */
+  async uploadImage(dataUrl, type = 'post') {
+    const response = await fetch(`${API_BASE}/uploads/image`, {
+      method: 'POST',
+      headers: {
+        ...Auth.getAuthHeaders(),
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        image: dataUrl,
+        type: type
+      })
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to upload image');
+    }
+
+    const result = await response.json();
+    return result.url;
+  },
+
+  /**
+   * Handle image selection for comment
+   */
+  handleCommentImageSelect(e) {
+    const files = Array.from(e.target.files);
+    if (files.length === 0) return;
+
+    // Limit to 4 images
+    const remaining = 4 - this.pendingCommentImages.length;
+    const toAdd = files.slice(0, remaining);
+
+    toAdd.forEach(file => {
+      if (file.size > 5 * 1024 * 1024) {
+        alert(`Image ${file.name} is too large (max 5MB)`);
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        this.pendingCommentImages.push({
+          file,
+          dataUrl: event.target.result
+        });
+        this.renderCommentImagePreviews();
+      };
+      reader.readAsDataURL(file);
+    });
+
+    // Clear input
+    e.target.value = '';
+  },
+
+  /**
+   * Render comment image previews
+   */
+  renderCommentImagePreviews() {
+    const container = document.getElementById('comment-image-previews');
+    if (!container) return;
+
+    container.innerHTML = this.pendingCommentImages.map((img, idx) => `
+      <div class="image-preview">
+        <img src="${img.dataUrl}" alt="Preview">
+        <button type="button" class="remove-image" onclick="Forums.removeCommentImage(${idx})">&times;</button>
+      </div>
+    `).join('');
+  },
+
+  /**
+   * Remove a pending comment image
+   */
+  removeCommentImage(index) {
+    this.pendingCommentImages.splice(index, 1);
+    this.renderCommentImagePreviews();
   },
 
   /**

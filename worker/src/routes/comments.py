@@ -3,6 +3,7 @@ Forum Comments API routes
 Nested comments with up to 3 levels of replies
 """
 
+import json
 from fastapi import APIRouter, Request, HTTPException, Depends
 from pydantic import BaseModel
 from .auth import require_auth
@@ -37,6 +38,7 @@ class CommentResponse(BaseModel):
     author: CommentAuthor
     parent_comment_id: int | None = None
     body: str
+    images: list[str] = []
     upvote_count: int = 0
     downvote_count: int = 0
     user_vote: int | None = None
@@ -55,6 +57,7 @@ class CreateCommentRequest(BaseModel):
     """Create comment request"""
     body: str
     parent_comment_id: int | None = None
+    images: list[str] = []
 
 
 class UpdateCommentRequest(BaseModel):
@@ -88,7 +91,7 @@ async def get_comments(
 
         # Get all comments for the post with votes
         result = await env.DB.prepare(
-            """SELECT c.id, c.post_id, c.user_id, c.parent_comment_id, c.body,
+            """SELECT c.id, c.post_id, c.user_id, c.parent_comment_id, c.body, c.images,
                       c.upvote_count, c.downvote_count, c.created_at,
                       u.name as author_name, u.picture as author_picture,
                       v.value as user_vote
@@ -110,6 +113,15 @@ async def get_comments(
 
         # First pass: create all comment objects
         for row in rows:
+            # Parse images JSON
+            images_raw = safe_value(row.get("images"))
+            images = []
+            if images_raw:
+                try:
+                    images = json.loads(images_raw) if isinstance(images_raw, str) else images_raw
+                except:
+                    images = []
+
             comment = CommentResponse(
                 id=row["id"],
                 post_id=row["post_id"],
@@ -121,6 +133,7 @@ async def get_comments(
                 ),
                 parent_comment_id=safe_value(row.get("parent_comment_id")),
                 body=row["body"],
+                images=images,
                 upvote_count=safe_value(row.get("upvote_count"), 0),
                 downvote_count=safe_value(row.get("downvote_count"), 0),
                 user_vote=safe_value(row.get("user_vote")),
@@ -214,13 +227,28 @@ async def create_comment(
 
                 current_id = parent_check.get("parent_comment_id") if parent_check else None
 
+        # Serialize images to JSON
+        images_json = json.dumps(body.images) if body.images else None
+
         # Insert comment - D1 doesn't handle None well, use separate queries
-        if body.parent_comment_id:
+        if body.parent_comment_id and images_json:
+            result = await env.DB.prepare(
+                """INSERT INTO forum_comments (post_id, user_id, parent_comment_id, body, images)
+                   VALUES (?, ?, ?, ?, ?)
+                   RETURNING id, created_at"""
+            ).bind(post_id, user_id, body.parent_comment_id, body.body, images_json).first()
+        elif body.parent_comment_id:
             result = await env.DB.prepare(
                 """INSERT INTO forum_comments (post_id, user_id, parent_comment_id, body)
                    VALUES (?, ?, ?, ?)
                    RETURNING id, created_at"""
             ).bind(post_id, user_id, body.parent_comment_id, body.body).first()
+        elif images_json:
+            result = await env.DB.prepare(
+                """INSERT INTO forum_comments (post_id, user_id, body, images)
+                   VALUES (?, ?, ?, ?)
+                   RETURNING id, created_at"""
+            ).bind(post_id, user_id, body.body, images_json).first()
         else:
             result = await env.DB.prepare(
                 """INSERT INTO forum_comments (post_id, user_id, body)
@@ -255,6 +283,7 @@ async def create_comment(
             ),
             parent_comment_id=body.parent_comment_id,
             body=body.body,
+            images=body.images,
             upvote_count=0,
             downvote_count=0,
             user_vote=None,
