@@ -11,7 +11,6 @@ import asgi
 
 from routes import discogs, chat, auth, collection, profile, upload, friends, messages
 from routes import categories, interests, posts, comments, votes, category_profiles, admin
-from utils.rate_limit import check_rate_limit
 
 # Create FastAPI app with OpenAPI documentation
 app = FastAPI(
@@ -56,15 +55,16 @@ Authorization: Bearer <jwt_token>
     ]
 )
 
-# CORS middleware for frontend access
 # Production origins - restrict to known frontend domains
 ALLOWED_ORIGINS = [
     "https://niche-collector.pages.dev",
     "https://niche-collector-connector.pages.dev",
-    "http://localhost:8000",  # Local development
-    "http://127.0.0.1:8000",  # Local development
+    "http://localhost:8000",
+    "http://127.0.0.1:8000",
 ]
 
+# CORS middleware - NOTE: Custom @app.middleware("http") causes crashes in CF Workers Python
+# Using CORSMiddleware class instead
 app.add_middleware(
     CORSMiddleware,
     allow_origins=ALLOWED_ORIGINS,
@@ -74,30 +74,14 @@ app.add_middleware(
 )
 
 
-# Rate limiting middleware
-@app.middleware("http")
-async def rate_limit_middleware(request: Request, call_next):
-    """Apply rate limiting to all API requests"""
-    # Skip rate limiting for OPTIONS requests and health checks
-    if request.method == "OPTIONS" or request.url.path == "/api/health":
-        return await call_next(request)
-
-    # Check rate limit
-    await check_rate_limit(request)
-
-    return await call_next(request)
-
-
 def get_cors_origin(request: Request) -> str:
     """Get appropriate CORS origin header based on request origin"""
     origin = request.headers.get("origin", "")
     if origin in ALLOWED_ORIGINS:
         return origin
-    # Default to production domain for error responses
     return "https://niche-collector.pages.dev"
 
 
-# CORS headers helper
 def get_cors_headers(request: Request) -> dict:
     """Get CORS headers for a request"""
     return {
@@ -108,7 +92,7 @@ def get_cors_headers(request: Request) -> dict:
     }
 
 
-# Global exception handler to ensure CORS headers on errors
+# Exception handlers with CORS headers
 @app.exception_handler(HTTPException)
 async def http_exception_handler(request: Request, exc: HTTPException):
     return JSONResponse(
@@ -126,15 +110,6 @@ async def general_exception_handler(request: Request, exc: Exception):
         headers=get_cors_headers(request)
     )
 
-
-# Explicit OPTIONS handler for all paths
-@app.options("/{path:path}")
-async def options_handler(request: Request, path: str):
-    """Handle CORS preflight requests for all paths"""
-    return JSONResponse(
-        content={},
-        headers=get_cors_headers(request)
-    )
 
 # Include routers
 app.include_router(discogs.router, prefix="/api/discogs", tags=["discogs"])
@@ -171,7 +146,6 @@ async def health_check():
 async def cache_stats(request: Request):
     """Get R2 cache statistics"""
     env = request.scope["env"]
-    # R2 doesn't have a native list-all, so return basic info
     return {
         "status": "ok",
         "bucket": "vinyl-vault-cache",
