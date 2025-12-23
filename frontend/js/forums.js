@@ -20,7 +20,9 @@ const Forums = {
    * Initialize forums
    */
   async init() {
+    console.log('[Forums] Initializing forums module...');
     this.bindEvents();
+    console.log('[Forums] Events bound successfully');
   },
 
   /**
@@ -28,8 +30,12 @@ const Forums = {
    */
   bindEvents() {
     // Main tab switching
-    document.querySelectorAll('.main-tab-btn').forEach(btn => {
+    const tabBtns = document.querySelectorAll('.main-tab-btn');
+    console.log('[Forums] Found', tabBtns.length, 'main-tab-btn elements');
+    tabBtns.forEach(btn => {
+      console.log('[Forums] Adding click listener to tab:', btn.dataset.tab);
       btn.addEventListener('click', (e) => {
+        console.log('[Forums] Tab button clicked:', e.currentTarget.dataset.tab);
         const tab = e.currentTarget.dataset.tab;
         if (tab) this.switchMainTab(tab);
       });
@@ -116,6 +122,7 @@ const Forums = {
    * Switch main tabs (Profile/Forums)
    */
   switchMainTab(tab) {
+    console.log('[Forums] switchMainTab called with tab:', tab);
     // Save to localStorage for persistence
     localStorage.setItem('ncc_active_tab', tab);
 
@@ -1553,7 +1560,12 @@ const Forums = {
   }
 };
 
-// Initialize on DOMContentLoaded
-document.addEventListener('DOMContentLoaded', () => {
+// Initialize on DOMContentLoaded (or immediately if already loaded)
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', () => {
+    Forums.init();
+  });
+} else {
+  // DOM already loaded, init immediately
   Forums.init();
-});
+}
