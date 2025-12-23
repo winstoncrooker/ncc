@@ -98,7 +98,44 @@ async function apiRequest(endpoint, options = {}) {
   return response;
 }
 
+/**
+ * Theme Management
+ */
+const THEME_KEY = 'ncc_theme';
+
+function getTheme() {
+  return localStorage.getItem(THEME_KEY) || 'dark';
+}
+
+function setTheme(theme) {
+  localStorage.setItem(THEME_KEY, theme);
+  document.documentElement.setAttribute('data-theme', theme);
+}
+
+function toggleTheme() {
+  const current = getTheme();
+  const next = current === 'dark' ? 'light' : 'dark';
+  setTheme(next);
+  return next;
+}
+
+// Apply saved theme immediately (prevents flash)
+(function() {
+  const saved = localStorage.getItem(THEME_KEY);
+  if (saved) {
+    document.documentElement.setAttribute('data-theme', saved);
+  }
+})();
+
+// Set up theme toggle button when DOM is ready
+document.addEventListener('DOMContentLoaded', () => {
+  const toggleBtn = document.getElementById('theme-toggle');
+  if (toggleBtn) {
+    toggleBtn.addEventListener('click', toggleTheme);
+  }
+});
+
 // Export for module usage
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { CONFIG, getAuthToken, setAuthToken, clearAuth, getCurrentUser, setCurrentUser, isAuthenticated, apiRequest };
+  module.exports = { CONFIG, getAuthToken, setAuthToken, clearAuth, getCurrentUser, setCurrentUser, isAuthenticated, apiRequest, getTheme, setTheme, toggleTheme };
 }

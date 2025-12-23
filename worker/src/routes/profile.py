@@ -2,6 +2,7 @@
 User profile CRUD routes for Niche Collector Connector
 """
 
+import json
 from fastapi import APIRouter, Request, HTTPException, Depends
 from pydantic import BaseModel
 from typing import Optional
@@ -9,6 +10,22 @@ from typing import Optional
 from routes.auth import require_auth
 
 router = APIRouter()
+
+# Default privacy settings
+DEFAULT_PRIVACY = {
+    "profile_visibility": "public",  # public, friends_only, private
+    "show_collection": True,
+    "show_showcase": True,
+    "searchable": True
+}
+
+
+class PrivacySettings(BaseModel):
+    """User privacy settings"""
+    profile_visibility: str = "public"  # public, friends_only, private
+    show_collection: bool = True
+    show_showcase: bool = True
+    searchable: bool = True
 
 
 class ProfileResponse(BaseModel):
@@ -21,6 +38,7 @@ class ProfileResponse(BaseModel):
     pronouns: Optional[str] = None
     background_image: Optional[str] = None
     created_at: Optional[str] = None
+    privacy: Optional[PrivacySettings] = None
 
 
 class ProfileUpdate(BaseModel):
@@ -59,6 +77,17 @@ def to_python_value(val):
     return val
 
 
+def parse_privacy_settings(privacy_json: str | None) -> PrivacySettings:
+    """Parse privacy settings JSON, returning defaults if invalid"""
+    if not privacy_json:
+        return PrivacySettings(**DEFAULT_PRIVACY)
+    try:
+        data = json.loads(privacy_json)
+        return PrivacySettings(**{**DEFAULT_PRIVACY, **data})
+    except (json.JSONDecodeError, TypeError):
+        return PrivacySettings(**DEFAULT_PRIVACY)
+
+
 @router.get("/me")
 async def get_profile(
     request: Request,
@@ -72,7 +101,7 @@ async def get_profile(
 
     try:
         user = await env.DB.prepare(
-            """SELECT id, email, name, picture, bio, pronouns, background_image, created_at
+            """SELECT id, email, name, picture, bio, pronouns, background_image, created_at, privacy_settings
                FROM users WHERE id = ?"""
         ).bind(user_id).first()
 
@@ -82,6 +111,8 @@ async def get_profile(
         if not user:
             raise HTTPException(status_code=404, detail="User not found")
 
+        privacy = parse_privacy_settings(to_python_value(user.get("privacy_settings")))
+
         return ProfileResponse(
             id=user["id"],
             email=user["email"],
@@ -90,7 +121,8 @@ async def get_profile(
             bio=to_python_value(user.get("bio")),
             pronouns=to_python_value(user.get("pronouns")),
             background_image=to_python_value(user.get("background_image")),
-            created_at=str(user["created_at"]) if to_python_value(user.get("created_at")) else None
+            created_at=str(user["created_at"]) if to_python_value(user.get("created_at")) else None,
+            privacy=privacy
         )
     except HTTPException:
         raise
@@ -341,3 +373,69 @@ async def reorder_showcase(
         return await get_showcase(request, user_id)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error reordering showcase: {str(e)}")
+
+
+@router.get("/me/privacy")
+async def get_privacy_settings(
+    request: Request,
+    user_id: int = Depends(require_auth)
+) -> PrivacySettings:
+    """
+    Get current user's privacy settings.
+    """
+    env = request.scope["env"]
+
+    try:
+        result = await env.DB.prepare(
+            "SELECT privacy_settings FROM users WHERE id = ?"
+        ).bind(user_id).first()
+
+        if result and hasattr(result, 'to_py'):
+            result = result.to_py()
+
+        if not result:
+            raise HTTPException(status_code=404, detail="User not found")
+
+        return parse_privacy_settings(to_python_value(result.get("privacy_settings")))
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error fetching privacy settings: {str(e)}")
+
+
+@router.put("/me/privacy")
+async def update_privacy_settings(
+    request: Request,
+    body: PrivacySettings,
+    user_id: int = Depends(require_auth)
+) -> PrivacySettings:
+    """
+    Update current user's privacy settings.
+    """
+    env = request.scope["env"]
+
+    # Validate profile_visibility
+    valid_visibility = ["public", "friends_only", "private"]
+    if body.profile_visibility not in valid_visibility:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid profile_visibility. Must be one of: {valid_visibility}"
+        )
+
+    try:
+        privacy_json = json.dumps({
+            "profile_visibility": body.profile_visibility,
+            "show_collection": body.show_collection,
+            "show_showcase": body.show_showcase,
+            "searchable": body.searchable
+        })
+
+        await env.DB.prepare(
+            "UPDATE users SET privacy_settings = ? WHERE id = ?"
+        ).bind(privacy_json, user_id).run()
+
+        return body
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error updating privacy settings: {str(e)}")

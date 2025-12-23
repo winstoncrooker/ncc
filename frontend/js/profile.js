@@ -458,8 +458,11 @@ const Profile = {
     addListener('view-profile-unfollow', 'click', () => this.unfollowFromProfile());
     addListener('view-collection-search', 'input', (e) => this.filterViewCollection(e.target.value));
 
-    // Collection search
-    addListener('collection-search-input', 'input', (e) => this.filterCollection(e.target.value));
+    // Collection search and filters
+    addListener('collection-search-input', 'input', () => this.applyCollectionFilters());
+    addListener('filter-genre', 'change', () => this.applyCollectionFilters());
+    addListener('filter-year', 'change', () => this.applyCollectionFilters());
+    addListener('filter-sort', 'change', () => this.applyCollectionFilters());
 
     // Messages Sidebar
     addListener('messages-toggle-btn', 'click', () => this.openMessagesSidebar());
@@ -852,6 +855,7 @@ const Profile = {
       const response = await Auth.apiRequest(url);
       if (response.ok) {
         this.collection = await response.json();
+        this.populateFilterOptions();
         this.renderCollection();
       }
     } catch (error) {
@@ -1366,6 +1370,14 @@ const Profile = {
     document.getElementById('edit-pronouns').value = this.profile?.pronouns || '';
     document.getElementById('edit-bio').value = this.profile?.bio || '';
     document.getElementById('bio-char-count').textContent = (this.profile?.bio || '').length;
+
+    // Load privacy settings
+    const privacy = this.profile?.privacy || {};
+    document.getElementById('privacy-visibility').value = privacy.profile_visibility || 'public';
+    document.getElementById('privacy-collection').checked = privacy.show_collection !== false;
+    document.getElementById('privacy-showcase').checked = privacy.show_showcase !== false;
+    document.getElementById('privacy-searchable').checked = privacy.searchable !== false;
+
     document.getElementById('edit-profile-modal').classList.add('open');
   },
 
@@ -1377,18 +1389,37 @@ const Profile = {
     const pronouns = document.getElementById('edit-pronouns').value.trim();
     const bio = document.getElementById('edit-bio').value.trim();
 
+    // Get privacy settings
+    const privacy = {
+      profile_visibility: document.getElementById('privacy-visibility').value,
+      show_collection: document.getElementById('privacy-collection').checked,
+      show_showcase: document.getElementById('privacy-showcase').checked,
+      searchable: document.getElementById('privacy-searchable').checked
+    };
+
     try {
-      const response = await Auth.apiRequest('/api/profile/me', {
+      // Save profile
+      const profileResponse = await Auth.apiRequest('/api/profile/me', {
         method: 'PUT',
         body: JSON.stringify({ name, pronouns, bio })
       });
 
-      if (response.ok) {
-        this.profile = await response.json();
+      // Save privacy settings separately
+      const privacyResponse = await Auth.apiRequest('/api/profile/me/privacy', {
+        method: 'PUT',
+        body: JSON.stringify(privacy)
+      });
+
+      if (profileResponse.ok) {
+        this.profile = await profileResponse.json();
+        // Update privacy in profile object
+        if (privacyResponse.ok) {
+          this.profile.privacy = await privacyResponse.json();
+        }
         this.renderProfile();
         this.closeModal('edit-profile-modal');
       } else {
-        const error = await response.json();
+        const error = await profileResponse.json();
         alert(error.detail || 'Failed to save profile');
       }
     } catch (error) {
@@ -3075,28 +3106,82 @@ const Profile = {
   },
 
   /**
-   * Filter own collection
+   * Populate filter dropdown options based on collection data
    */
-  filterCollection(query) {
-    const q = query.toLowerCase().trim();
+  populateFilterOptions() {
+    const genres = new Set();
+    const years = new Set();
+
+    this.collection.forEach(item => {
+      if (item.genre) genres.add(item.genre);
+      if (item.year) years.add(item.year);
+    });
+
+    // Populate genre dropdown
+    const genreSelect = document.getElementById('filter-genre');
+    if (genreSelect) {
+      const sortedGenres = [...genres].sort();
+      genreSelect.innerHTML = '<option value="">All Genres</option>' +
+        sortedGenres.map(g => `<option value="${this.escapeHtml(g)}">${this.escapeHtml(g)}</option>`).join('');
+    }
+
+    // Populate year dropdown
+    const yearSelect = document.getElementById('filter-year');
+    if (yearSelect) {
+      const sortedYears = [...years].sort((a, b) => b - a); // Descending
+      yearSelect.innerHTML = '<option value="">All Years</option>' +
+        sortedYears.map(y => `<option value="${y}">${y}</option>`).join('');
+    }
+  },
+
+  /**
+   * Apply all collection filters (search, genre, year, sort)
+   */
+  applyCollectionFilters() {
+    const searchQuery = (document.getElementById('collection-search-input')?.value || '').toLowerCase().trim();
+    const genreFilter = document.getElementById('filter-genre')?.value || '';
+    const yearFilter = document.getElementById('filter-year')?.value || '';
+    const sortBy = document.getElementById('filter-sort')?.value || 'recent';
     const grid = document.getElementById('collection-grid');
 
-    if (!q) {
+    // Filter collection
+    let filtered = this.collection.filter(item => {
+      // Search filter
+      if (searchQuery) {
+        const matchesSearch =
+          item.artist.toLowerCase().includes(searchQuery) ||
+          item.album.toLowerCase().includes(searchQuery) ||
+          (item.genre && item.genre.toLowerCase().includes(searchQuery));
+        if (!matchesSearch) return false;
+      }
+
+      // Genre filter
+      if (genreFilter && item.genre !== genreFilter) return false;
+
+      // Year filter
+      if (yearFilter && String(item.year) !== yearFilter) return false;
+
+      return true;
+    });
+
+    // Sort collection
+    filtered = this.sortCollection(filtered, sortBy);
+
+    // Check if no filters active
+    const noFilters = !searchQuery && !genreFilter && !yearFilter && sortBy === 'recent';
+    if (noFilters && filtered.length === this.collection.length) {
       this.renderCollection();
       return;
     }
 
-    const filtered = this.collection.filter(a =>
-      a.artist.toLowerCase().includes(q) ||
-      a.album.toLowerCase().includes(q)
-    );
-
+    // Render filtered results
     if (filtered.length === 0) {
       const terms = this.getTerms();
       grid.innerHTML = `
         <div class="collection-empty">
           <div class="empty-icon">🔍</div>
-          <p>No ${terms.itemPlural} found matching "${this.escapeHtml(query)}"</p>
+          <p>No ${terms.itemPlural} found with current filters</p>
+          <button onclick="Profile.clearFilters()" style="margin-top: 12px; padding: 8px 16px; background: var(--accent); border: none; border-radius: 6px; cursor: pointer; color: #000;">Clear Filters</button>
         </div>
       `;
       return;
@@ -3126,6 +3211,49 @@ const Profile = {
         }
       });
     });
+  },
+
+  /**
+   * Sort collection array
+   */
+  sortCollection(items, sortBy) {
+    const sorted = [...items];
+    switch (sortBy) {
+      case 'artist-asc':
+        return sorted.sort((a, b) => a.artist.localeCompare(b.artist));
+      case 'artist-desc':
+        return sorted.sort((a, b) => b.artist.localeCompare(a.artist));
+      case 'album-asc':
+        return sorted.sort((a, b) => a.album.localeCompare(b.album));
+      case 'album-desc':
+        return sorted.sort((a, b) => b.album.localeCompare(a.album));
+      case 'year-asc':
+        return sorted.sort((a, b) => (a.year || 0) - (b.year || 0));
+      case 'year-desc':
+        return sorted.sort((a, b) => (b.year || 0) - (a.year || 0));
+      case 'recent':
+      default:
+        return sorted; // Already in recent order from API
+    }
+  },
+
+  /**
+   * Clear all collection filters
+   */
+  clearFilters() {
+    document.getElementById('collection-search-input').value = '';
+    document.getElementById('filter-genre').value = '';
+    document.getElementById('filter-year').value = '';
+    document.getElementById('filter-sort').value = 'recent';
+    this.renderCollection();
+  },
+
+  /**
+   * Filter own collection (legacy, redirects to new filter)
+   */
+  filterCollection(query) {
+    document.getElementById('collection-search-input').value = query;
+    this.applyCollectionFilters();
   },
 
   /**

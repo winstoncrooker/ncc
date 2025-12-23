@@ -27,6 +27,17 @@
         <button class="main-tab-btn" data-tab="forums">Forums</button>
       </nav>
       <div class="header-actions">
+        <button class="theme-toggle" id="theme-toggle" title="Toggle theme">
+          <svg class="moon-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+          </svg>
+          <svg class="sun-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/>
+            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
+            <line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/>
+            <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+          </svg>
+        </button>
         <div id="user-menu" class="user-menu"></div>
         <button class="messages-toggle-btn" id="messages-toggle-btn" title="Messages">
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -139,9 +150,28 @@
           Add Record
         </button>
       </div>
-      <!-- Collection search -->
-      <div class="collection-search">
-        <input type="text" id="collection-search-input" placeholder="Search your collection..." autocomplete="off">
+      <!-- Collection search and filters -->
+      <div class="collection-filters">
+        <div class="collection-search">
+          <input type="text" id="collection-search-input" placeholder="Search your collection..." autocomplete="off">
+        </div>
+        <div class="filter-controls">
+          <select id="filter-genre" class="filter-select">
+            <option value="">All Genres</option>
+          </select>
+          <select id="filter-year" class="filter-select">
+            <option value="">All Years</option>
+          </select>
+          <select id="filter-sort" class="filter-select">
+            <option value="recent">Recently Added</option>
+            <option value="artist-asc">Artist A-Z</option>
+            <option value="artist-desc">Artist Z-A</option>
+            <option value="album-asc">Album A-Z</option>
+            <option value="album-desc">Album Z-A</option>
+            <option value="year-asc">Year (Oldest)</option>
+            <option value="year-desc">Year (Newest)</option>
+          </select>
+        </div>
       </div>
       <!-- Cover fetch progress bar -->
       <div class="cover-progress" id="cover-progress" style="display: none;">
@@ -419,6 +449,43 @@
           <textarea id="edit-bio" rows="4" maxlength="500" placeholder="Tell us about yourself and your vinyl journey..."></textarea>
           <span class="char-count"><span id="bio-char-count">0</span>/500</span>
         </div>
+
+        <!-- Privacy Settings Section -->
+        <div class="privacy-section">
+          <h4 style="color: #1db954; margin: 16px 0 12px; font-size: 0.9rem;">Privacy Settings</h4>
+          <div class="toggle-group">
+            <label class="toggle-label">
+              <span>Profile Visibility</span>
+              <select id="privacy-visibility" class="privacy-select">
+                <option value="public">Public</option>
+                <option value="friends_only">Friends Only</option>
+                <option value="private">Private</option>
+              </select>
+            </label>
+          </div>
+          <div class="toggle-group">
+            <label class="toggle-label">
+              <span>Show Collection</span>
+              <input type="checkbox" id="privacy-collection" checked class="toggle-checkbox">
+              <span class="toggle-switch"></span>
+            </label>
+          </div>
+          <div class="toggle-group">
+            <label class="toggle-label">
+              <span>Show Showcase</span>
+              <input type="checkbox" id="privacy-showcase" checked class="toggle-checkbox">
+              <span class="toggle-switch"></span>
+            </label>
+          </div>
+          <div class="toggle-group">
+            <label class="toggle-label">
+              <span>Searchable by Friends</span>
+              <input type="checkbox" id="privacy-searchable" checked class="toggle-checkbox">
+              <span class="toggle-switch"></span>
+            </label>
+          </div>
+        </div>
+
         <div class="form-actions">
           <button type="button" class="btn-cancel" id="edit-profile-cancel">Cancel</button>
           <button type="submit" class="btn-save">Save Changes</button>
@@ -656,6 +723,10 @@
   <script src="js/templates/index.js"></script>
   <script src="js/interests.js"></script>
   <script src="js/forums.js"></script>
+  <!-- Modular components (loaded before profile.js) -->
+  <script src="js/modules/chat.js"></script>
+  <script src="js/modules/messages.js"></script>
+  <script src="js/modules/friends.js"></script>
   <script src="js/profile.js"></script>
 
   <script>

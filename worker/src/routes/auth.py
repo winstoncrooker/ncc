@@ -9,7 +9,8 @@ from pydantic import BaseModel
 import jwt
 import httpx
 import urllib.parse
-from datetime import datetime, timedelta
+import hashlib
+from datetime import datetime, timedelta, timezone
 
 router = APIRouter()
 security = HTTPBearer(auto_error=False)
@@ -53,6 +54,45 @@ def create_token(user_id: int, email: str, secret: str) -> str:
     return jwt.encode(payload, secret, algorithm="HS256")
 
 
+def hash_token(token: str) -> str:
+    """Hash a token for storage in blacklist"""
+    return hashlib.sha256(token.encode()).hexdigest()
+
+
+async def is_token_blacklisted(env, token: str) -> bool:
+    """Check if a token is in the blacklist"""
+    try:
+        token_hash = hash_token(token)
+        result = await env.DB.prepare(
+            "SELECT id FROM token_blacklist WHERE token_hash = ?"
+        ).bind(token_hash).first()
+        return result is not None
+    except Exception as e:
+        # If blacklist check fails, allow the request (fail open)
+        print(f"[Auth] Blacklist check failed: {e}")
+        return False
+
+
+async def blacklist_token(env, token: str, user_id: int, expires_at: int) -> None:
+    """Add a token to the blacklist"""
+    try:
+        token_hash = hash_token(token)
+        await env.DB.prepare(
+            """INSERT OR IGNORE INTO token_blacklist (token_hash, user_id, expires_at)
+               VALUES (?, ?, ?)"""
+        ).bind(token_hash, user_id, expires_at).run()
+
+        # Cleanup old expired tokens (1% chance)
+        import random
+        if random.random() < 0.01:
+            now = int(datetime.now(timezone.utc).timestamp())
+            await env.DB.prepare(
+                "DELETE FROM token_blacklist WHERE expires_at < ?"
+            ).bind(now).run()
+    except Exception as e:
+        print(f"[Auth] Failed to blacklist token: {e}")
+
+
 async def get_current_user(
     request: Request,
     credentials: HTTPAuthorizationCredentials | None = Depends(security)
@@ -72,8 +112,10 @@ async def get_current_user(
             print("[Auth] JWT_SECRET not found in env!")
             raise HTTPException(status_code=500, detail="Server configuration error")
 
-        print(f"[Auth] Verifying token, secret length: {len(secret)}, secret starts: {secret[:10]}...")
-        print(f"[Auth] Token starts: {credentials.credentials[:50]}...")
+        # Check if token is blacklisted
+        if await is_token_blacklisted(env, credentials.credentials):
+            print("[Auth] Token is blacklisted!")
+            raise HTTPException(status_code=401, detail="Token has been revoked")
 
         payload = jwt.decode(
             credentials.credentials,
@@ -81,7 +123,6 @@ async def get_current_user(
             algorithms=["HS256"]
         )
         user_id = int(payload["sub"])  # Convert back from string
-        print(f"[Auth] Token valid, user_id: {user_id}")
         return user_id
     except jwt.ExpiredSignatureError:
         print("[Auth] Token expired!")
@@ -384,10 +425,33 @@ async def refresh_token(
 
 
 @router.post("/logout")
-async def logout():
+async def logout(
+    request: Request,
+    credentials: HTTPAuthorizationCredentials | None = Depends(security)
+):
     """
     Logout endpoint.
-    Client should clear stored token.
-    Returns success message.
+    Blacklists the current token so it can't be reused.
+    Client should also clear stored token.
     """
-    return {"status": "logged_out", "message": "Clear token from client storage"}
+    if credentials:
+        env = request.scope["env"]
+        try:
+            # Decode token to get expiration time
+            secret = str(env.JWT_SECRET) if hasattr(env, 'JWT_SECRET') else None
+            if secret:
+                payload = jwt.decode(
+                    credentials.credentials,
+                    secret,
+                    algorithms=["HS256"],
+                    options={"verify_exp": False}  # Allow expired tokens to be blacklisted
+                )
+                user_id = int(payload.get("sub", 0))
+                exp = payload.get("exp", 0)
+
+                # Add token to blacklist
+                await blacklist_token(env, credentials.credentials, user_id, exp)
+        except Exception as e:
+            print(f"[Auth] Error during logout: {e}")
+
+    return {"status": "logged_out", "message": "Token invalidated"}

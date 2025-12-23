@@ -253,80 +253,35 @@ wrangler secret put TOGETHER_API_KEY
 
 # Development Standards
 
-For every task, work through these phases sequentially and show your work at each step:
+When working on any task, show thinking as a conversation between specialist agents. Use this format:
 
-## Phase 1: Architect
-- Analyze requirements and edge cases
-- Consider how this fits into the existing codebase structure
-- Identify potential impacts on other parts of the system
-- Choose appropriate design patterns
-- Plan the file structure and module organization
+## Agent Discussion Format
 
-## Phase 2: Security Analyst
-- Authentication/authorization implications
-- Input validation requirements
-- SQL injection, XSS, CSRF vulnerabilities
-- Sensitive data exposure risks
-- API rate limiting needs
-- Environment variable and secrets handling
+```
+🏗️ **Architect:** [analysis and recommendations - requirements, edge cases, design patterns, file structure]
 
-## Phase 3: Developer
-- Clean, readable, self-documenting code
-- Proper error handling and logging
-- TypeScript types or proper type hints (if applicable)
-- Consistent naming conventions
-- DRY principles without over-abstraction
-- Comments only where intent isn't obvious
+🔒 **Security:** [concerns and requirements - auth, validation, vulnerabilities, secrets handling]
 
-## Phase 4: Database Expert
-- Optimal schema design
-- Proper indexing strategy
-- Query performance considerations
-- Migration safety (backwards compatible if needed)
-- Data validation at the DB level
+💻 **Developer:** [implementation approach - clean code, error handling, naming, DRY principles]
 
-## Phase 5: API Designer
-- RESTful conventions (or GraphQL best practices)
-- Consistent error response formats
-- Proper HTTP status codes
-- Request/response validation
-- API versioning considerations
-- Documentation (OpenAPI/Swagger if applicable)
+🗄️ **Database:** [data considerations - schema, indexing, query performance, migrations]
 
-## Phase 6: Frontend Specialist
-- Component structure and reusability
-- Accessibility (WCAG compliance)
-- Responsive design
-- Loading and error states
-- Optimistic updates where appropriate
-- Performance (bundle size, lazy loading)
+🔌 **API:** [endpoint thoughts - REST conventions, status codes, validation, documentation]
 
-## Phase 7: Test Engineer
-- Unit tests for business logic
-- Integration tests for API endpoints
-- Component tests for UI (if applicable)
-- Edge cases and error conditions
-- Identify what should be mocked vs real
+🎨 **Frontend:** [UI/UX considerations - accessibility, responsive, loading states, performance]
 
-## Phase 8: Code Reviewer
-- Identify any code smells
-- Check for potential race conditions
-- Verify error handling completeness
-- Assess maintainability and readability
-- Look for premature optimization or over-engineering
-- Confirm naming clarity
+🧪 **Tester:** [testing needs - unit tests, integration tests, edge cases, what to mock]
 
-## Phase 9: DevOps Engineer
-- Environment configuration
-- Deployment implications
-- Logging and monitoring hooks
-- Performance bottlenecks
-- Caching opportunities
-- CI/CD impact
+🔍 **Reviewer:** [critiques - code smells, race conditions, maintainability, over-engineering]
 
-## Phase 10: Final Pass
-- Address any issues found in the review phase
-- Ensure all phases are satisfied
-- Provide a summary of what was built and any tradeoffs made
+⚙️ **DevOps:** [deployment thoughts - environment, logging, caching, CI/CD impact]
 
-Always be critical of your own work. If you find issues at any phase, go back and fix them before proceeding. Production-quality code only, not prototypes.
+✅ **Lead:** [final decision - resolving disagreements, summary of approach]
+```
+
+**Rules:**
+- Skip agents not relevant to the current task
+- If agents disagree, show the debate and have Lead make the final call
+- After the agent discussion, proceed with implementation
+- Always be critical - if issues are found, go back and fix before proceeding
+- Production-quality code only, not prototypes

@@ -13,11 +13,47 @@ from routes import discogs, chat, auth, collection, profile, upload, friends, me
 from routes import categories, interests, posts, comments, votes, category_profiles, admin
 from utils.rate_limit import check_rate_limit
 
-# Create FastAPI app
+# Create FastAPI app with OpenAPI documentation
 app = FastAPI(
     title="Niche Collector Connector API",
     version="3.0.0",
-    description="API for vinyl collector profiles and collections"
+    description="""
+## Niche Collector Connector API
+
+A social platform API for collectors of vinyl records, trading cards, cars, sneakers, watches, comics, video games, and coins.
+
+### Features
+- **Authentication**: Google OAuth2 with JWT tokens
+- **Profiles**: User profiles with bios, pronouns, and category-specific showcases
+- **Collections**: Manage collectibles with Discogs integration for vinyl
+- **Social**: Friends, messaging, and forums
+- **AI Assistant**: Chat-based collection management
+
+### Authentication
+Most endpoints require a Bearer token in the Authorization header:
+```
+Authorization: Bearer <jwt_token>
+```
+    """,
+    docs_url="/api/docs",
+    redoc_url="/api/redoc",
+    openapi_url="/api/openapi.json",
+    openapi_tags=[
+        {"name": "auth", "description": "Authentication and user management"},
+        {"name": "profile", "description": "User profile operations"},
+        {"name": "collection", "description": "Collection management"},
+        {"name": "discogs", "description": "Discogs API integration"},
+        {"name": "friends", "description": "Friend requests and management"},
+        {"name": "messages", "description": "Direct messaging"},
+        {"name": "posts", "description": "Forum posts"},
+        {"name": "comments", "description": "Post comments"},
+        {"name": "votes", "description": "Upvotes and downvotes"},
+        {"name": "categories", "description": "Collection categories"},
+        {"name": "interests", "description": "Interest groups"},
+        {"name": "chat", "description": "AI chat assistant"},
+        {"name": "uploads", "description": "Image uploads"},
+        {"name": "admin", "description": "Admin operations"},
+    ]
 )
 
 # CORS middleware for frontend access

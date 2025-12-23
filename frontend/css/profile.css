@@ -2,7 +2,7 @@
    NICHE COLLECTOR CONNECTOR - PROFILE STYLES
    ============================================ */
 
-/* Variables */
+/* Variables - Dark theme (default) */
 :root {
   --accent: #1db954;
   --accent-dark: #169c46;
@@ -16,15 +16,59 @@
   --shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
 }
 
+/* Light theme overrides */
+[data-theme="light"] {
+  --bg-dark: #f5f5f5;
+  --bg-card: #ffffff;
+  --bg-hover: #f0f0f0;
+  --text-primary: #1a1a1a;
+  --text-secondary: #555555;
+  --text-muted: #888888;
+  --border-color: #e0e0e0;
+  --shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+}
+
+/* Theme Toggle Button */
+.theme-toggle {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 8px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-secondary);
+  transition: all 0.2s;
+}
+
+.theme-toggle:hover {
+  background: var(--bg-hover);
+  color: var(--accent);
+}
+
+.theme-toggle svg {
+  width: 20px;
+  height: 20px;
+}
+
+/* Hide/show icons based on theme */
+.theme-toggle .sun-icon { display: none; }
+.theme-toggle .moon-icon { display: block; }
+
+[data-theme="light"] .theme-toggle .sun-icon { display: block; }
+[data-theme="light"] .theme-toggle .moon-icon { display: none; }
+
 /* ============================================
    HEADER
    ============================================ */
 .profile-header {
-  background: rgba(14, 14, 14, 0.95);
+  background: var(--bg-card);
   backdrop-filter: blur(10px);
   padding: 12px 24px;
   position: fixed;
   top: 0;
+  transition: background-color 0.3s;
   left: 0;
   right: 0;
   z-index: 100;
@@ -359,9 +403,18 @@
   transition: width 0.3s ease;
 }
 
-/* Collection Search */
-.collection-search {
+/* Collection Search and Filters */
+.collection-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
   margin-bottom: 16px;
+  align-items: center;
+}
+
+.collection-search {
+  flex: 1;
+  min-width: 200px;
 }
 
 .collection-search input,
@@ -385,6 +438,33 @@
 .collection-search input::placeholder,
 #view-collection-search::placeholder {
   color: var(--text-muted);
+}
+
+.filter-controls {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.filter-select {
+  padding: 10px 14px;
+  background: var(--bg-hover);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  color: var(--text-primary);
+  font-size: 0.85rem;
+  cursor: pointer;
+  min-width: 120px;
+}
+
+.filter-select:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.filter-select option {
+  background: var(--surface-color);
+  color: var(--text-primary);
 }
 
 .collection-grid {
@@ -973,6 +1053,80 @@
   justify-content: flex-end;
   padding: 20px 24px;
   border-top: 1px solid var(--border-color);
+}
+
+/* Privacy Settings */
+.privacy-section {
+  padding: 0 24px 16px;
+  border-top: 1px solid var(--border-color);
+  margin-top: 8px;
+}
+
+.toggle-group {
+  margin-bottom: 12px;
+}
+
+.toggle-label {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: pointer;
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+}
+
+.toggle-label span:first-child {
+  flex: 1;
+}
+
+.privacy-select {
+  background: var(--surface-secondary);
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.privacy-select:focus {
+  border-color: var(--accent);
+  outline: none;
+}
+
+.toggle-checkbox {
+  display: none;
+}
+
+.toggle-switch {
+  position: relative;
+  width: 44px;
+  height: 24px;
+  background: var(--surface-secondary);
+  border-radius: 12px;
+  transition: background 0.3s;
+  flex-shrink: 0;
+}
+
+.toggle-switch::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 20px;
+  height: 20px;
+  background: var(--text-muted);
+  border-radius: 50%;
+  transition: all 0.3s;
+}
+
+.toggle-checkbox:checked + .toggle-switch {
+  background: var(--accent);
+}
+
+.toggle-checkbox:checked + .toggle-switch::after {
+  left: 22px;
+  background: #fff;
 }
 
 .btn-save {
