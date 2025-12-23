@@ -1669,7 +1669,7 @@ const Profile = {
   },
 
   /**
-   * Search Discogs
+   * Search Discogs via server-side proxy
    */
   async searchDiscogs() {
     const query = document.getElementById('discogs-query').value.trim();
@@ -1679,17 +1679,28 @@ const Profile = {
     resultsEl.innerHTML = '<div class="loading">Searching Discogs</div>';
 
     try {
-      // Use Discogs API directly with client credentials
-      const url = `https://api.discogs.com/database/search?q=${encodeURIComponent(query)}&type=release&per_page=10`;
-      const response = await fetch(url, {
-        headers: {
-          'Authorization': `Discogs key=${CONFIG.DISCOGS_KEY}, secret=${CONFIG.DISCOGS_SECRET}`
-        }
-      });
+      // Parse query into artist/album (best effort)
+      const parts = query.split(' - ');
+      const artist = parts[0]?.trim() || query;
+      const album = parts[1]?.trim() || query;
+
+      // Use server-side Discogs proxy
+      const response = await Auth.apiRequest(`/api/discogs/search?artist=${encodeURIComponent(artist)}&album=${encodeURIComponent(album)}`);
 
       if (response.ok) {
         const data = await response.json();
-        this.renderSearchResults(data.results || []);
+        // Single result from search endpoint - wrap in array for renderSearchResults
+        if (data.id) {
+          this.renderSearchResults([{
+            id: data.id,
+            title: data.title || `${artist} - ${album}`,
+            year: data.year,
+            cover_image: data.cover,
+            thumb: data.cover
+          }]);
+        } else {
+          resultsEl.innerHTML = '<p style="color:#888;text-align:center;">No results found.</p>';
+        }
       } else {
         resultsEl.innerHTML = '<p style="color:#888;text-align:center;">Search failed. Please try again.</p>';
       }

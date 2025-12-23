@@ -44,3 +44,6 @@ npm-debug.log*
 
 # Local development
 *.local.html
+
+# Legacy code (migrated from old architecture)
+legacy/

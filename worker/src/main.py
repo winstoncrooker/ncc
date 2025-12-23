@@ -11,6 +11,7 @@ import asgi
 
 from routes import discogs, chat, auth, collection, profile, upload, friends, messages
 from routes import categories, interests, posts, comments, votes, category_profiles, admin
+from utils.rate_limit import check_rate_limit
 
 # Create FastAPI app
 app = FastAPI(
@@ -20,13 +21,44 @@ app = FastAPI(
 )
 
 # CORS middleware for frontend access
+# Production origins - restrict to known frontend domains
+ALLOWED_ORIGINS = [
+    "https://niche-collector.pages.dev",
+    "https://niche-collector-connector.pages.dev",
+    "http://localhost:8000",  # Local development
+    "http://127.0.0.1:8000",  # Local development
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Configure for production
+    allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
     allow_headers=["Authorization", "Content-Type", "Accept", "Origin", "X-Requested-With"],
 )
+
+
+# Rate limiting middleware
+@app.middleware("http")
+async def rate_limit_middleware(request: Request, call_next):
+    """Apply rate limiting to all API requests"""
+    # Skip rate limiting for OPTIONS requests and health checks
+    if request.method == "OPTIONS" or request.url.path == "/api/health":
+        return await call_next(request)
+
+    # Check rate limit
+    await check_rate_limit(request)
+
+    return await call_next(request)
+
+
+def get_cors_origin(request: Request) -> str:
+    """Get appropriate CORS origin header based on request origin"""
+    origin = request.headers.get("origin", "")
+    if origin in ALLOWED_ORIGINS:
+        return origin
+    # Default to production domain for error responses
+    return "https://niche-collector.pages.dev"
 
 
 # Global exception handler to ensure CORS headers on errors
@@ -36,7 +68,7 @@ async def http_exception_handler(request: Request, exc: HTTPException):
         status_code=exc.status_code,
         content={"detail": exc.detail},
         headers={
-            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Origin": get_cors_origin(request),
             "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS, PATCH",
             "Access-Control-Allow-Headers": "Authorization, Content-Type, Accept, Origin, X-Requested-With",
         }
@@ -49,7 +81,7 @@ async def general_exception_handler(request: Request, exc: Exception):
         status_code=500,
         content={"detail": str(exc)},
         headers={
-            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Origin": get_cors_origin(request),
             "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS, PATCH",
             "Access-Control-Allow-Headers": "Authorization, Content-Type, Accept, Origin, X-Requested-With",
         }

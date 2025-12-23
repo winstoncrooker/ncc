@@ -248,3 +248,85 @@ wrangler secret put TOGETHER_API_KEY
 - **API Proxying**: Together.ai calls go through Worker (no exposed key)
 - **OAuth2**: Google Sign-In (test users only until app is published)
 - **Auth Required**: All pages require login (no public browsing)
+
+---
+
+# Development Standards
+
+For every task, work through these phases sequentially and show your work at each step:
+
+## Phase 1: Architect
+- Analyze requirements and edge cases
+- Consider how this fits into the existing codebase structure
+- Identify potential impacts on other parts of the system
+- Choose appropriate design patterns
+- Plan the file structure and module organization
+
+## Phase 2: Security Analyst
+- Authentication/authorization implications
+- Input validation requirements
+- SQL injection, XSS, CSRF vulnerabilities
+- Sensitive data exposure risks
+- API rate limiting needs
+- Environment variable and secrets handling
+
+## Phase 3: Developer
+- Clean, readable, self-documenting code
+- Proper error handling and logging
+- TypeScript types or proper type hints (if applicable)
+- Consistent naming conventions
+- DRY principles without over-abstraction
+- Comments only where intent isn't obvious
+
+## Phase 4: Database Expert
+- Optimal schema design
+- Proper indexing strategy
+- Query performance considerations
+- Migration safety (backwards compatible if needed)
+- Data validation at the DB level
+
+## Phase 5: API Designer
+- RESTful conventions (or GraphQL best practices)
+- Consistent error response formats
+- Proper HTTP status codes
+- Request/response validation
+- API versioning considerations
+- Documentation (OpenAPI/Swagger if applicable)
+
+## Phase 6: Frontend Specialist
+- Component structure and reusability
+- Accessibility (WCAG compliance)
+- Responsive design
+- Loading and error states
+- Optimistic updates where appropriate
+- Performance (bundle size, lazy loading)
+
+## Phase 7: Test Engineer
+- Unit tests for business logic
+- Integration tests for API endpoints
+- Component tests for UI (if applicable)
+- Edge cases and error conditions
+- Identify what should be mocked vs real
+
+## Phase 8: Code Reviewer
+- Identify any code smells
+- Check for potential race conditions
+- Verify error handling completeness
+- Assess maintainability and readability
+- Look for premature optimization or over-engineering
+- Confirm naming clarity
+
+## Phase 9: DevOps Engineer
+- Environment configuration
+- Deployment implications
+- Logging and monitoring hooks
+- Performance bottlenecks
+- Caching opportunities
+- CI/CD impact
+
+## Phase 10: Final Pass
+- Address any issues found in the review phase
+- Ensure all phases are satisfied
+- Provide a summary of what was built and any tradeoffs made
+
+Always be critical of your own work. If you find issues at any phase, go back and fix them before proceeding. Production-quality code only, not prototypes.

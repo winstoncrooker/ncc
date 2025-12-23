@@ -14,10 +14,6 @@ const CONFIG = {
     return 'https://vinyl-vault-api.christophercrooker.workers.dev';
   })(),
 
-  // Discogs credentials - client-side calls (Worker requests blocked by Cloudflare)
-  DISCOGS_KEY: 'yRxzvHyveKiFOEHuwmcW',
-  DISCOGS_SECRET: 'GnnPcnLGovdJLMfMyEpaSRoXOsRqojBr',
-
   // Auth token storage key
   AUTH_TOKEN_KEY: 'ncc_token',
   AUTH_USER_KEY: 'ncc_user',
