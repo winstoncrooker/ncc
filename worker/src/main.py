@@ -97,17 +97,24 @@ def get_cors_origin(request: Request) -> str:
     return "https://niche-collector.pages.dev"
 
 
+# CORS headers helper
+def get_cors_headers(request: Request) -> dict:
+    """Get CORS headers for a request"""
+    return {
+        "Access-Control-Allow-Origin": get_cors_origin(request),
+        "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS, PATCH",
+        "Access-Control-Allow-Headers": "Authorization, Content-Type, Accept, Origin, X-Requested-With",
+        "Access-Control-Allow-Credentials": "true",
+    }
+
+
 # Global exception handler to ensure CORS headers on errors
 @app.exception_handler(HTTPException)
 async def http_exception_handler(request: Request, exc: HTTPException):
     return JSONResponse(
         status_code=exc.status_code,
         content={"detail": exc.detail},
-        headers={
-            "Access-Control-Allow-Origin": get_cors_origin(request),
-            "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS, PATCH",
-            "Access-Control-Allow-Headers": "Authorization, Content-Type, Accept, Origin, X-Requested-With",
-        }
+        headers=get_cors_headers(request)
     )
 
 
@@ -116,11 +123,17 @@ async def general_exception_handler(request: Request, exc: Exception):
     return JSONResponse(
         status_code=500,
         content={"detail": str(exc)},
-        headers={
-            "Access-Control-Allow-Origin": get_cors_origin(request),
-            "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS, PATCH",
-            "Access-Control-Allow-Headers": "Authorization, Content-Type, Accept, Origin, X-Requested-With",
-        }
+        headers=get_cors_headers(request)
+    )
+
+
+# Explicit OPTIONS handler for all paths
+@app.options("/{path:path}")
+async def options_handler(request: Request, path: str):
+    """Handle CORS preflight requests for all paths"""
+    return JSONResponse(
+        content={},
+        headers=get_cors_headers(request)
     )
 
 # Include routers

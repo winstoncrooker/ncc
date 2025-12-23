@@ -198,6 +198,11 @@ const Profile = {
    * Initialize the profile page
    */
   async init() {
+    // Mix in module methods (chat, messages, friends)
+    if (window.ChatModule) Object.assign(this, window.ChatModule);
+    if (window.MessagesModule) Object.assign(this, window.MessagesModule);
+    if (window.FriendsModule) Object.assign(this, window.FriendsModule);
+
     // Handle OAuth callback first (extracts token from URL if present)
     Auth.init();
 
