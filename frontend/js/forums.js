@@ -20,9 +20,7 @@ const Forums = {
    * Initialize forums
    */
   async init() {
-    console.log('[Forums] Initializing forums module...');
     this.bindEvents();
-    console.log('[Forums] Events bound successfully');
   },
 
   /**
@@ -30,12 +28,8 @@ const Forums = {
    */
   bindEvents() {
     // Main tab switching
-    const tabBtns = document.querySelectorAll('.main-tab-btn');
-    console.log('[Forums] Found', tabBtns.length, 'main-tab-btn elements');
-    tabBtns.forEach(btn => {
-      console.log('[Forums] Adding click listener to tab:', btn.dataset.tab);
+    document.querySelectorAll('.main-tab-btn').forEach(btn => {
       btn.addEventListener('click', (e) => {
-        console.log('[Forums] Tab button clicked:', e.currentTarget.dataset.tab);
         const tab = e.currentTarget.dataset.tab;
         if (tab) this.switchMainTab(tab);
       });
@@ -122,7 +116,6 @@ const Forums = {
    * Switch main tabs (Profile/Forums)
    */
   switchMainTab(tab) {
-    console.log('[Forums] switchMainTab called with tab:', tab);
     // Save to localStorage for persistence
     localStorage.setItem('ncc_active_tab', tab);
 
@@ -1325,8 +1318,30 @@ const Forums = {
       this.discoverCategories = categoriesData.categories;
       this.joinedCategorySlugs = joinedCategorySlugs;
 
+      // Also build set of joined group IDs
+      const joinedGroupIds = new Set();
+      for (const interest of interestsData.interests) {
+        if (interest.interest_group_id) {
+          joinedGroupIds.add(interest.interest_group_id);
+        }
+      }
+      this.joinedGroupIds = joinedGroupIds;
+
+      // Store interest IDs for leave functionality
+      this.interestIdsByCategory = {};
+      this.interestIdsByGroup = {};
+      for (const interest of interestsData.interests) {
+        if (interest.category_slug && !interest.interest_group_id) {
+          this.interestIdsByCategory[interest.category_slug] = interest.id;
+        }
+        if (interest.interest_group_id) {
+          this.interestIdsByGroup[interest.interest_group_id] = interest.id;
+        }
+      }
+
       content.innerHTML = categoriesData.categories.map(cat => {
         const isJoined = joinedCategorySlugs.has(cat.slug);
+        const interestId = this.interestIdsByCategory[cat.slug];
         return `
           <div class="discover-category" data-slug="${cat.slug}">
             <div class="category-header">
@@ -1339,6 +1354,7 @@ const Forums = {
                     <polyline points="6 9 12 15 18 9"></polyline>
                   </svg>
                 </button>
+                <button class="leave-category-btn" onclick="Forums.leaveCategoryFromDiscover(${interestId}, '${cat.slug}', this)">Leave</button>
               ` : `
                 <button class="join-category-btn" onclick="Forums.joinCategory('${cat.slug}', ${cat.id}, this)">+ Join</button>
               `}
@@ -1370,13 +1386,21 @@ const Forums = {
 
       if (!response.ok) throw new Error('Failed to join category');
 
-      // Update UI - replace + Join with expand button
+      const data = await response.json();
+      const interestId = data.interest?.id;
+
+      // Store the interest ID for leave functionality
+      if (!this.interestIdsByCategory) this.interestIdsByCategory = {};
+      this.interestIdsByCategory[categorySlug] = interestId;
+
+      // Update UI - replace + Join with expand and leave buttons
       btn.outerHTML = `
         <button class="expand-btn" onclick="Forums.toggleCategoryGroups('${categorySlug}')">
           <svg class="expand-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <polyline points="6 9 12 15 18 9"></polyline>
           </svg>
         </button>
+        <button class="leave-category-btn" onclick="Forums.leaveCategoryFromDiscover(${interestId}, '${categorySlug}', this)">Leave</button>
       `;
 
       // Add to joined set
@@ -1392,40 +1416,94 @@ const Forums = {
   },
 
   /**
+   * Leave a category from discover modal
+   */
+  async leaveCategoryFromDiscover(interestId, categorySlug, btn) {
+    try {
+      const response = await fetch(`${API_BASE}/interests/leave/${interestId}`, {
+        method: 'POST',
+        headers: Auth.getAuthHeaders()
+      });
+
+      if (!response.ok) throw new Error('Failed to leave category');
+
+      // Find the category to get its ID
+      const category = this.discoverCategories.find(c => c.slug === categorySlug);
+
+      // Update UI - replace expand and leave buttons with + Join
+      const header = btn.closest('.category-header');
+      const expandBtn = header.querySelector('.expand-btn');
+      if (expandBtn) expandBtn.remove();
+      btn.outerHTML = `
+        <button class="join-category-btn" onclick="Forums.joinCategory('${categorySlug}', ${category?.id || 0}, this)">+ Join</button>
+      `;
+
+      // Hide sub-groups if visible
+      const groupsContainer = document.getElementById(`category-groups-${categorySlug}`);
+      if (groupsContainer) {
+        groupsContainer.style.display = 'none';
+        groupsContainer.innerHTML = '';
+      }
+
+      // Remove from joined set
+      this.joinedCategorySlugs.delete(categorySlug);
+      delete this.interestIdsByCategory[categorySlug];
+
+      // Refresh sidebar
+      this.loadMyGroups();
+
+      // Also refresh Profile's userCategories
+      if (typeof Profile !== 'undefined') {
+        await Profile.loadUserCategories();
+      }
+
+    } catch (error) {
+      console.error('Error leaving category:', error);
+      alert('Failed to leave category');
+    }
+  },
+
+  /**
    * Toggle category groups visibility
    */
-  async toggleCategoryGroups(categoryId) {
-    const container = document.getElementById(`category-groups-${categoryId}`);
+  async toggleCategoryGroups(categorySlug) {
+    const container = document.getElementById(`category-groups-${categorySlug}`);
 
     if (container.style.display === 'none') {
       container.style.display = 'block';
 
-      if (!container.innerHTML) {
-        container.innerHTML = '<div class="loading">Loading...</div>';
+      // Always refresh to show current join status
+      container.innerHTML = '<div class="loading">Loading...</div>';
 
-        try {
-          const response = await fetch(`${API_BASE}/categories/${categoryId}`, {
-            headers: Auth.getAuthHeaders()
-          });
+      try {
+        const response = await fetch(`${API_BASE}/categories/${categorySlug}`, {
+          headers: Auth.getAuthHeaders()
+        });
 
-          if (!response.ok) throw new Error('Failed to load groups');
+        if (!response.ok) throw new Error('Failed to load groups');
 
-          const data = await response.json();
+        const data = await response.json();
 
-          const groups = data.interest_groups.filter(g => g.level === 1);
-          container.innerHTML = groups.map(g => `
-            <div class="group-item">
+        const groups = data.interest_groups.filter(g => g.level === 1);
+        container.innerHTML = groups.map(g => {
+          const isJoined = this.joinedGroupIds && this.joinedGroupIds.has(g.id);
+          const interestId = this.interestIdsByGroup ? this.interestIdsByGroup[g.id] : null;
+          return `
+            <div class="group-item" data-group-id="${g.id}">
               <div class="group-info">
                 <span class="group-name">${g.name}</span>
                 <span class="group-count">${g.member_count} members</span>
               </div>
-              <button class="join-btn" onclick="Forums.joinGroup(${g.id}, this)">Join</button>
+              ${isJoined
+                ? `<button class="leave-btn joined" onclick="Forums.leaveGroupFromDiscover(${interestId}, ${g.id}, this)">Leave</button>`
+                : `<button class="join-btn" onclick="Forums.joinGroup(${g.id}, this)">Join</button>`
+              }
             </div>
-          `).join('');
+          `;
+        }).join('');
 
-        } catch (error) {
-          container.innerHTML = '<div class="error">Failed to load</div>';
-        }
+      } catch (error) {
+        container.innerHTML = '<div class="error">Failed to load</div>';
       }
     } else {
       container.style.display = 'none';
@@ -1448,15 +1526,51 @@ const Forums = {
 
       if (!response.ok) throw new Error('Failed to join');
 
-      btn.textContent = 'Joined';
-      btn.disabled = true;
-      btn.classList.add('joined');
+      const data = await response.json();
+      const interestId = data.interest?.id;
+
+      // Store the interest ID for leave functionality
+      if (!this.interestIdsByGroup) this.interestIdsByGroup = {};
+      this.interestIdsByGroup[groupId] = interestId;
+      if (!this.joinedGroupIds) this.joinedGroupIds = new Set();
+      this.joinedGroupIds.add(groupId);
+
+      // Update UI - change to Leave button
+      btn.outerHTML = `<button class="leave-btn joined" onclick="Forums.leaveGroupFromDiscover(${interestId}, ${groupId}, this)">Leave</button>`;
 
       // Refresh sidebar
       this.loadMyGroups();
 
     } catch (error) {
       console.error('Error joining group:', error);
+    }
+  },
+
+  /**
+   * Leave a group from discover modal
+   */
+  async leaveGroupFromDiscover(interestId, groupId, btn) {
+    try {
+      const response = await fetch(`${API_BASE}/interests/leave/${interestId}`, {
+        method: 'POST',
+        headers: Auth.getAuthHeaders()
+      });
+
+      if (!response.ok) throw new Error('Failed to leave group');
+
+      // Update UI - change to Join button
+      btn.outerHTML = `<button class="join-btn" onclick="Forums.joinGroup(${groupId}, this)">Join</button>`;
+
+      // Remove from joined set
+      if (this.joinedGroupIds) this.joinedGroupIds.delete(groupId);
+      if (this.interestIdsByGroup) delete this.interestIdsByGroup[groupId];
+
+      // Refresh sidebar
+      this.loadMyGroups();
+
+    } catch (error) {
+      console.error('Error leaving group:', error);
+      alert('Failed to leave group');
     }
   },
 

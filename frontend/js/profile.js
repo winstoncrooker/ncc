@@ -832,7 +832,7 @@ const Profile = {
       collectionHeader.innerHTML = `
         <span class="section-icon">📚</span>
         ${sectionNames[1] || 'Collection'}
-        <span class="collection-count">${count}</span>
+        <span class="collection-count" id="collection-count">${count}</span>
       `;
     }
   },
