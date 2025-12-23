@@ -752,8 +752,6 @@ const Forums = {
    * Delete a comment
    */
   async deleteComment(commentId) {
-    if (!confirm('Are you sure you want to delete this comment?')) return;
-
     try {
       const response = await fetch(`${API_BASE}/comments/${commentId}`, {
         method: 'DELETE',
@@ -1216,8 +1214,6 @@ const Forums = {
    * Leave a group/category
    */
   async leaveGroup(interestId) {
-    if (!confirm('Are you sure you want to leave this group?')) return;
-
     try {
       const response = await fetch(`${API_BASE}/interests/leave/${interestId}`, {
         method: 'POST',
@@ -1278,9 +1274,20 @@ const Forums = {
   },
 
   formatTimeAgo(dateString) {
-    const date = new Date(dateString);
+    if (!dateString) return 'just now';
+
+    // Handle SQLite datetime format (YYYY-MM-DD HH:MM:SS) by converting to ISO
+    let normalizedDate = dateString;
+    if (dateString.includes(' ') && !dateString.includes('T')) {
+      normalizedDate = dateString.replace(' ', 'T') + 'Z';
+    }
+
+    const date = new Date(normalizedDate);
     const now = new Date();
     const seconds = Math.floor((now - date) / 1000);
+
+    // Handle invalid dates or future dates
+    if (isNaN(seconds) || seconds < 0) return 'just now';
 
     if (seconds < 60) return 'just now';
     if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;

@@ -630,6 +630,9 @@ const Profile = {
       // Update all UI elements for this category
       this.updateUIForCategory(categorySlug);
 
+      // Reset AI chat for new category context
+      this.resetAIChat();
+
     } catch (error) {
       console.error('Error switching category profile:', error);
     }
@@ -662,6 +665,28 @@ const Profile = {
     if (welcomeList && terms.aiCapabilities) {
       welcomeList.innerHTML = terms.aiCapabilities.map(cap => `<li>${cap}</li>`).join('');
     }
+  },
+
+  /**
+   * Reset AI chat to welcome state (used when switching categories)
+   */
+  resetAIChat() {
+    const container = document.getElementById('ai-chat-container');
+    if (!container) return;
+
+    const terms = this.getTerms();
+
+    // Reset to welcome message with category-specific capabilities
+    container.innerHTML = `
+      <div class="ai-welcome">
+        <div class="welcome-icon">👋</div>
+        <h4>Hey there!</h4>
+        <p>I can help you with:</p>
+        <ul>
+          ${terms.aiCapabilities.map(cap => `<li>${cap}</li>`).join('')}
+        </ul>
+      </div>
+    `;
   },
 
   /**
@@ -1746,15 +1771,17 @@ const Profile = {
    * Add to showcase
    */
   async addToShowcase(collectionId) {
+    const terms = this.getTerms();
+
     // Check if already in showcase
     if (this.showcase.find(s => s.collection_id === collectionId)) {
-      alert('This album is already in your showcase');
+      alert(`This ${terms.itemSingular} is already in your showcase`);
       return;
     }
 
     // Check showcase limit
     if (this.showcase.length >= 8) {
-      alert('Showcase limit reached (max 8 albums). Remove one to add another.');
+      alert(`Showcase limit reached (max 8 ${terms.itemPlural}). Remove one to add another.`);
       return;
     }
 

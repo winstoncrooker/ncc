@@ -16,9 +16,13 @@ EPOCH = datetime(2024, 1, 1).timestamp()
 
 
 def calculate_hot_score(upvotes: int, downvotes: int, created_at: str) -> float:
-    """Calculate Reddit-style hot score."""
+    """
+    Calculate hot score with stronger vote weighting.
+    Higher upvotes = more visibility, with some time decay.
+    """
     score = upvotes - downvotes
-    order = math.log10(max(abs(score), 1))
+    # Multiply vote component by 2 for stronger vote influence
+    order = math.log10(max(abs(score), 1)) * 2
     sign = 1 if score > 0 else -1 if score < 0 else 0
 
     try:
@@ -30,7 +34,8 @@ def calculate_hot_score(upvotes: int, downvotes: int, created_at: str) -> float:
     except Exception:
         seconds = 0
 
-    return round(sign * order + seconds / 45000, 7)
+    # Increased divisor (180000 = ~50 hours) so time matters less than votes
+    return round(sign * order + seconds / 180000, 7)
 
 
 class VoteRequest(BaseModel):
