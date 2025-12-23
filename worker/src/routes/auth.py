@@ -329,8 +329,11 @@ async def google_callback(request: Request, code: str = None, error: str = None,
 
                 user_id = result["id"]
 
-        # Create JWT token
-        token = create_token(user_id, email, env.JWT_SECRET)
+        # Create JWT token - must convert secret to string
+        jwt_secret = str(env.JWT_SECRET) if hasattr(env, 'JWT_SECRET') else None
+        if not jwt_secret:
+            raise HTTPException(status_code=500, detail="JWT_SECRET not configured")
+        token = create_token(user_id, email, jwt_secret)
 
         # Redirect to frontend with token
         # Frontend will extract token from URL and store it
@@ -409,7 +412,10 @@ async def refresh_token(
         if not user:
             raise HTTPException(status_code=404, detail="User not found")
 
-        token = create_token(user["id"], user["email"], env.JWT_SECRET)
+        jwt_secret = str(env.JWT_SECRET) if hasattr(env, 'JWT_SECRET') else None
+        if not jwt_secret:
+            raise HTTPException(status_code=500, detail="JWT_SECRET not configured")
+        token = create_token(user["id"], user["email"], jwt_secret)
 
         return TokenResponse(
             access_token=token,
