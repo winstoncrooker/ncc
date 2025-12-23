@@ -257,6 +257,125 @@
   display: none;
 }
 
+.member-since {
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 12px;
+}
+
+.member-since:empty {
+  display: none;
+}
+
+.member-since::before {
+  content: '📅';
+  font-size: 0.8rem;
+}
+
+/* Profile Completion Progress Bar */
+.profile-completion {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+  padding: 8px 0;
+}
+
+.completion-bar {
+  flex: 1;
+  max-width: 200px;
+  height: 6px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.completion-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent), #4ade80);
+  border-radius: 3px;
+  transition: width 0.5s ease;
+}
+
+.completion-text {
+  color: var(--text-muted);
+  font-size: 0.8rem;
+}
+
+/* Collection Summary Card */
+.collection-summary-section {
+  max-width: 1000px;
+  margin: 20px auto;
+  padding: 0 24px;
+}
+
+.collection-summary-card {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 16px 20px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+}
+
+.collection-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  background: rgba(29, 185, 84, 0.1);
+  border: 1px solid rgba(29, 185, 84, 0.3);
+  border-radius: 20px;
+  color: var(--text-primary);
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.collection-badge:hover {
+  background: rgba(29, 185, 84, 0.2);
+  border-color: var(--accent);
+  transform: translateY(-2px);
+}
+
+.collection-badge.active {
+  background: var(--accent);
+  color: #000;
+  font-weight: 600;
+}
+
+.collection-badge .badge-icon {
+  font-size: 1.1rem;
+}
+
+.collection-badge .badge-count {
+  font-weight: 600;
+  color: var(--accent);
+}
+
+.collection-badge.active .badge-count {
+  color: #000;
+}
+
+.collector-score {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  background: linear-gradient(135deg, rgba(255, 215, 0, 0.15), rgba(255, 140, 0, 0.15));
+  border: 1px solid rgba(255, 215, 0, 0.3);
+  border-radius: 20px;
+  color: #ffd700;
+  font-weight: 600;
+}
+
 .profile-bio {
   color: var(--text-secondary);
   font-size: 1rem;
@@ -269,6 +388,71 @@
   content: 'No bio yet. Tell the world about your vinyl journey!';
   color: var(--text-muted);
   font-style: italic;
+}
+
+/* Location Display */
+.profile-location {
+  display: none;
+  align-items: center;
+  gap: 4px;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  margin: 4px 0 8px 0;
+}
+
+.profile-location .location-icon {
+  font-size: 0.85rem;
+}
+
+/* External Links Display */
+.external-links-display {
+  display: none;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 12px 0;
+}
+
+.external-link {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 50%;
+  color: var(--text-secondary);
+  text-decoration: none;
+  transition: all 0.3s ease;
+}
+
+.external-link:hover {
+  background: var(--accent);
+  border-color: var(--accent);
+  transform: scale(1.1);
+}
+
+.external-link .link-icon {
+  font-size: 1.1rem;
+}
+
+/* External Links Section in Edit Modal */
+.external-links-section {
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  margin-top: 16px;
+  padding-top: 8px;
+}
+
+.external-links-section .form-group {
+  margin-bottom: 12px;
+}
+
+.external-links-section label {
+  font-size: 0.85rem;
+}
+
+.external-links-section input {
+  font-size: 0.9rem;
 }
 
 .edit-profile-btn {
@@ -351,6 +535,186 @@
 .add-btn:hover {
   transform: translateY(-2px);
   box-shadow: 0 6px 20px rgba(29, 185, 84, 0.4);
+}
+
+/* ============================================
+   WISHLIST SECTION
+   ============================================ */
+.wishlist-section {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 40px 20px;
+}
+
+.wishlist-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 20px;
+}
+
+.wishlist-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  padding: 16px;
+  position: relative;
+  transition: all 0.3s ease;
+}
+
+.wishlist-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+}
+
+.wishlist-card.priority-high {
+  border-left: 4px solid #ffd700;
+}
+
+.wishlist-card.priority-medium {
+  border-left: 4px solid #1db954;
+}
+
+.wishlist-card.priority-low {
+  border-left: 4px solid var(--border-color);
+}
+
+.wishlist-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.wishlist-priority {
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 12px;
+  text-transform: uppercase;
+}
+
+.wishlist-priority.high {
+  background: rgba(255, 215, 0, 0.2);
+  color: #ffd700;
+}
+
+.wishlist-priority.medium {
+  background: rgba(29, 185, 84, 0.2);
+  color: #1db954;
+}
+
+.wishlist-priority.low {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--text-secondary);
+}
+
+.wishlist-found {
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 12px;
+  background: rgba(76, 175, 80, 0.2);
+  color: #4caf50;
+}
+
+.wishlist-title {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0 0 4px 0;
+}
+
+.wishlist-artist {
+  font-size: 0.9rem;
+  color: var(--accent);
+  margin: 0 0 4px 0;
+}
+
+.wishlist-year {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  margin: 0 0 8px 0;
+}
+
+.wishlist-desc {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  margin: 0 0 12px 0;
+  line-height: 1.4;
+}
+
+.wishlist-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.wishlist-condition,
+.wishlist-price {
+  font-size: 0.75rem;
+  padding: 4px 8px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-secondary);
+}
+
+.wishlist-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.wishlist-found-btn {
+  background: var(--accent);
+  border: none;
+  color: #000;
+  padding: 6px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.8rem;
+  font-weight: 600;
+  transition: all 0.2s ease;
+}
+
+.wishlist-found-btn:hover {
+  transform: scale(1.05);
+}
+
+.wishlist-delete-btn {
+  background: transparent;
+  border: 1px solid rgba(255, 100, 100, 0.3);
+  color: #ff6464;
+  padding: 6px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 1rem;
+  transition: all 0.2s ease;
+}
+
+.wishlist-delete-btn:hover {
+  background: rgba(255, 100, 100, 0.1);
+}
+
+.wishlist-empty {
+  grid-column: 1 / -1;
+  text-align: center;
+  padding: 60px 20px;
+  color: var(--text-muted);
+}
+
+.wishlist-empty .empty-icon {
+  font-size: 3rem;
+  margin-bottom: 16px;
+}
+
+.wishlist-empty p {
+  font-size: 1.1rem;
+  margin: 0 0 8px 0;
+}
+
+.wishlist-empty span {
+  font-size: 0.9rem;
 }
 
 /* ============================================
@@ -651,6 +1015,236 @@
 .album-card .image-btn:hover {
   background: var(--accent);
   transform: scale(1.1);
+}
+
+/* Tag button on album cards */
+.album-card .tag-btn {
+  position: absolute;
+  bottom: 50px;
+  left: 10px;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(4px);
+  border: none;
+  color: #fff;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  cursor: pointer;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  transition: all 0.2s;
+}
+
+.album-card:hover .tag-btn {
+  display: flex;
+}
+
+.album-card .tag-btn:hover {
+  background: var(--accent);
+  transform: scale(1.1);
+}
+
+/* Item tags display on album cards */
+.item-tags {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  max-width: calc(100% - 60px);
+  z-index: 5;
+}
+
+.item-tag {
+  font-size: 0.65rem;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  backdrop-filter: blur(4px);
+}
+
+.tag-trade {
+  background: rgba(33, 150, 243, 0.9);
+  color: #fff;
+}
+
+.tag-grail {
+  background: rgba(255, 215, 0, 0.9);
+  color: #000;
+}
+
+.tag-sealed {
+  background: rgba(76, 175, 80, 0.9);
+  color: #fff;
+}
+
+.tag-signed {
+  background: rgba(156, 39, 176, 0.9);
+  color: #fff;
+}
+
+.tag-first {
+  background: rgba(255, 87, 34, 0.9);
+  color: #fff;
+}
+
+.tag-rare {
+  background: rgba(233, 30, 99, 0.9);
+  color: #fff;
+}
+
+.tag-default {
+  background: rgba(128, 128, 128, 0.9);
+  color: #fff;
+}
+
+/* Tag Modal */
+#tag-modal .tag-modal-content {
+  background: var(--bg-card);
+  border-radius: 12px;
+  padding: 24px;
+  max-width: 400px;
+  margin: auto;
+}
+
+#tag-modal .tag-modal-content h3 {
+  margin: 0 0 8px 0;
+  color: var(--text-primary);
+}
+
+#tag-modal .tag-album-name {
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  margin: 0 0 20px 0;
+}
+
+#tag-modal .tag-options {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+#tag-modal .tag-option {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+  color: var(--text-primary);
+}
+
+#tag-modal .tag-option input[type="checkbox"] {
+  width: 20px;
+  height: 20px;
+  accent-color: var(--accent);
+}
+
+#tag-modal .tag-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+/* Showcase Notes */
+.showcase-note {
+  position: absolute;
+  bottom: 60px;
+  left: 0;
+  right: 0;
+  background: rgba(0, 0, 0, 0.85);
+  padding: 8px 12px;
+  font-size: 0.8rem;
+  color: #ffd700;
+  font-style: italic;
+  line-height: 1.3;
+  max-height: 60px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.album-card .note-btn {
+  position: absolute;
+  bottom: 50px;
+  left: 10px;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(4px);
+  border: none;
+  color: #fff;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  cursor: pointer;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  transition: all 0.2s;
+}
+
+.album-card:hover .note-btn {
+  display: flex;
+}
+
+.album-card .note-btn:hover {
+  background: #ffd700;
+  transform: scale(1.1);
+}
+
+/* Showcase Note Modal */
+#showcase-note-modal .note-modal-content {
+  background: var(--bg-card);
+  border-radius: 12px;
+  padding: 24px;
+  max-width: 400px;
+  margin: auto;
+}
+
+#showcase-note-modal .note-modal-content h3 {
+  margin: 0 0 8px 0;
+  color: var(--text-primary);
+}
+
+#showcase-note-modal .note-album-name {
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  margin: 0 0 16px 0;
+}
+
+#showcase-note-modal textarea {
+  width: 100%;
+  min-height: 80px;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 12px;
+  color: var(--text-primary);
+  font-size: 0.95rem;
+  resize: vertical;
+  font-family: inherit;
+}
+
+#showcase-note-modal textarea:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+#showcase-note-modal .char-count {
+  display: block;
+  text-align: right;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  margin: 4px 0 16px 0;
+}
+
+#showcase-note-modal .note-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
 }
 
 /* ============================================

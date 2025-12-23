@@ -86,8 +86,20 @@
           <div class="profile-name-row">
             <h1 class="profile-name" id="profile-name">Loading...</h1>
             <span class="profile-pronouns" id="profile-pronouns"></span>
+            <span class="member-since" id="member-since"></span>
           </div>
+          <span class="profile-location" id="profile-location"></span>
           <p class="profile-bio" id="profile-bio"></p>
+          <div class="external-links-display" id="external-links-display"></div>
+
+          <!-- Profile Completion Progress -->
+          <div class="profile-completion" id="profile-completion" style="display: none;">
+            <div class="completion-bar">
+              <div class="completion-fill" id="completion-fill"></div>
+            </div>
+            <span class="completion-text" id="completion-text">Profile 0% complete</span>
+          </div>
+
           <button class="edit-profile-btn" id="edit-profile-btn">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
@@ -107,6 +119,13 @@
           <option value="">🎵 Vinyl Records (Default)</option>
         </select>
         <span class="switcher-hint">Switch between your collecting interests</span>
+      </div>
+    </section>
+
+    <!-- Collection Summary Card (Multi-Collection Identity) -->
+    <section class="collection-summary-section" id="collection-summary-section" style="display: none;">
+      <div class="collection-summary-card" id="collection-summary-card">
+        <!-- Dynamically populated with collection badges -->
       </div>
     </section>
 
@@ -189,6 +208,31 @@
           <div class="empty-icon">🎵</div>
           <p>Your collection is empty</p>
           <span>Start adding your vinyl records!</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Wishlist / Currently Seeking Section -->
+    <section class="wishlist-section" id="wishlist-section" style="display: none;">
+      <div class="section-header">
+        <h2>
+          <span class="section-icon">🎯</span>
+          Currently Seeking
+          <span class="wishlist-count" id="wishlist-count">0</span>
+        </h2>
+        <button class="add-btn" id="add-wishlist-btn">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="12" y1="5" x2="12" y2="19"></line>
+            <line x1="5" y1="12" x2="19" y2="12"></line>
+          </svg>
+          Add Wanted Item
+        </button>
+      </div>
+      <div class="wishlist-grid" id="wishlist-grid">
+        <div class="wishlist-empty" id="wishlist-empty">
+          <div class="empty-icon">🔍</div>
+          <p>No items on your wishlist</p>
+          <span>Add items you're looking for!</span>
         </div>
       </div>
     </section>
@@ -449,6 +493,39 @@
           <textarea id="edit-bio" rows="4" maxlength="500" placeholder="Tell us about yourself and your vinyl journey..."></textarea>
           <span class="char-count"><span id="bio-char-count">0</span>/500</span>
         </div>
+        <div class="form-group">
+          <label for="edit-location">Location</label>
+          <input type="text" id="edit-location" maxlength="100" placeholder="City, State/Country">
+        </div>
+
+        <!-- External Links Section -->
+        <div class="external-links-section">
+          <h4 style="color: #1db954; margin: 16px 0 12px; font-size: 0.9rem;">External Links</h4>
+          <div class="form-group">
+            <label for="edit-link-discogs">Discogs Username</label>
+            <input type="text" id="edit-link-discogs" maxlength="100" placeholder="username">
+          </div>
+          <div class="form-group">
+            <label for="edit-link-instagram">Instagram</label>
+            <input type="text" id="edit-link-instagram" maxlength="100" placeholder="@username">
+          </div>
+          <div class="form-group">
+            <label for="edit-link-twitter">Twitter/X</label>
+            <input type="text" id="edit-link-twitter" maxlength="100" placeholder="@username">
+          </div>
+          <div class="form-group">
+            <label for="edit-link-youtube">YouTube</label>
+            <input type="text" id="edit-link-youtube" maxlength="200" placeholder="Channel URL">
+          </div>
+          <div class="form-group">
+            <label for="edit-link-ebay">eBay Seller ID</label>
+            <input type="text" id="edit-link-ebay" maxlength="100" placeholder="seller-id">
+          </div>
+          <div class="form-group">
+            <label for="edit-link-website">Personal Website</label>
+            <input type="text" id="edit-link-website" maxlength="200" placeholder="https://...">
+          </div>
+        </div>
 
         <!-- Privacy Settings Section -->
         <div class="privacy-section">
@@ -489,6 +566,66 @@
         <div class="form-actions">
           <button type="button" class="btn-cancel" id="edit-profile-cancel">Cancel</button>
           <button type="submit" class="btn-save">Save Changes</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Add Wishlist Item Modal -->
+  <div class="modal" id="add-wishlist-modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3>Add Wanted Item</h3>
+        <button class="modal-close" id="add-wishlist-close">&times;</button>
+      </div>
+      <form id="add-wishlist-form">
+        <div class="form-group">
+          <label for="wishlist-title">Item Title *</label>
+          <input type="text" id="wishlist-title" required placeholder="Album name, card name, etc." maxlength="200">
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label for="wishlist-artist">Artist / Brand</label>
+            <input type="text" id="wishlist-artist" placeholder="Artist or manufacturer" maxlength="200">
+          </div>
+          <div class="form-group">
+            <label for="wishlist-year">Year</label>
+            <input type="number" id="wishlist-year" min="1900" max="2030" placeholder="Release year">
+          </div>
+        </div>
+        <div class="form-group">
+          <label for="wishlist-description">Description</label>
+          <textarea id="wishlist-description" rows="2" maxlength="500" placeholder="Additional details, specific pressing, etc."></textarea>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label for="wishlist-condition">Condition Wanted</label>
+            <select id="wishlist-condition">
+              <option value="">Any Condition</option>
+              <option value="Mint">Mint (M)</option>
+              <option value="Near Mint">Near Mint (NM)</option>
+              <option value="Very Good Plus">Very Good Plus (VG+)</option>
+              <option value="Very Good">Very Good (VG)</option>
+              <option value="Good Plus">Good Plus (G+)</option>
+              <option value="Good">Good (G)</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="wishlist-max-price">Max Price ($)</label>
+            <input type="number" id="wishlist-max-price" min="0" step="0.01" placeholder="0.00">
+          </div>
+        </div>
+        <div class="form-group">
+          <label for="wishlist-priority">Priority</label>
+          <select id="wishlist-priority">
+            <option value="0">Low Priority</option>
+            <option value="1">Medium Priority</option>
+            <option value="2">High Priority - Grail!</option>
+          </select>
+        </div>
+        <div class="form-actions">
+          <button type="button" class="btn-cancel" id="add-wishlist-cancel">Cancel</button>
+          <button type="submit" class="btn-save">Add to Wishlist</button>
         </div>
       </form>
     </div>

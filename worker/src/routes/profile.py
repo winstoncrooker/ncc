@@ -28,6 +28,19 @@ class PrivacySettings(BaseModel):
     searchable: bool = True
 
 
+class ExternalLinks(BaseModel):
+    """External account links"""
+    discogs: Optional[str] = None
+    instagram: Optional[str] = None
+    twitter: Optional[str] = None
+    youtube: Optional[str] = None
+    ebay: Optional[str] = None
+    tcgplayer: Optional[str] = None
+    pcgs: Optional[str] = None
+    psa: Optional[str] = None
+    website: Optional[str] = None
+
+
 class ProfileResponse(BaseModel):
     """User profile response"""
     id: int
@@ -37,6 +50,8 @@ class ProfileResponse(BaseModel):
     bio: Optional[str] = None
     pronouns: Optional[str] = None
     background_image: Optional[str] = None
+    location: Optional[str] = None
+    external_links: Optional[ExternalLinks] = None
     created_at: Optional[str] = None
     privacy: Optional[PrivacySettings] = None
 
@@ -47,6 +62,8 @@ class ProfileUpdate(BaseModel):
     bio: Optional[str] = None
     pronouns: Optional[str] = None
     background_image: Optional[str] = None
+    location: Optional[str] = None
+    external_links: Optional[dict] = None
 
 
 class ShowcaseAlbum(BaseModel):
@@ -58,6 +75,7 @@ class ShowcaseAlbum(BaseModel):
     album: str
     cover: Optional[str] = None
     year: Optional[int] = None
+    notes: Optional[str] = None
 
 
 class ShowcaseAdd(BaseModel):
@@ -68,6 +86,11 @@ class ShowcaseAdd(BaseModel):
 class ShowcaseReorder(BaseModel):
     """Reorder showcase albums"""
     album_ids: list[int]  # List of showcase album IDs in new order
+
+
+class ShowcaseNotesUpdate(BaseModel):
+    """Update showcase item notes"""
+    notes: Optional[str] = None
 
 
 def to_python_value(val):
@@ -88,6 +111,17 @@ def parse_privacy_settings(privacy_json: str | None) -> PrivacySettings:
         return PrivacySettings(**DEFAULT_PRIVACY)
 
 
+def parse_external_links(links_json: str | None) -> ExternalLinks | None:
+    """Parse external links JSON into ExternalLinks model"""
+    if not links_json:
+        return None
+    try:
+        links_dict = json.loads(links_json)
+        return ExternalLinks(**links_dict) if links_dict else None
+    except (json.JSONDecodeError, TypeError):
+        return None
+
+
 @router.get("/me")
 async def get_profile(
     request: Request,
@@ -101,7 +135,8 @@ async def get_profile(
 
     try:
         user = await env.DB.prepare(
-            """SELECT id, email, name, picture, bio, pronouns, background_image, created_at, privacy_settings
+            """SELECT id, email, name, picture, bio, pronouns, background_image,
+                      location, external_links, created_at, privacy_settings
                FROM users WHERE id = ?"""
         ).bind(user_id).first()
 
@@ -112,6 +147,7 @@ async def get_profile(
             raise HTTPException(status_code=404, detail="User not found")
 
         privacy = parse_privacy_settings(to_python_value(user.get("privacy_settings")))
+        external_links = parse_external_links(to_python_value(user.get("external_links")))
 
         return ProfileResponse(
             id=user["id"],
@@ -121,6 +157,8 @@ async def get_profile(
             bio=to_python_value(user.get("bio")),
             pronouns=to_python_value(user.get("pronouns")),
             background_image=to_python_value(user.get("background_image")),
+            location=to_python_value(user.get("location")),
+            external_links=external_links,
             created_at=str(user["created_at"]) if to_python_value(user.get("created_at")) else None,
             privacy=privacy
         )
@@ -168,6 +206,12 @@ async def update_profile(
         if body.background_image is not None:
             updates.append("background_image = ?")
             values.append(body.background_image)
+        if body.location is not None:
+            updates.append("location = ?")
+            values.append(body.location)
+        if body.external_links is not None:
+            updates.append("external_links = ?")
+            values.append(json.dumps(body.external_links))
 
         if updates:
             query = f"UPDATE users SET {', '.join(updates)} WHERE id = ?"
@@ -197,7 +241,7 @@ async def get_showcase(
     try:
         if category_id:
             results = await env.DB.prepare(
-                """SELECT s.id, s.collection_id, s.position, c.artist, c.album, c.cover, c.year
+                """SELECT s.id, s.collection_id, s.position, s.notes, c.artist, c.album, c.cover, c.year
                    FROM showcase_albums s
                    JOIN collections c ON s.collection_id = c.id
                    WHERE s.user_id = ? AND c.category_id = ?
@@ -205,7 +249,7 @@ async def get_showcase(
             ).bind(user_id, category_id).all()
         else:
             results = await env.DB.prepare(
-                """SELECT s.id, s.collection_id, s.position, c.artist, c.album, c.cover, c.year
+                """SELECT s.id, s.collection_id, s.position, s.notes, c.artist, c.album, c.cover, c.year
                    FROM showcase_albums s
                    JOIN collections c ON s.collection_id = c.id
                    WHERE s.user_id = ?
@@ -224,7 +268,8 @@ async def get_showcase(
                 artist=row["artist"],
                 album=row["album"],
                 cover=to_python_value(row.get("cover")),
-                year=to_python_value(row.get("year"))
+                year=to_python_value(row.get("year")),
+                notes=to_python_value(row.get("notes"))
             ))
 
         return albums
@@ -373,6 +418,59 @@ async def reorder_showcase(
         return await get_showcase(request, user_id)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error reordering showcase: {str(e)}")
+
+
+@router.put("/me/showcase/{showcase_id}/notes")
+async def update_showcase_notes(
+    request: Request,
+    showcase_id: int,
+    body: ShowcaseNotesUpdate,
+    user_id: int = Depends(require_auth)
+) -> ShowcaseAlbum:
+    """
+    Update notes for a showcase item.
+    """
+    env = request.scope["env"]
+
+    try:
+        # Verify ownership
+        existing = await env.DB.prepare(
+            "SELECT id FROM showcase_albums WHERE id = ? AND user_id = ?"
+        ).bind(showcase_id, user_id).first()
+
+        if not existing:
+            raise HTTPException(status_code=404, detail="Showcase item not found")
+
+        # Update notes
+        await env.DB.prepare(
+            "UPDATE showcase_albums SET notes = ? WHERE id = ? AND user_id = ?"
+        ).bind(body.notes, showcase_id, user_id).run()
+
+        # Return updated item
+        result = await env.DB.prepare(
+            """SELECT s.id, s.collection_id, s.position, s.notes, c.artist, c.album, c.cover, c.year
+               FROM showcase_albums s
+               JOIN collections c ON s.collection_id = c.id
+               WHERE s.id = ?"""
+        ).bind(showcase_id).first()
+
+        if result and hasattr(result, 'to_py'):
+            result = result.to_py()
+
+        return ShowcaseAlbum(
+            id=result["id"],
+            collection_id=result["collection_id"],
+            position=result["position"],
+            artist=result["artist"],
+            album=result["album"],
+            cover=to_python_value(result.get("cover")),
+            year=to_python_value(result.get("year")),
+            notes=to_python_value(result.get("notes"))
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error updating showcase notes: {str(e)}")
 
 
 @router.get("/me/privacy")

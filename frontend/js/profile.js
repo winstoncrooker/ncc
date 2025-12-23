@@ -224,14 +224,21 @@ const Profile = {
       this.loadUnreadCount()
     ]);
 
-    // Now load collection and showcase with category filter applied
+    // Now load collection, showcase, and wishlist with category filter applied
     await Promise.all([
       this.loadCollection(),
-      this.loadShowcase()
+      this.loadShowcase(),
+      this.loadWishlist()
     ]);
 
     // Render user menu
     this.renderUserMenu();
+
+    // Render collection summary card
+    this.renderCollectionSummary();
+
+    // Update profile completion now that we have all data
+    this.renderProfileCompletion();
 
     // Start polling for updates (messages, friend requests, friends)
     this.startPolling();
@@ -456,6 +463,15 @@ const Profile = {
       }
     });
 
+    // Wishlist
+    addListener('add-wishlist-btn', 'click', () => this.openAddWishlistModal());
+    addListener('add-wishlist-close', 'click', () => this.closeModal('add-wishlist-modal'));
+    addListener('add-wishlist-cancel', 'click', () => this.closeModal('add-wishlist-modal'));
+    addListener('add-wishlist-form', 'submit', (e) => {
+      e.preventDefault();
+      this.addWishlistItem();
+    });
+
     // View Profile modal
     addListener('view-profile-close', 'click', () => this.closeModal('view-profile-modal'));
     addListener('view-profile-message', 'click', () => this.messageFromProfile());
@@ -532,13 +548,307 @@ const Profile = {
       pronounsEl.style.display = 'none';
     }
 
+    // Member Since
+    const memberSinceEl = document.getElementById('member-since');
+    if (memberSinceEl && this.profile.created_at) {
+      const date = new Date(this.profile.created_at);
+      const options = { year: 'numeric', month: 'short' };
+      memberSinceEl.textContent = `Member since ${date.toLocaleDateString('en-US', options)}`;
+    }
+
+    // Location
+    const locationEl = document.getElementById('profile-location');
+    if (locationEl) {
+      if (this.profile.location) {
+        locationEl.innerHTML = `<span class="location-icon">📍</span> ${this.escapeHtml(this.profile.location)}`;
+        locationEl.style.display = 'block';
+      } else {
+        locationEl.style.display = 'none';
+      }
+    }
+
     // Bio
     document.getElementById('profile-bio').textContent = this.profile.bio || '';
+
+    // External Links
+    this.renderExternalLinks();
 
     // Background
     if (this.profile.background_image) {
       document.getElementById('hero-background').style.backgroundImage = `url(${this.profile.background_image})`;
     }
+
+    // Profile Completion
+    this.renderProfileCompletion();
+  },
+
+  /**
+   * Calculate and render profile completion progress
+   */
+  renderProfileCompletion() {
+    const completionEl = document.getElementById('profile-completion');
+    const fillEl = document.getElementById('completion-fill');
+    const textEl = document.getElementById('completion-text');
+
+    if (!completionEl) return;
+
+    const fields = {
+      name: !!this.profile?.name,
+      bio: !!this.profile?.bio && this.profile.bio.length > 10,
+      picture: !!this.profile?.picture,
+      pronouns: !!this.profile?.pronouns,
+      showcase: this.showcase && this.showcase.length >= 1,
+      collection: this.collection && this.collection.length >= 1,
+      categories: this.userCategories && this.userCategories.length >= 1
+    };
+
+    const completed = Object.values(fields).filter(Boolean).length;
+    const total = Object.keys(fields).length;
+    const percent = Math.round((completed / total) * 100);
+
+    // Show progress bar only if incomplete
+    if (percent < 100) {
+      completionEl.style.display = 'flex';
+      fillEl.style.width = `${percent}%`;
+      textEl.textContent = `Profile ${percent}% complete`;
+    } else {
+      completionEl.style.display = 'none';
+    }
+  },
+
+  /**
+   * Render external links display
+   */
+  renderExternalLinks() {
+    const container = document.getElementById('external-links-display');
+    if (!container) return;
+
+    const links = this.profile?.external_links || {};
+    const hasLinks = Object.values(links).some(v => v);
+
+    if (!hasLinks) {
+      container.style.display = 'none';
+      return;
+    }
+
+    const linkConfigs = [
+      { key: 'discogs', icon: '💿', label: 'Discogs', urlPrefix: 'https://www.discogs.com/user/' },
+      { key: 'instagram', icon: '📷', label: 'Instagram', urlPrefix: 'https://instagram.com/' },
+      { key: 'twitter', icon: '🐦', label: 'Twitter', urlPrefix: 'https://twitter.com/' },
+      { key: 'youtube', icon: '📺', label: 'YouTube', urlPrefix: '' },
+      { key: 'ebay', icon: '🛒', label: 'eBay', urlPrefix: 'https://www.ebay.com/usr/' },
+      { key: 'website', icon: '🌐', label: 'Website', urlPrefix: '' }
+    ];
+
+    const linksHtml = linkConfigs
+      .filter(config => links[config.key])
+      .map(config => {
+        const value = links[config.key];
+        let url = value;
+        if (config.urlPrefix && !value.startsWith('http')) {
+          url = config.urlPrefix + value.replace(/^@/, '');
+        }
+        return `<a href="${this.escapeHtml(url)}" target="_blank" rel="noopener" class="external-link" title="${config.label}">
+          <span class="link-icon">${config.icon}</span>
+        </a>`;
+      })
+      .join('');
+
+    container.innerHTML = linksHtml;
+    container.style.display = 'flex';
+  },
+
+  /**
+   * Render item tags as badges
+   */
+  renderItemTags(tagsStr) {
+    if (!tagsStr) return '';
+
+    const tagConfig = {
+      'for_trade': { label: 'For Trade', class: 'tag-trade' },
+      'grail': { label: 'Grail', class: 'tag-grail' },
+      'sealed': { label: 'Sealed', class: 'tag-sealed' },
+      'signed': { label: 'Signed', class: 'tag-signed' },
+      'first_press': { label: '1st Press', class: 'tag-first' },
+      'rare': { label: 'Rare', class: 'tag-rare' }
+    };
+
+    const tags = tagsStr.split(',').filter(t => t.trim());
+    if (tags.length === 0) return '';
+
+    return `<div class="item-tags">${tags.map(tag => {
+      const config = tagConfig[tag.trim()] || { label: tag.trim(), class: 'tag-default' };
+      return `<span class="item-tag ${config.class}">${config.label}</span>`;
+    }).join('')}</div>`;
+  },
+
+  /**
+   * Show tag editing modal
+   */
+  showTagModal(albumId) {
+    const album = this.collection.find(a => a.id === albumId);
+    if (!album) return;
+
+    const currentTags = album.tags ? album.tags.split(',') : [];
+    const allTags = ['for_trade', 'grail', 'sealed', 'signed', 'first_press', 'rare'];
+    const tagLabels = {
+      'for_trade': 'For Trade',
+      'grail': 'Grail / Holy Grail',
+      'sealed': 'Sealed / Mint',
+      'signed': 'Signed',
+      'first_press': '1st Press',
+      'rare': 'Rare'
+    };
+
+    const html = `
+      <div class="tag-modal-content">
+        <h3>Edit Tags</h3>
+        <p class="tag-album-name">${this.escapeHtml(album.album)} - ${this.escapeHtml(album.artist)}</p>
+        <div class="tag-options">
+          ${allTags.map(tag => `
+            <label class="tag-option">
+              <input type="checkbox" value="${tag}" ${currentTags.includes(tag) ? 'checked' : ''}>
+              <span>${tagLabels[tag]}</span>
+            </label>
+          `).join('')}
+        </div>
+        <div class="tag-modal-actions">
+          <button class="btn-cancel" onclick="Profile.closeTagModal()">Cancel</button>
+          <button class="btn-save" onclick="Profile.saveItemTags(${albumId})">Save</button>
+        </div>
+      </div>
+    `;
+
+    // Create or show modal
+    let modal = document.getElementById('tag-modal');
+    if (!modal) {
+      modal = document.createElement('div');
+      modal.id = 'tag-modal';
+      modal.className = 'modal';
+      document.body.appendChild(modal);
+    }
+    modal.innerHTML = html;
+    modal.classList.add('open');
+  },
+
+  /**
+   * Close tag modal
+   */
+  closeTagModal() {
+    const modal = document.getElementById('tag-modal');
+    if (modal) modal.classList.remove('open');
+  },
+
+  /**
+   * Save item tags
+   */
+  async saveItemTags(albumId) {
+    const modal = document.getElementById('tag-modal');
+    const checkboxes = modal.querySelectorAll('input[type="checkbox"]:checked');
+    const tags = Array.from(checkboxes).map(cb => cb.value).join(',');
+
+    try {
+      const response = await Auth.apiRequest(`/api/collection/${albumId}`, {
+        method: 'PUT',
+        body: JSON.stringify({ tags: tags || null })
+      });
+
+      if (response.ok) {
+        const album = this.collection.find(a => a.id === albumId);
+        if (album) album.tags = tags || null;
+        this.renderCollection();
+        this.closeTagModal();
+      }
+    } catch (error) {
+      console.error('Error saving tags:', error);
+    }
+  },
+
+  /**
+   * Render collection summary card showing all collections at a glance
+   */
+  async renderCollectionSummary() {
+    const section = document.getElementById('collection-summary-section');
+    const card = document.getElementById('collection-summary-card');
+
+    if (!section || !card || !this.userCategories || this.userCategories.length === 0) {
+      if (section) section.style.display = 'none';
+      return;
+    }
+
+    try {
+      // Fetch collection counts per category
+      const response = await Auth.apiRequest('/api/collection/stats');
+      if (!response.ok) {
+        section.style.display = 'none';
+        return;
+      }
+
+      const stats = await response.json();
+
+      // Only show if user has multiple categories or significant collection
+      if (this.userCategories.length <= 1 && stats.total_albums < 5) {
+        section.style.display = 'none';
+        return;
+      }
+
+      section.style.display = 'block';
+
+      // Calculate collector score (gamification)
+      const collectorScore = this.calculateCollectorScore(stats);
+
+      // Build badges HTML
+      const categoryBadges = this.userCategories.map(cat => {
+        const count = stats.category_breakdown?.[cat.id] || 0;
+        const isActive = cat.slug === this.currentCategorySlug;
+        return `
+          <div class="collection-badge ${isActive ? 'active' : ''}"
+               onclick="Profile.switchCategoryProfile('${cat.slug}')"
+               title="View ${cat.name} collection">
+            <span class="badge-icon">${cat.icon || '📦'}</span>
+            <span class="badge-count">${count}</span>
+            <span class="badge-label">${cat.name}</span>
+          </div>
+        `;
+      }).join('');
+
+      const scoreHtml = collectorScore > 0 ? `
+        <div class="collector-score" title="Your Collector Score based on activity">
+          <span>⭐</span>
+          <span>${collectorScore}</span>
+        </div>
+      ` : '';
+
+      card.innerHTML = categoryBadges + scoreHtml;
+
+    } catch (error) {
+      console.error('Error rendering collection summary:', error);
+      section.style.display = 'none';
+    }
+  },
+
+  /**
+   * Calculate collector score based on activity
+   */
+  calculateCollectorScore(stats) {
+    let score = 0;
+
+    // Points for collection size
+    score += Math.min(stats.total_albums * 2, 200);
+
+    // Points for showcase items
+    score += (this.showcase?.length || 0) * 10;
+
+    // Points for diversity (multiple categories)
+    const categoryCount = Object.keys(stats.category_breakdown || {}).length;
+    score += categoryCount * 25;
+
+    // Points for profile completion
+    if (this.profile?.bio) score += 15;
+    if (this.profile?.picture) score += 10;
+    if (this.profile?.pronouns) score += 5;
+
+    return score;
   },
 
   /**
@@ -637,6 +947,9 @@ const Profile = {
 
       // Reload showcase for this category
       await this.loadShowcase();
+
+      // Reload wishlist for this category
+      await this.loadWishlist();
 
       // Update all UI elements for this category
       this.updateUIForCategory(categorySlug);
@@ -895,10 +1208,12 @@ const Profile = {
         <img src="${album.cover || this.getPlaceholderCover(album)}"
              alt="${album.album}" loading="lazy"
              onerror="this.src='${this.getPlaceholderCover(album)}'">
+        ${this.renderItemTags(album.tags)}
         <div class="album-info">
           <p class="album-title">${this.escapeHtml(album.album)}</p>
           <p class="album-artist">${this.escapeHtml(album.artist)}</p>
         </div>
+        <button class="tag-btn" onclick="event.stopPropagation(); Profile.showTagModal(${album.id})" title="Edit tags">🏷️</button>
         <button class="image-btn" onclick="Profile.showImageModal(${album.id})" title="Add/change image">📷</button>
         ${isVinyl ? `<button class="refresh-btn" onclick="Profile.refreshCover(${album.id})" title="Find cover">↻</button>` : ''}
         <button class="remove-btn" onclick="Profile.removeFromCollection(${album.id})" title="Remove">&times;</button>
@@ -1357,13 +1672,82 @@ const Profile = {
         <img src="${album.cover || this.getPlaceholderCover(album)}"
              alt="${album.album}" loading="lazy"
              onerror="this.src='${this.getPlaceholderCover(album)}'">
+        ${album.notes ? `<div class="showcase-note">${this.escapeHtml(album.notes)}</div>` : ''}
         <div class="album-info">
           <p class="album-title">${this.escapeHtml(album.album)}</p>
           <p class="album-artist">${this.escapeHtml(album.artist)}</p>
         </div>
+        <button class="note-btn" onclick="event.stopPropagation(); Profile.showShowcaseNoteModal(${album.id})" title="Add note">📝</button>
         <button class="remove-btn" onclick="Profile.removeFromShowcase(${album.id})" title="Remove from showcase">&times;</button>
       </div>
     `).join('');
+  },
+
+  /**
+   * Show modal to edit showcase note
+   */
+  showShowcaseNoteModal(showcaseId) {
+    const album = this.showcase.find(a => a.id === showcaseId);
+    if (!album) return;
+
+    const html = `
+      <div class="note-modal-content">
+        <h3>Add Note</h3>
+        <p class="note-album-name">${this.escapeHtml(album.album)} - ${this.escapeHtml(album.artist)}</p>
+        <textarea id="showcase-note-input" maxlength="200" placeholder="Why is this special to you?">${album.notes || ''}</textarea>
+        <span class="char-count"><span id="note-char-count">${(album.notes || '').length}</span>/200</span>
+        <div class="note-modal-actions">
+          <button class="btn-cancel" onclick="Profile.closeShowcaseNoteModal()">Cancel</button>
+          <button class="btn-save" onclick="Profile.saveShowcaseNote(${showcaseId})">Save</button>
+        </div>
+      </div>
+    `;
+
+    let modal = document.getElementById('showcase-note-modal');
+    if (!modal) {
+      modal = document.createElement('div');
+      modal.id = 'showcase-note-modal';
+      modal.className = 'modal';
+      document.body.appendChild(modal);
+    }
+    modal.innerHTML = html;
+    modal.classList.add('open');
+
+    // Add character counter
+    document.getElementById('showcase-note-input').addEventListener('input', (e) => {
+      document.getElementById('note-char-count').textContent = e.target.value.length;
+    });
+  },
+
+  /**
+   * Close showcase note modal
+   */
+  closeShowcaseNoteModal() {
+    const modal = document.getElementById('showcase-note-modal');
+    if (modal) modal.classList.remove('open');
+  },
+
+  /**
+   * Save showcase note
+   */
+  async saveShowcaseNote(showcaseId) {
+    const notes = document.getElementById('showcase-note-input').value.trim();
+
+    try {
+      const response = await Auth.apiRequest(`/api/profile/me/showcase/${showcaseId}/notes`, {
+        method: 'PUT',
+        body: JSON.stringify({ notes: notes || null })
+      });
+
+      if (response.ok) {
+        const album = this.showcase.find(a => a.id === showcaseId);
+        if (album) album.notes = notes || null;
+        this.renderShowcase();
+        this.closeShowcaseNoteModal();
+      }
+    } catch (error) {
+      console.error('Error saving showcase note:', error);
+    }
   },
 
   /**
@@ -1374,6 +1758,16 @@ const Profile = {
     document.getElementById('edit-pronouns').value = this.profile?.pronouns || '';
     document.getElementById('edit-bio').value = this.profile?.bio || '';
     document.getElementById('bio-char-count').textContent = (this.profile?.bio || '').length;
+    document.getElementById('edit-location').value = this.profile?.location || '';
+
+    // Load external links
+    const links = this.profile?.external_links || {};
+    document.getElementById('edit-link-discogs').value = links.discogs || '';
+    document.getElementById('edit-link-instagram').value = links.instagram || '';
+    document.getElementById('edit-link-twitter').value = links.twitter || '';
+    document.getElementById('edit-link-youtube').value = links.youtube || '';
+    document.getElementById('edit-link-ebay').value = links.ebay || '';
+    document.getElementById('edit-link-website').value = links.website || '';
 
     // Load privacy settings
     const privacy = this.profile?.privacy || {};
@@ -1392,6 +1786,17 @@ const Profile = {
     const name = document.getElementById('edit-name').value.trim();
     const pronouns = document.getElementById('edit-pronouns').value.trim();
     const bio = document.getElementById('edit-bio').value.trim();
+    const location = document.getElementById('edit-location').value.trim();
+
+    // Get external links
+    const external_links = {
+      discogs: document.getElementById('edit-link-discogs').value.trim() || null,
+      instagram: document.getElementById('edit-link-instagram').value.trim() || null,
+      twitter: document.getElementById('edit-link-twitter').value.trim() || null,
+      youtube: document.getElementById('edit-link-youtube').value.trim() || null,
+      ebay: document.getElementById('edit-link-ebay').value.trim() || null,
+      website: document.getElementById('edit-link-website').value.trim() || null
+    };
 
     // Get privacy settings
     const privacy = {
@@ -1405,7 +1810,7 @@ const Profile = {
       // Save profile
       const profileResponse = await Auth.apiRequest('/api/profile/me', {
         method: 'PUT',
-        body: JSON.stringify({ name, pronouns, bio })
+        body: JSON.stringify({ name, pronouns, bio, location, external_links })
       });
 
       // Save privacy settings separately
@@ -1915,6 +2320,172 @@ const Profile = {
       }
     } catch (error) {
       console.error('Error removing album:', error);
+    }
+  },
+
+  // ============================================
+  // WISHLIST FUNCTIONALITY
+  // ============================================
+
+  wishlist: [],
+
+  /**
+   * Load wishlist items
+   */
+  async loadWishlist() {
+    const categoryId = this.userCategories?.find(c => c.slug === this.currentCategorySlug)?.id;
+    try {
+      const url = categoryId ? `/api/wishlist?category_id=${categoryId}` : '/api/wishlist';
+      const response = await Auth.apiRequest(url);
+      if (response.ok) {
+        this.wishlist = await response.json();
+        this.renderWishlist();
+      }
+    } catch (error) {
+      console.error('Error loading wishlist:', error);
+    }
+  },
+
+  /**
+   * Render wishlist section
+   */
+  renderWishlist() {
+    const section = document.getElementById('wishlist-section');
+    const grid = document.getElementById('wishlist-grid');
+    const countEl = document.getElementById('wishlist-count');
+    const emptyEl = document.getElementById('wishlist-empty');
+
+    if (!section || !grid) return;
+
+    // Always show section on own profile page
+    section.style.display = 'block';
+
+    countEl.textContent = this.wishlist.length;
+
+    if (this.wishlist.length === 0) {
+      emptyEl.style.display = 'block';
+      grid.innerHTML = '';
+      grid.appendChild(emptyEl);
+      return;
+    }
+
+    emptyEl.style.display = 'none';
+    const priorityLabels = ['Low', 'Medium', 'Grail!'];
+    const priorityClasses = ['low', 'medium', 'high'];
+
+    grid.innerHTML = this.wishlist.map(item => `
+      <div class="wishlist-card priority-${priorityClasses[item.priority] || 'low'}">
+        <div class="wishlist-header">
+          <span class="wishlist-priority ${priorityClasses[item.priority] || 'low'}">${priorityLabels[item.priority] || 'Low'}</span>
+          ${item.is_found ? '<span class="wishlist-found">Found!</span>' : ''}
+        </div>
+        <h4 class="wishlist-title">${this.escapeHtml(item.title)}</h4>
+        ${item.artist ? `<p class="wishlist-artist">${this.escapeHtml(item.artist)}</p>` : ''}
+        ${item.year ? `<p class="wishlist-year">${item.year}</p>` : ''}
+        ${item.description ? `<p class="wishlist-desc">${this.escapeHtml(item.description)}</p>` : ''}
+        <div class="wishlist-meta">
+          ${item.condition_wanted ? `<span class="wishlist-condition">${this.escapeHtml(item.condition_wanted)}</span>` : ''}
+          ${item.max_price ? `<span class="wishlist-price">Max $${item.max_price.toFixed(2)}</span>` : ''}
+        </div>
+        <div class="wishlist-actions">
+          ${!item.is_found ? `<button class="wishlist-found-btn" onclick="Profile.markWishlistFound(${item.id})">Mark Found</button>` : ''}
+          <button class="wishlist-delete-btn" onclick="Profile.deleteWishlistItem(${item.id})">&times;</button>
+        </div>
+      </div>
+    `).join('');
+  },
+
+  /**
+   * Open add wishlist modal
+   */
+  openAddWishlistModal() {
+    document.getElementById('wishlist-title').value = '';
+    document.getElementById('wishlist-artist').value = '';
+    document.getElementById('wishlist-year').value = '';
+    document.getElementById('wishlist-description').value = '';
+    document.getElementById('wishlist-condition').value = '';
+    document.getElementById('wishlist-max-price').value = '';
+    document.getElementById('wishlist-priority').value = '0';
+    document.getElementById('add-wishlist-modal').classList.add('open');
+  },
+
+  /**
+   * Add item to wishlist
+   */
+  async addWishlistItem() {
+    const categoryId = this.userCategories?.find(c => c.slug === this.currentCategorySlug)?.id;
+    if (!categoryId) {
+      alert('Please select a category first');
+      return;
+    }
+
+    const item = {
+      category_id: categoryId,
+      title: document.getElementById('wishlist-title').value.trim(),
+      artist: document.getElementById('wishlist-artist').value.trim() || null,
+      year: parseInt(document.getElementById('wishlist-year').value) || null,
+      description: document.getElementById('wishlist-description').value.trim() || null,
+      condition_wanted: document.getElementById('wishlist-condition').value || null,
+      max_price: parseFloat(document.getElementById('wishlist-max-price').value) || null,
+      priority: parseInt(document.getElementById('wishlist-priority').value) || 0
+    };
+
+    try {
+      const response = await Auth.apiRequest('/api/wishlist', {
+        method: 'POST',
+        body: JSON.stringify(item)
+      });
+
+      if (response.ok) {
+        const newItem = await response.json();
+        this.wishlist.unshift(newItem);
+        this.renderWishlist();
+        this.closeModal('add-wishlist-modal');
+      } else {
+        const error = await response.json();
+        alert(error.detail || 'Failed to add item');
+      }
+    } catch (error) {
+      console.error('Error adding wishlist item:', error);
+      alert('Failed to add item');
+    }
+  },
+
+  /**
+   * Mark wishlist item as found
+   */
+  async markWishlistFound(itemId) {
+    try {
+      const response = await Auth.apiRequest(`/api/wishlist/${itemId}`, {
+        method: 'PUT',
+        body: JSON.stringify({ is_found: true })
+      });
+
+      if (response.ok) {
+        const item = this.wishlist.find(i => i.id === itemId);
+        if (item) item.is_found = true;
+        this.renderWishlist();
+      }
+    } catch (error) {
+      console.error('Error marking item found:', error);
+    }
+  },
+
+  /**
+   * Delete wishlist item
+   */
+  async deleteWishlistItem(itemId) {
+    try {
+      const response = await Auth.apiRequest(`/api/wishlist/${itemId}`, {
+        method: 'DELETE'
+      });
+
+      if (response.ok) {
+        this.wishlist = this.wishlist.filter(i => i.id !== itemId);
+        this.renderWishlist();
+      }
+    } catch (error) {
+      console.error('Error deleting wishlist item:', error);
     }
   },
 

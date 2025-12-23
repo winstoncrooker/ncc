@@ -10,7 +10,7 @@ from fastapi.responses import JSONResponse
 import asgi
 
 from routes import discogs, chat, auth, collection, profile, upload, friends, messages
-from routes import categories, interests, posts, comments, votes, category_profiles, admin
+from routes import categories, interests, posts, comments, votes, category_profiles, admin, wishlist
 
 # Create FastAPI app with OpenAPI documentation
 app = FastAPI(
@@ -127,6 +127,7 @@ app.include_router(comments.router, prefix="/api", tags=["comments"])
 app.include_router(votes.router, prefix="/api/votes", tags=["votes"])
 app.include_router(category_profiles.router, prefix="/api/profile", tags=["category_profiles"])
 app.include_router(admin.router, prefix="/api/admin", tags=["admin"])
+app.include_router(wishlist.router, prefix="/api/wishlist", tags=["wishlist"])
 
 
 @app.get("/")

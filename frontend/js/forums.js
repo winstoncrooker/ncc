@@ -277,8 +277,20 @@ const Forums = {
     const downvoteClass = post.user_vote === -1 ? 'active' : '';
     const saveClass = post.is_saved ? 'active' : '';
 
+    // Parse images from post
+    let images = [];
+    try {
+      images = post.images ? JSON.parse(post.images) : [];
+    } catch (e) {
+      images = [];
+    }
+    const hasImage = images.length > 0;
+
+    // Author flair based on author data
+    const authorFlair = this.getAuthorFlair(post.author);
+
     return `
-      <article class="post-card" data-post-id="${post.id}">
+      <article class="post-card ${hasImage ? 'has-image' : ''}" data-post-id="${post.id}">
         <div class="post-votes">
           <button class="vote-btn upvote ${upvoteClass}" onclick="Forums.vote(${post.id}, 1)">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -298,12 +310,23 @@ const Forums = {
             ${post.interest_group_name ? `<span class="post-group">${post.interest_group_name}</span>` : ''}
             <span class="post-type-badge ${post.post_type}">${this.getPostTypeLabel(post.post_type)}</span>
           </div>
-          <h3 class="post-title">${this.escapeHtml(post.title)}</h3>
-          <p class="post-preview">${this.escapeHtml(preview)}</p>
+          <div class="post-main-content">
+            <div class="post-text">
+              <h3 class="post-title">${this.escapeHtml(post.title)}</h3>
+              <p class="post-preview">${this.escapeHtml(preview)}</p>
+            </div>
+            ${hasImage ? `
+              <div class="post-image-preview">
+                <img src="${images[0]}" alt="" loading="lazy">
+                ${images.length > 1 ? `<span class="image-count">+${images.length - 1}</span>` : ''}
+              </div>
+            ` : ''}
+          </div>
           <div class="post-meta-bottom">
             <span class="post-author">
               ${post.author.picture ? `<img src="${post.author.picture}" alt="">` : ''}
               ${this.escapeHtml(post.author.name || 'Anonymous')}
+              ${authorFlair}
             </span>
             <span class="post-time">${timeAgo}</span>
             <button class="post-action" onclick="event.stopPropagation(); Forums.openPost(${post.id})">
@@ -321,6 +344,28 @@ const Forums = {
         </div>
       </article>
     `;
+  },
+
+  /**
+   * Get author flair badge HTML
+   */
+  getAuthorFlair(author) {
+    if (!author) return '';
+    const badges = [];
+
+    // Check for verified seller
+    if (author.is_verified_seller) {
+      badges.push('<span class="author-flair verified">✓ Verified</span>');
+    }
+
+    // Check collection size for badges
+    if (author.collection_count >= 100) {
+      badges.push('<span class="author-flair collector">💯 100+</span>');
+    } else if (author.collection_count >= 50) {
+      badges.push('<span class="author-flair collector">🏆 50+</span>');
+    }
+
+    return badges.join('');
   },
 
   /**

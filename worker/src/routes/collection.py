@@ -29,6 +29,9 @@ class Album(BaseModel):
     discogs_id: Optional[int] = None
     year: Optional[int] = None
     category_id: Optional[int] = None
+    tags: Optional[str] = None  # Comma-separated: "for_trade,grail,sealed"
+    condition: Optional[str] = None
+    notes: Optional[str] = None
 
 
 class AlbumCreate(BaseModel):
@@ -41,6 +44,9 @@ class AlbumCreate(BaseModel):
     discogs_id: Optional[int] = None
     year: Optional[int] = None
     category_id: Optional[int] = None
+    tags: Optional[str] = None
+    condition: Optional[str] = None
+    notes: Optional[str] = None
 
 
 class AlbumUpdate(BaseModel):
@@ -52,6 +58,9 @@ class AlbumUpdate(BaseModel):
     price: Optional[float] = None
     discogs_id: Optional[int] = None
     year: Optional[int] = None
+    tags: Optional[str] = None
+    condition: Optional[str] = None
+    notes: Optional[str] = None
 
 
 class SyncRequest(BaseModel):
@@ -72,6 +81,7 @@ class CollectionStats(BaseModel):
     total_albums: int
     total_value: float
     genres: dict[str, int]
+    category_breakdown: dict[int, int] = {}  # category_id -> count
 
 
 @router.get("/")
@@ -89,14 +99,14 @@ async def get_collection(
     try:
         if category_id:
             results = await env.DB.prepare(
-                """SELECT id, artist, album, genre, cover, price, discogs_id, year, category_id
+                """SELECT id, artist, album, genre, cover, price, discogs_id, year, category_id, tags, condition, notes
                    FROM collections
                    WHERE user_id = ? AND category_id = ?
                    ORDER BY artist, album"""
             ).bind(user_id, category_id).all()
         else:
             results = await env.DB.prepare(
-                """SELECT id, artist, album, genre, cover, price, discogs_id, year, category_id
+                """SELECT id, artist, album, genre, cover, price, discogs_id, year, category_id, tags, condition, notes
                    FROM collections
                    WHERE user_id = ?
                    ORDER BY artist, album"""
@@ -116,7 +126,10 @@ async def get_collection(
                 price=to_python_value(row.get("price")),
                 discogs_id=to_python_value(row.get("discogs_id")),
                 year=to_python_value(row.get("year")),
-                category_id=to_python_value(row.get("category_id"))
+                category_id=to_python_value(row.get("category_id")),
+                tags=to_python_value(row.get("tags")),
+                condition=to_python_value(row.get("condition")),
+                notes=to_python_value(row.get("notes"))
             ))
 
         return albums
@@ -178,6 +191,15 @@ async def add_album(
         if body.category_id is not None:
             fields.append("category_id")
             values.append(body.category_id)
+        if body.tags:
+            fields.append("tags")
+            values.append(body.tags)
+        if body.condition:
+            fields.append("condition")
+            values.append(body.condition)
+        if body.notes:
+            fields.append("notes")
+            values.append(body.notes)
 
         placeholders = ", ".join(["?" for _ in fields])
         field_names = ", ".join(fields)
@@ -256,6 +278,15 @@ async def update_album(
         if body.year is not None:
             updates.append("year = ?")
             values.append(body.year)
+        if body.tags is not None:
+            updates.append("tags = ?")
+            values.append(body.tags)
+        if body.condition is not None:
+            updates.append("condition = ?")
+            values.append(body.condition)
+        if body.notes is not None:
+            updates.append("notes = ?")
+            values.append(body.notes)
 
         if updates:
             updates.append("updated_at = CURRENT_TIMESTAMP")
@@ -439,10 +470,27 @@ async def get_stats(
             if genre_val:
                 genres[genre_val] = row["count"]
 
+        # Get category breakdown
+        category_result = await env.DB.prepare(
+            """SELECT category_id, COUNT(*) as count
+               FROM collections
+               WHERE user_id = ? AND category_id IS NOT NULL
+               GROUP BY category_id"""
+        ).bind(user_id).all()
+
+        category_breakdown = {}
+        for row in category_result.results:
+            if hasattr(row, 'to_py'):
+                row = row.to_py()
+            cat_id = to_python_value(row.get("category_id"))
+            if cat_id is not None:
+                category_breakdown[int(cat_id)] = row["count"]
+
         return CollectionStats(
             total_albums=totals["count"] or 0 if totals else 0,
             total_value=totals["total_value"] or 0.0 if totals else 0.0,
-            genres=genres
+            genres=genres,
+            category_breakdown=category_breakdown
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error fetching stats: {str(e)}")
