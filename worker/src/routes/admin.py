@@ -26,7 +26,7 @@ class UserListResponse(BaseModel):
 
 
 # Admin emails (add your email here)
-ADMIN_EMAILS = ["winstoncrooker@gmail.com", "christophercrooker@gmail.com"]
+ADMIN_EMAILS = ["winstoncrooker8@gmail.com", "christophercrooker@gmail.com"]
 
 
 @router.get("/users")
@@ -69,7 +69,7 @@ async def list_users(
         admin_emails_lower = [e.lower().strip() for e in ADMIN_EMAILS]
 
         if email_lower not in admin_emails_lower:
-            raise HTTPException(status_code=403, detail="Admin access required - not authorized")
+            raise HTTPException(status_code=403, detail=f"Admin access required - email '{email_lower}' not in admin list")
 
     except HTTPException:
         raise

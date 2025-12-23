@@ -229,13 +229,11 @@
       try {
         const response = await Auth.apiRequest('/api/admin/users');
 
-        if (response.status === 403) {
-          tableEl.innerHTML = '<div class="error">Access denied. Admin privileges required.</div>';
-          return;
-        }
-
         if (!response.ok) {
-          throw new Error('Failed to load users');
+          const errorData = await response.json().catch(() => ({}));
+          const errorMsg = errorData.detail || 'Access denied';
+          tableEl.innerHTML = `<div class="error">${escapeHtml(errorMsg)}</div>`;
+          return;
         }
 
         const data = await response.json();
