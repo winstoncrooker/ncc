@@ -438,7 +438,7 @@
   color: var(--accent);
 }
 
-/* Category-specific badge colors */
+/* Category-specific badge colors (matching categoryColors in profile.js) */
 .collection-badge[data-category="cars"] {
   background: rgba(230, 57, 70, 0.1);
   border-color: rgba(230, 57, 70, 0.3);
@@ -451,47 +451,47 @@
 }
 
 .collection-badge[data-category="coins"] {
-  background: rgba(244, 162, 97, 0.1);
-  border-color: rgba(244, 162, 97, 0.3);
+  background: rgba(212, 163, 115, 0.1);
+  border-color: rgba(212, 163, 115, 0.3);
 }
 .collection-badge[data-category="coins"]:hover {
-  background: rgba(244, 162, 97, 0.2);
+  background: rgba(212, 163, 115, 0.2);
 }
 .collection-badge[data-category="coins"] .badge-count {
-  color: #f4a261;
+  color: #d4a373;
 }
 
 .collection-badge[data-category="comics"] {
-  background: rgba(139, 92, 246, 0.1);
-  border-color: rgba(139, 92, 246, 0.3);
+  background: rgba(247, 127, 0, 0.1);
+  border-color: rgba(247, 127, 0, 0.3);
 }
 .collection-badge[data-category="comics"]:hover {
-  background: rgba(139, 92, 246, 0.2);
+  background: rgba(247, 127, 0, 0.2);
 }
 .collection-badge[data-category="comics"] .badge-count {
-  color: #8b5cf6;
+  color: #f77f00;
 }
 
 .collection-badge[data-category="trading-cards"] {
-  background: rgba(249, 115, 22, 0.1);
-  border-color: rgba(249, 115, 22, 0.3);
+  background: rgba(255, 107, 53, 0.1);
+  border-color: rgba(255, 107, 53, 0.3);
 }
 .collection-badge[data-category="trading-cards"]:hover {
-  background: rgba(249, 115, 22, 0.2);
+  background: rgba(255, 107, 53, 0.2);
 }
 .collection-badge[data-category="trading-cards"] .badge-count {
-  color: #f97316;
+  color: #ff6b35;
 }
 
 .collection-badge[data-category="video-games"] {
-  background: rgba(6, 182, 212, 0.1);
-  border-color: rgba(6, 182, 212, 0.3);
+  background: rgba(67, 97, 238, 0.1);
+  border-color: rgba(67, 97, 238, 0.3);
 }
 .collection-badge[data-category="video-games"]:hover {
-  background: rgba(6, 182, 212, 0.2);
+  background: rgba(67, 97, 238, 0.2);
 }
 .collection-badge[data-category="video-games"] .badge-count {
-  color: #06b6d4;
+  color: #4361ee;
 }
 
 .collection-badge[data-category="vinyl"] {
@@ -506,25 +506,25 @@
 }
 
 .collection-badge[data-category="watches"] {
-  background: rgba(100, 116, 139, 0.1);
-  border-color: rgba(100, 116, 139, 0.3);
+  background: rgba(42, 157, 143, 0.1);
+  border-color: rgba(42, 157, 143, 0.3);
 }
 .collection-badge[data-category="watches"]:hover {
-  background: rgba(100, 116, 139, 0.2);
+  background: rgba(42, 157, 143, 0.2);
 }
 .collection-badge[data-category="watches"] .badge-count {
-  color: #64748b;
+  color: #2a9d8f;
 }
 
 .collection-badge[data-category="sneakers"] {
-  background: rgba(34, 197, 94, 0.1);
-  border-color: rgba(34, 197, 94, 0.3);
+  background: rgba(123, 44, 191, 0.1);
+  border-color: rgba(123, 44, 191, 0.3);
 }
 .collection-badge[data-category="sneakers"]:hover {
-  background: rgba(34, 197, 94, 0.2);
+  background: rgba(123, 44, 191, 0.2);
 }
 .collection-badge[data-category="sneakers"] .badge-count {
-  color: #22c55e;
+  color: #7b2cbf;
 }
 
 .collector-score {
