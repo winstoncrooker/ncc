@@ -965,6 +965,7 @@ const Profile = {
       const isActive = cat.slug === this.currentCategorySlug;
       return `
         <div class="collection-badge ${isActive ? 'active' : ''}"
+             data-category="${cat.slug}"
              onclick="Profile.switchCategoryProfile('${cat.slug}')"
              title="View ${cat.name} collection">
           <span class="badge-icon">${cat.icon || '📦'}</span>

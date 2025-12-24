@@ -186,8 +186,10 @@ async def search_album(
                 discogs_secret = str(env.DISCOGS_SECRET)
         except Exception as e:
             print(f"[Discogs] Error getting secrets: {e}")
+            raise HTTPException(status_code=500, detail=f"Error accessing Discogs credentials: {str(e)}")
 
         if not discogs_key or not discogs_secret:
+            print(f"[Discogs] Missing credentials - key: {bool(discogs_key)}, secret: {bool(discogs_secret)}")
             raise HTTPException(status_code=500, detail="Discogs credentials not configured")
 
         query = f"{artist} {album}"
@@ -195,36 +197,45 @@ async def search_album(
         url = f"{DISCOGS_API}/database/search?q={encoded_query}&type=release&key={discogs_key}&secret={discogs_secret}"
 
         print(f"[Discogs] Searching: {artist} - {album}")
+        print(f"[Discogs] URL: {DISCOGS_API}/database/search?q={encoded_query}&type=release")
 
         headers = to_js({
             "User-Agent": "NicheCollectorConnector/1.0 +https://niche-collector.pages.dev"
         })
 
+        print(f"[Discogs] Making API request...")
         response = await js.fetch(url, to_js({"headers": headers}))
+        print(f"[Discogs] Response status: {response.status}")
 
         if response.status != 200:
             text = await response.text()
-            print(f"[Discogs] API error {response.status}: {text[:200]}")
+            print(f"[Discogs] API error {response.status}: {text[:500]}")
             raise HTTPException(
                 status_code=response.status,
                 detail=f"Discogs API error: {response.status} - {text[:200]}"
             )
 
         # Parse JSON response
+        print(f"[Discogs] Parsing JSON response...")
         json_data = await response.json()
 
         # Handle both JsProxy and dict cases
         if hasattr(json_data, 'to_py'):
+            print(f"[Discogs] Converting JsProxy to Python dict...")
             data = json_data.to_py()
         else:
+            print(f"[Discogs] Response is already a dict or dict-like...")
             data = dict(json_data) if json_data else {}
 
+        print(f"[Discogs] Data type: {type(data)}, keys: {list(data.keys()) if isinstance(data, dict) else 'N/A'}")
+
         results = data.get("results", [])
+        print(f"[Discogs] Found {len(results)} results")
+
         if not results:
-            raise HTTPException(status_code=404, detail="Album not found")
+            raise HTTPException(status_code=404, detail="Album not found on Discogs")
 
         # Find best match
-        results = data["results"]
         best_match = None
         artist_lower = artist.lower()
         album_lower = album.lower()
@@ -238,9 +249,18 @@ async def search_album(
         if not best_match:
             best_match = results[0]
 
+        print(f"[Discogs] Best match: {best_match.get('title', 'Unknown')}")
+
         # Get cover image
         cover_url = best_match.get("cover_image") or best_match.get("thumb")
-        local_cover = await cache_image(env, cover_url, cache_key)
+        print(f"[Discogs] Cover URL: {cover_url[:100] if cover_url else 'None'}...")
+
+        try:
+            local_cover = await cache_image(env, cover_url, cache_key)
+            print(f"[Discogs] Local cover: {local_cover[:100] if local_cover else 'None'}...")
+        except Exception as img_err:
+            print(f"[Discogs] Error caching image: {type(img_err).__name__}: {str(img_err)}")
+            local_cover = cover_url  # Fall back to original URL
 
         # Get price (separate request to avoid rate limits in main search)
         price = None
@@ -256,7 +276,11 @@ async def search_album(
         )
 
         # Cache the result
-        await save_cached_data(env, cache_key, result.model_dump())
+        try:
+            await save_cached_data(env, cache_key, result.model_dump())
+            print(f"[Discogs] Result cached successfully")
+        except Exception as cache_err:
+            print(f"[Discogs] Error caching result (non-fatal): {str(cache_err)}")
 
         return result
 
@@ -264,7 +288,10 @@ async def search_album(
         raise
     except Exception as e:
         # Provide more context in error messages
+        import traceback
         error_msg = f"Discogs search error: {type(e).__name__}: {str(e)}"
+        print(f"[Discogs] EXCEPTION: {error_msg}")
+        print(f"[Discogs] Traceback: {traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=error_msg)
 
 
