@@ -660,9 +660,19 @@ const Profile = {
       .map(([key, value]) => {
         const config = this.socialPlatforms[key];
         let url = value;
+        const isClickable = config.urlPrefix || value.startsWith('http');
+
         if (config.urlPrefix && !value.startsWith('http')) {
           url = config.urlPrefix + value.replace(/^@/, '');
         }
+
+        // For non-linkable items (like Discord usernames), show as non-clickable
+        if (!isClickable) {
+          return `<span class="external-link non-clickable" title="${config.label}: ${this.escapeHtml(value)}">
+            <span class="link-icon">${config.icon}</span>
+          </span>`;
+        }
+
         return `<a href="${this.escapeHtml(url)}" target="_blank" rel="noopener" class="external-link" title="${config.label}">
           <span class="link-icon">${config.icon}</span>
         </a>`;
@@ -974,8 +984,8 @@ const Profile = {
     // Points for collection size
     score += Math.min(stats.total_albums * 2, 200);
 
-    // Points for showcase items
-    score += (this.showcase?.length || 0) * 10;
+    // Points for showcase items (use total from stats, not current category)
+    score += (stats.total_showcase || 0) * 10;
 
     // Points for diversity (multiple categories)
     const categoryCount = Object.keys(stats.category_breakdown || {}).length;
@@ -1906,9 +1916,11 @@ const Profile = {
    * Save showcase note
    */
   async saveShowcaseNote(showcaseId) {
-    const notes = document.getElementById('showcase-note-input').value.trim();
+    const notesInput = document.getElementById('showcase-note-input');
+    const notes = notesInput ? notesInput.value.trim() : '';
 
     try {
+      // Send empty string as null to clear notes
       const response = await Auth.apiRequest(`/api/profile/me/showcase/${showcaseId}/notes`, {
         method: 'PUT',
         body: JSON.stringify({ notes: notes || null })
@@ -1919,6 +1931,8 @@ const Profile = {
         if (album) album.notes = notes || null;
         this.renderShowcase();
         this.closeShowcaseNoteModal();
+      } else {
+        console.error('Failed to save note:', await response.text());
       }
     } catch (error) {
       console.error('Error saving showcase note:', error);

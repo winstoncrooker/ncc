@@ -145,6 +145,11 @@ const Forums = {
       this.loadFeed(true);
       this.loadMyGroups();
     }
+
+    // Reset accent color when switching back to Profile
+    if (tab === 'profile' && typeof Profile !== 'undefined') {
+      Profile.applyCategoryColor(Profile.currentCategorySlug);
+    }
   },
 
   /**

@@ -746,8 +746,8 @@
 }
 
 .category-card.selected {
-  border-color: #1db954;
-  background: rgba(29, 185, 84, 0.1);
+  border-color: var(--accent, #1db954);
+  background: var(--bg-dark, #0e0e0e);
 }
 
 .category-card .category-icon {

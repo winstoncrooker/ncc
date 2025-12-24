@@ -511,6 +511,17 @@
   font-size: 1.1rem;
 }
 
+.external-link.non-clickable {
+  cursor: default;
+  opacity: 0.7;
+}
+
+.external-link.non-clickable:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.15);
+  transform: none;
+}
+
 /* External Links Section in Edit Modal */
 .external-links-section {
   border-top: 1px solid rgba(255, 255, 255, 0.1);

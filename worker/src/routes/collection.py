@@ -80,6 +80,7 @@ class CollectionStats(BaseModel):
     """Collection statistics"""
     total_albums: int
     total_value: float
+    total_showcase: int = 0
     genres: dict[str, int]
     category_breakdown: dict[int, int] = {}  # category_id -> count
 
@@ -486,9 +487,18 @@ async def get_stats(
             if cat_id is not None:
                 category_breakdown[int(cat_id)] = row["count"]
 
+        # Get total showcase count across all categories
+        showcase_result = await env.DB.prepare(
+            "SELECT COUNT(*) as count FROM showcase_albums WHERE user_id = ?"
+        ).bind(user_id).first()
+        if showcase_result and hasattr(showcase_result, 'to_py'):
+            showcase_result = showcase_result.to_py()
+        total_showcase = showcase_result.get("count", 0) or 0 if showcase_result else 0
+
         return CollectionStats(
             total_albums=totals["count"] or 0 if totals else 0,
             total_value=totals["total_value"] or 0.0 if totals else 0.0,
+            total_showcase=total_showcase,
             genres=genres,
             category_breakdown=category_breakdown
         )
