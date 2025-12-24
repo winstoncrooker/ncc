@@ -129,6 +129,15 @@ const Forums = {
       view.classList.toggle('active', view.id === `${tab}-view`);
     });
 
+    // Close friend profile page if open (fixes navigation bug)
+    const friendProfilePage = document.getElementById('friend-profile-page');
+    if (friendProfilePage) {
+      friendProfilePage.style.display = 'none';
+      if (typeof Profile !== 'undefined') {
+        Profile.closeFriendProfile();
+      }
+    }
+
     // Show/hide AI chat button based on tab
     const aiToggleBtn = document.getElementById('ai-toggle-btn');
     const aiSidebar = document.getElementById('ai-sidebar');
@@ -142,6 +151,12 @@ const Forums = {
 
     // Load forums data if switching to forums
     if (tab === 'forums') {
+      // Auto-filter to current profile category if set
+      if (typeof Profile !== 'undefined' && Profile.currentCategorySlug) {
+        this.currentCategory = Profile.currentCategorySlug;
+        this.currentGroupId = null;
+        this.applyCategoryColor(Profile.currentCategorySlug);
+      }
       this.loadFeed(true);
       this.loadMyGroups();
     }

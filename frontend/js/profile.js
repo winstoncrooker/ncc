@@ -824,11 +824,16 @@ const Profile = {
       'rare': { label: 'Rare', class: 'tag-rare' }
     };
 
-    const tags = tagsStr.split(',').filter(t => t.trim());
+    // Filter to only valid tags (must be in tagConfig), ignore junk like "[]"
+    const validTagKeys = Object.keys(tagConfig);
+    const tags = tagsStr.split(',')
+      .map(t => t.trim())
+      .filter(t => t && validTagKeys.includes(t));
+
     if (tags.length === 0) return '';
 
     return `<div class="item-tags">${tags.map(tag => {
-      const config = tagConfig[tag.trim()] || { label: tag.trim(), class: 'tag-default' };
+      const config = tagConfig[tag];
       return `<span class="item-tag ${config.class}">${config.label}</span>`;
     }).join('')}</div>`;
   },

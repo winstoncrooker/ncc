@@ -186,11 +186,11 @@
 }
 
 .group-item:hover {
-  background: rgba(29, 185, 84, 0.15);
+  background: rgba(255, 255, 255, 0.08);
 }
 
 .group-item.active {
-  background: rgba(29, 185, 84, 0.25);
+  background: var(--bg-dark, #0e0e0e);
   border-left: 3px solid var(--accent, #1db954);
 }
 
