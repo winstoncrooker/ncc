@@ -354,6 +354,11 @@ const Profile = {
       if (countEl) countEl.textContent = e.target.value.length;
     });
 
+    // Social links add button
+    addListener('add-social-btn', 'click', () => {
+      this.showSocialPicker();
+    });
+
     // Add to Showcase button
     addListener('add-to-showcase-btn', 'click', () => {
       if (this.collection.length === 0) {
@@ -493,10 +498,6 @@ const Profile = {
       this.sendMessage();
     });
 
-    // Category profile switcher
-    addListener('category-profile-select', 'change', (e) => {
-      this.switchCategoryProfile(e.target.value);
-    });
   },
 
   /**
@@ -616,6 +617,27 @@ const Profile = {
     }
   },
 
+  // Social link platform configurations
+  socialPlatforms: {
+    instagram: { icon: '📷', label: 'Instagram', urlPrefix: 'https://instagram.com/', placeholder: '@username' },
+    tiktok: { icon: '🎵', label: 'TikTok', urlPrefix: 'https://tiktok.com/@', placeholder: '@username' },
+    twitter: { icon: '🐦', label: 'Twitter/X', urlPrefix: 'https://twitter.com/', placeholder: '@username' },
+    youtube: { icon: '📺', label: 'YouTube', urlPrefix: '', placeholder: 'Channel URL' },
+    facebook: { icon: '👤', label: 'Facebook', urlPrefix: 'https://facebook.com/', placeholder: 'Profile URL or username' },
+    threads: { icon: '🧵', label: 'Threads', urlPrefix: 'https://threads.net/@', placeholder: '@username' },
+    bluesky: { icon: '🦋', label: 'Bluesky', urlPrefix: 'https://bsky.app/profile/', placeholder: 'handle.bsky.social' },
+    mastodon: { icon: '🐘', label: 'Mastodon', urlPrefix: '', placeholder: '@user@instance.social' },
+    twitch: { icon: '🎮', label: 'Twitch', urlPrefix: 'https://twitch.tv/', placeholder: 'username' },
+    discord: { icon: '💬', label: 'Discord', urlPrefix: '', placeholder: 'username or invite link' },
+    spotify: { icon: '🎧', label: 'Spotify', urlPrefix: '', placeholder: 'Profile or playlist URL' },
+    soundcloud: { icon: '☁️', label: 'SoundCloud', urlPrefix: 'https://soundcloud.com/', placeholder: 'username' },
+    bandcamp: { icon: '🎸', label: 'Bandcamp', urlPrefix: '', placeholder: 'Profile URL' },
+    linkedin: { icon: '💼', label: 'LinkedIn', urlPrefix: 'https://linkedin.com/in/', placeholder: 'profile-name' },
+    pinterest: { icon: '📌', label: 'Pinterest', urlPrefix: 'https://pinterest.com/', placeholder: 'username' },
+    reddit: { icon: '🔴', label: 'Reddit', urlPrefix: 'https://reddit.com/user/', placeholder: 'u/username' },
+    website: { icon: '🌐', label: 'Website', urlPrefix: '', placeholder: 'https://...' }
+  },
+
   /**
    * Render external links display
    */
@@ -631,19 +653,10 @@ const Profile = {
       return;
     }
 
-    const linkConfigs = [
-      { key: 'discogs', icon: '💿', label: 'Discogs', urlPrefix: 'https://www.discogs.com/user/' },
-      { key: 'instagram', icon: '📷', label: 'Instagram', urlPrefix: 'https://instagram.com/' },
-      { key: 'twitter', icon: '🐦', label: 'Twitter', urlPrefix: 'https://twitter.com/' },
-      { key: 'youtube', icon: '📺', label: 'YouTube', urlPrefix: '' },
-      { key: 'ebay', icon: '🛒', label: 'eBay', urlPrefix: 'https://www.ebay.com/usr/' },
-      { key: 'website', icon: '🌐', label: 'Website', urlPrefix: '' }
-    ];
-
-    const linksHtml = linkConfigs
-      .filter(config => links[config.key])
-      .map(config => {
-        const value = links[config.key];
+    const linksHtml = Object.entries(links)
+      .filter(([key, value]) => value && this.socialPlatforms[key])
+      .map(([key, value]) => {
+        const config = this.socialPlatforms[key];
         let url = value;
         if (config.urlPrefix && !value.startsWith('http')) {
           url = config.urlPrefix + value.replace(/^@/, '');
@@ -656,6 +669,129 @@ const Profile = {
 
     container.innerHTML = linksHtml;
     container.style.display = 'flex';
+  },
+
+  /**
+   * Populate social links in edit modal
+   */
+  populateSocialLinksEditor() {
+    const container = document.getElementById('social-links-list');
+    if (!container) return;
+
+    const links = this.profile?.external_links || {};
+    container.innerHTML = '';
+
+    // Add existing links
+    Object.entries(links).forEach(([key, value]) => {
+      if (value && this.socialPlatforms[key]) {
+        this.addSocialLinkField(key, value);
+      }
+    });
+  },
+
+  /**
+   * Add a social link input field
+   */
+  addSocialLinkField(platform, value = '') {
+    const container = document.getElementById('social-links-list');
+    const config = this.socialPlatforms[platform];
+    if (!config) return;
+
+    const fieldId = `social-link-${platform}`;
+
+    // Check if field already exists
+    if (document.getElementById(fieldId)) return;
+
+    const fieldHtml = `
+      <div class="social-link-field" data-platform="${platform}" id="field-${platform}">
+        <span class="social-link-icon">${config.icon}</span>
+        <input type="text" id="${fieldId}" value="${this.escapeHtml(value)}"
+               placeholder="${config.placeholder}" maxlength="200">
+        <button type="button" class="remove-social-btn" onclick="Profile.removeSocialLinkField('${platform}')">&times;</button>
+      </div>
+    `;
+    container.insertAdjacentHTML('beforeend', fieldHtml);
+
+    // Hide this option from picker
+    this.updateSocialPicker();
+  },
+
+  /**
+   * Remove a social link field
+   */
+  removeSocialLinkField(platform) {
+    const field = document.getElementById(`field-${platform}`);
+    if (field) field.remove();
+    this.updateSocialPicker();
+  },
+
+  /**
+   * Show social platform picker
+   */
+  showSocialPicker() {
+    const picker = document.getElementById('social-picker');
+    const options = document.getElementById('social-picker-options');
+
+    // Get already added platforms
+    const addedPlatforms = Array.from(document.querySelectorAll('.social-link-field'))
+      .map(el => el.dataset.platform);
+
+    // Build options for platforms not yet added
+    const availableHtml = Object.entries(this.socialPlatforms)
+      .filter(([key]) => !addedPlatforms.includes(key))
+      .map(([key, config]) => `
+        <button type="button" class="social-option" onclick="Profile.selectSocialPlatform('${key}')">
+          <span>${config.icon}</span> ${config.label}
+        </button>
+      `)
+      .join('');
+
+    if (availableHtml) {
+      options.innerHTML = availableHtml;
+      picker.style.display = 'block';
+    }
+  },
+
+  /**
+   * Hide social platform picker
+   */
+  hideSocialPicker() {
+    const picker = document.getElementById('social-picker');
+    if (picker) picker.style.display = 'none';
+  },
+
+  /**
+   * Select a platform from picker
+   */
+  selectSocialPlatform(platform) {
+    this.addSocialLinkField(platform, '');
+    this.hideSocialPicker();
+    // Focus the new input
+    const input = document.getElementById(`social-link-${platform}`);
+    if (input) input.focus();
+  },
+
+  /**
+   * Update social picker options
+   */
+  updateSocialPicker() {
+    // Just hide picker after changes
+    this.hideSocialPicker();
+  },
+
+  /**
+   * Get social links from form
+   */
+  getSocialLinksFromForm() {
+    const links = {};
+    document.querySelectorAll('.social-link-field').forEach(field => {
+      const platform = field.dataset.platform;
+      const input = field.querySelector('input');
+      if (input && input.value.trim()) {
+        links[platform] = input.value.trim();
+      }
+    });
+    return links;
   },
 
   /**
@@ -953,6 +1089,9 @@ const Profile = {
 
       // Update all UI elements for this category
       this.updateUIForCategory(categorySlug);
+
+      // Re-render collection summary to update active badge highlighting
+      await this.renderCollectionSummary();
 
       // Reset AI chat for new category context
       this.resetAIChat();
@@ -1760,14 +1899,8 @@ const Profile = {
     document.getElementById('bio-char-count').textContent = (this.profile?.bio || '').length;
     document.getElementById('edit-location').value = this.profile?.location || '';
 
-    // Load external links
-    const links = this.profile?.external_links || {};
-    document.getElementById('edit-link-discogs').value = links.discogs || '';
-    document.getElementById('edit-link-instagram').value = links.instagram || '';
-    document.getElementById('edit-link-twitter').value = links.twitter || '';
-    document.getElementById('edit-link-youtube').value = links.youtube || '';
-    document.getElementById('edit-link-ebay').value = links.ebay || '';
-    document.getElementById('edit-link-website').value = links.website || '';
+    // Load social links dynamically
+    this.populateSocialLinksEditor();
 
     // Load privacy settings
     const privacy = this.profile?.privacy || {};
@@ -1788,15 +1921,8 @@ const Profile = {
     const bio = document.getElementById('edit-bio').value.trim();
     const location = document.getElementById('edit-location').value.trim();
 
-    // Get external links
-    const external_links = {
-      discogs: document.getElementById('edit-link-discogs').value.trim() || null,
-      instagram: document.getElementById('edit-link-instagram').value.trim() || null,
-      twitter: document.getElementById('edit-link-twitter').value.trim() || null,
-      youtube: document.getElementById('edit-link-youtube').value.trim() || null,
-      ebay: document.getElementById('edit-link-ebay').value.trim() || null,
-      website: document.getElementById('edit-link-website').value.trim() || null
-    };
+    // Get social links from dynamic form
+    const external_links = this.getSocialLinksFromForm();
 
     // Get privacy settings
     const privacy = {

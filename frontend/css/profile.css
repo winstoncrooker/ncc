@@ -28,6 +28,80 @@
   --shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
 }
 
+/* Light mode specific overrides for elements using rgba(255,255,255,...) */
+[data-theme="light"] .member-since {
+  background: rgba(0, 0, 0, 0.05);
+}
+
+[data-theme="light"] .completion-bar {
+  background: rgba(0, 0, 0, 0.1);
+}
+
+[data-theme="light"] .collection-summary-card {
+  background: rgba(0, 0, 0, 0.03);
+}
+
+[data-theme="light"] .external-link {
+  background: rgba(0, 0, 0, 0.05);
+  border: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+[data-theme="light"] .external-links-section {
+  border-top-color: rgba(0, 0, 0, 0.1);
+}
+
+[data-theme="light"] .wishlist-condition,
+[data-theme="light"] .wishlist-price {
+  background: rgba(0, 0, 0, 0.05);
+}
+
+[data-theme="light"] .wishlist-priority.low {
+  background: rgba(0, 0, 0, 0.08);
+}
+
+[data-theme="light"] .album-card .album-info {
+  background: linear-gradient(transparent, rgba(0, 0, 0, 0.85));
+}
+
+[data-theme="light"] .album-card .album-info .album-title,
+[data-theme="light"] .album-card .album-info .album-artist {
+  color: #fff;
+}
+
+[data-theme="light"] .showcase-select-item .album-overlay {
+  background: linear-gradient(transparent, rgba(0, 0, 0, 0.9));
+}
+
+[data-theme="light"] .showcase-select-item .album-overlay span {
+  color: #fff;
+}
+
+[data-theme="light"] .ai-sidebar {
+  box-shadow: -10px 0 40px rgba(0, 0, 0, 0.15);
+}
+
+[data-theme="light"] .social-links-section {
+  border-top-color: rgba(0, 0, 0, 0.1);
+}
+
+[data-theme="light"] .hero-background {
+  background: linear-gradient(135deg, #e0e0e0 0%, #f5f5f5 50%, #e0e0e0 100%);
+}
+
+[data-theme="light"] .hero-background::after {
+  background: linear-gradient(transparent, var(--bg-dark));
+}
+
+[data-theme="light"] .change-bg-btn {
+  background: rgba(255, 255, 255, 0.8);
+  color: var(--text-secondary);
+}
+
+[data-theme="light"] .change-bg-btn:hover {
+  background: var(--accent);
+  color: #000;
+}
+
 /* Theme Toggle Button */
 .theme-toggle {
   background: none;
@@ -3815,5 +3889,191 @@
   .friend-collection-grid {
     grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
     gap: 12px;
+  }
+}
+
+/* ============================================
+   SOCIAL LINKS EDITOR (Edit Profile Modal)
+   ============================================ */
+.social-links-section {
+  border-top: 1px solid var(--border-color);
+  margin-top: 16px;
+  padding-top: 16px;
+}
+
+.social-links-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.social-links-header h4 {
+  margin: 0;
+  font-size: 0.95rem;
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.add-social-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: none;
+  color: #000;
+  font-size: 1.3rem;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.add-social-btn:hover {
+  transform: scale(1.1);
+  box-shadow: 0 4px 12px rgba(29, 185, 84, 0.4);
+}
+
+.social-links-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.social-link-field {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  background: var(--bg-hover);
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  transition: border-color 0.2s;
+}
+
+.social-link-field:focus-within {
+  border-color: var(--accent);
+}
+
+.social-link-icon {
+  font-size: 1.2rem;
+  flex-shrink: 0;
+  width: 24px;
+  text-align: center;
+}
+
+.social-link-label {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  min-width: 80px;
+  flex-shrink: 0;
+}
+
+.social-link-field input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  color: var(--text-primary);
+  font-size: 0.9rem;
+  padding: 4px 0;
+  outline: none;
+}
+
+.social-link-field input::placeholder {
+  color: var(--text-muted);
+}
+
+.remove-social-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  font-size: 1.1rem;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 50%;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.remove-social-btn:hover {
+  color: #ff6b6b;
+  background: rgba(255, 107, 107, 0.1);
+}
+
+/* Social Platform Picker */
+.social-picker {
+  margin-top: 12px;
+  padding: 12px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  box-shadow: var(--shadow);
+}
+
+.social-picker-options {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+  gap: 8px;
+}
+
+.social-option {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 12px 8px;
+  background: var(--bg-hover);
+  border: 1px solid transparent;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.social-option:hover {
+  border-color: var(--accent);
+  background: rgba(29, 185, 84, 0.1);
+  transform: translateY(-2px);
+}
+
+.social-option.disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.social-option-icon {
+  font-size: 1.4rem;
+}
+
+.social-option-label {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  text-align: center;
+}
+
+/* Empty state for social links */
+.social-links-empty {
+  text-align: center;
+  padding: 16px;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}
+
+/* Mobile responsive for social links */
+@media (max-width: 768px) {
+  .social-picker-options {
+    grid-template-columns: repeat(3, 1fr);
+  }
+
+  .social-link-label {
+    display: none;
+  }
+
+  .social-link-field {
+    padding: 8px 10px;
   }
 }
