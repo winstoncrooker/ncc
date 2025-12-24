@@ -886,6 +886,8 @@
   color: var(--text-primary);
   font-size: 0.95rem;
   transition: border-color 0.2s;
+  box-sizing: border-box;
+  text-overflow: ellipsis;
 }
 
 .collection-search input:focus,
@@ -903,6 +905,7 @@
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
+  flex-shrink: 0;  /* Prevent controls from shrinking into search bar */
 }
 
 .filter-select {

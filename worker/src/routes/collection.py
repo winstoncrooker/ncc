@@ -279,15 +279,20 @@ async def update_album(
         if body.year is not None:
             updates.append("year = ?")
             values.append(body.year)
-        if body.tags is not None:
+        # For tags, notes, condition - check if explicitly provided in request
+        # Use model_dump to detect if field was sent (even as null) vs not sent at all
+        provided_fields = body.model_dump(exclude_unset=True)
+
+        if 'tags' in provided_fields:
             updates.append("tags = ?")
-            values.append(body.tags)
-        if body.condition is not None:
+            # Convert empty string to null
+            values.append(body.tags if body.tags else None)
+        if 'condition' in provided_fields:
             updates.append("condition = ?")
-            values.append(body.condition)
-        if body.notes is not None:
+            values.append(body.condition if body.condition else None)
+        if 'notes' in provided_fields:
             updates.append("notes = ?")
-            values.append(body.notes)
+            values.append(body.notes if body.notes else None)
 
         if updates:
             updates.append("updated_at = CURRENT_TIMESTAMP")
