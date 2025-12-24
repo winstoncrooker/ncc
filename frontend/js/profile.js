@@ -1504,8 +1504,14 @@ const Profile = {
           const data = await discogsResponse.json();
 
           if (data.cover) {
+            // Convert relative API paths to full URLs
+            let coverUrl = data.cover;
+            if (coverUrl.startsWith('/api/')) {
+              coverUrl = CONFIG.API_BASE + coverUrl;
+            }
+
             // Update album in collection
-            album.cover = data.cover;
+            album.cover = coverUrl;
             if (data.year && !album.year) album.year = data.year;
             if (data.id && !album.discogs_id) album.discogs_id = data.id;
 
@@ -1513,7 +1519,7 @@ const Profile = {
             await Auth.apiRequest(`/api/collection/${album.id}`, {
               method: 'PUT',
               body: JSON.stringify({
-                cover: data.cover,
+                cover: coverUrl,
                 year: data.year || album.year,
                 discogs_id: data.id || album.discogs_id
               })
@@ -1577,8 +1583,14 @@ const Profile = {
         const data = await discogsResponse.json();
 
         if (data.cover) {
+          // Convert relative API paths to full URLs
+          let coverUrl = data.cover;
+          if (coverUrl.startsWith('/api/')) {
+            coverUrl = CONFIG.API_BASE + coverUrl;
+          }
+
           // Update album in collection
-          album.cover = data.cover;
+          album.cover = coverUrl;
           if (data.year && !album.year) album.year = data.year;
           if (data.id && !album.discogs_id) album.discogs_id = data.id;
 
@@ -1586,7 +1598,7 @@ const Profile = {
           await Auth.apiRequest(`/api/collection/${album.id}`, {
             method: 'PUT',
             body: JSON.stringify({
-              cover: data.cover,
+              cover: coverUrl,
               year: data.year || album.year,
               discogs_id: data.id || album.discogs_id
             })

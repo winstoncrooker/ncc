@@ -262,7 +262,11 @@ const ChatModule = {
 
           if (discogsResponse.ok) {
             const discogsData = await discogsResponse.json();
+            // Convert relative API paths to full URLs
             cover = discogsData.cover || null;
+            if (cover && cover.startsWith('/api/')) {
+              cover = CONFIG.API_BASE + cover;
+            }
             year = discogsData.year || null;
             discogs_id = discogsData.id || null;
           }

@@ -124,7 +124,8 @@ async def cache_image(env, url: str, cache_key: str) -> str | None:
     try:
         existing = await env.CACHE.head(local_path)
         if existing:
-            return f"/cache/{local_path}"
+            # Return full API path that will work from frontend
+            return f"/api/discogs/cache/{local_path}"
     except Exception:
         pass
 
@@ -144,7 +145,8 @@ async def cache_image(env, url: str, cache_key: str) -> str | None:
                 array_buffer,
                 httpMetadata={"contentType": content_type}
             )
-            return f"/cache/{local_path}"
+            # Return full API path that will work from frontend
+            return f"/api/discogs/cache/{local_path}"
     except Exception:
         pass
 
