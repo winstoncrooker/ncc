@@ -103,54 +103,9 @@ async def save_cached_data(env, cache_key: str, data: dict) -> None:
 
 
 async def cache_image(env, url: str, cache_key: str) -> str | None:
-    """Download and cache image in R2, return local path or original URL"""
-    if not url:
-        return None
-
-    # If R2 not available, return original URL
-    if not hasattr(env, 'CACHE') or env.CACHE is None:
-        return url
-
-    # Determine extension
-    ext = "jpg"
-    if ".png" in url.lower():
-        ext = "png"
-    elif ".gif" in url.lower():
-        ext = "gif"
-
-    local_path = f"images/{cache_key}.{ext}"
-
-    # Check if already cached
-    try:
-        existing = await env.CACHE.head(local_path)
-        if existing:
-            # Return full API path that will work from frontend
-            return f"/api/discogs/cache/{local_path}"
-    except Exception:
-        pass
-
-    # Download and cache using js.fetch (bypasses Cloudflare blocking)
-    try:
-        headers = to_js({
-            "User-Agent": "NicheCollectorConnector/1.0 +https://niche-collector.pages.dev"
-        })
-        response = await js.fetch(url, to_js({"headers": headers}))
-
-        if response.ok:
-            # Get image data as ArrayBuffer
-            array_buffer = await response.arrayBuffer()
-            content_type = f"image/{ext}"
-            await env.CACHE.put(
-                local_path,
-                array_buffer,
-                httpMetadata={"contentType": content_type}
-            )
-            # Return full API path that will work from frontend
-            return f"/api/discogs/cache/{local_path}"
-    except Exception:
-        pass
-
-    # Fallback to original URL
+    """Return the original image URL - R2 caching is disabled for reliability"""
+    # Just return the original Discogs URL directly
+    # The browser can load images from Discogs without CORS issues
     return url
 
 
