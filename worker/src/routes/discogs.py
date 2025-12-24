@@ -252,7 +252,9 @@ async def search_album(
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        # Provide more context in error messages
+        error_msg = f"Discogs search error: {type(e).__name__}: {str(e)}"
+        raise HTTPException(status_code=500, detail=error_msg)
 
 
 @router.get("/price/{release_id}")
