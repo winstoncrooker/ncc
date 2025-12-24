@@ -170,9 +170,11 @@ async def search_album(
     cache_key = get_cache_key(artist, album)
 
     # Check cache first
-    cached = await get_cached_data(env, cache_key)
-    if cached:
-        return AlbumSearchResult(**cached, cached=True)
+    cached_data = await get_cached_data(env, cache_key)
+    if cached_data:
+        # Set cached flag to True (overwrite the False that was saved)
+        cached_data['cached'] = True
+        return AlbumSearchResult(**cached_data)
 
     # Search Discogs using js.fetch (bypasses Cloudflare blocking)
     try:
