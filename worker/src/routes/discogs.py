@@ -184,8 +184,8 @@ async def search_album(
                 discogs_key = str(env.DISCOGS_KEY)
             if hasattr(env, 'DISCOGS_SECRET'):
                 discogs_secret = str(env.DISCOGS_SECRET)
-        except Exception:
-            pass
+        except Exception as e:
+            print(f"[Discogs] Error getting secrets: {e}")
 
         if not discogs_key or not discogs_secret:
             raise HTTPException(status_code=500, detail="Discogs credentials not configured")
@@ -193,6 +193,8 @@ async def search_album(
         query = f"{artist} {album}"
         encoded_query = urllib.parse.quote(query, safe='')
         url = f"{DISCOGS_API}/database/search?q={encoded_query}&type=release&key={discogs_key}&secret={discogs_secret}"
+
+        print(f"[Discogs] Searching: {artist} - {album}")
 
         headers = to_js({
             "User-Agent": "NicheCollectorConnector/1.0 +https://niche-collector.pages.dev"
@@ -202,14 +204,23 @@ async def search_album(
 
         if response.status != 200:
             text = await response.text()
+            print(f"[Discogs] API error {response.status}: {text[:200]}")
             raise HTTPException(
                 status_code=response.status,
                 detail=f"Discogs API error: {response.status} - {text[:200]}"
             )
 
-        data = (await response.json()).to_py()
+        # Parse JSON response
+        json_data = await response.json()
 
-        if not data.get("results"):
+        # Handle both JsProxy and dict cases
+        if hasattr(json_data, 'to_py'):
+            data = json_data.to_py()
+        else:
+            data = dict(json_data) if json_data else {}
+
+        results = data.get("results", [])
+        if not results:
             raise HTTPException(status_code=404, detail="Album not found")
 
         # Find best match
