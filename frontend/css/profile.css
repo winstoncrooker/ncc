@@ -509,6 +509,15 @@
 
 .external-link .link-icon {
   font-size: 1.1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.external-link .link-icon svg {
+  width: 18px;
+  height: 18px;
+  fill: currentColor;
 }
 
 .external-link.non-clickable {
@@ -2175,20 +2184,28 @@
   .collection-filters {
     flex-direction: column;
     align-items: stretch;
+    gap: 10px;
   }
 
   .collection-search {
     min-width: unset;
     width: 100%;
+    order: 1;  /* Search first */
   }
 
   .filter-controls {
     width: 100%;
+    order: 2;  /* Filters below search */
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
   }
 
   .filter-select {
     flex: 1;
     min-width: 0;
+    padding: 8px 10px;
+    font-size: 0.8rem;
   }
 
   /* Modal adjustments for mobile */
@@ -3994,6 +4011,15 @@
   flex-shrink: 0;
   width: 24px;
   text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.social-link-icon svg {
+  width: 18px;
+  height: 18px;
+  fill: currentColor;
 }
 
 .social-link-label {
