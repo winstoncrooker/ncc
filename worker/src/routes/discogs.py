@@ -156,11 +156,13 @@ async def cache_image(env, url: str, cache_key: str) -> str | None:
 async def search_album(
     request: Request,
     artist: str,
-    album: str
+    album: str,
+    refresh: bool = False
 ) -> AlbumSearchResult:
     """
     Search Discogs for an album and cache results in R2.
     Returns cover image URL and price if available.
+    Use refresh=true to bypass cache and fetch fresh data.
     """
     env = request.scope["env"]
 
@@ -169,12 +171,13 @@ async def search_album(
 
     cache_key = get_cache_key(artist, album)
 
-    # Check cache first
-    cached_data = await get_cached_data(env, cache_key)
-    if cached_data:
-        # Set cached flag to True (overwrite the False that was saved)
-        cached_data['cached'] = True
-        return AlbumSearchResult(**cached_data)
+    # Check cache first (unless refresh is requested)
+    if not refresh:
+        cached_data = await get_cached_data(env, cache_key)
+        if cached_data:
+            # Set cached flag to True (overwrite the False that was saved)
+            cached_data['cached'] = True
+            return AlbumSearchResult(**cached_data)
 
     # Search Discogs using js.fetch (bypasses Cloudflare blocking)
     try:

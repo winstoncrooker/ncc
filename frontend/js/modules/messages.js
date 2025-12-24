@@ -75,13 +75,26 @@ const MessagesModule = {
     }
 
     list.innerHTML = this.friends.map(friend => `
-      <div class="friend-message-item" onclick="Profile.openConversation(${friend.id}, '${this.escapeHtml(friend.name || 'User')}', '${friend.picture || ''}')">
+      <div class="friend-message-item"
+           data-friend-id="${friend.id}"
+           data-friend-name="${this.escapeHtml(friend.name || 'User')}"
+           data-friend-picture="${this.escapeHtml(friend.picture || '')}">
         <img src="${friend.picture || ''}" alt="" class="friend-avatar" onerror="this.src='${this.getDefaultAvatar(friend.name)}'">
         <div class="friend-info">
           <span class="friend-name">${this.escapeHtml(friend.name || 'User')}</span>
         </div>
       </div>
     `).join('');
+
+    // Add click handlers
+    list.querySelectorAll('.friend-message-item').forEach(item => {
+      item.addEventListener('click', () => {
+        const friendId = parseInt(item.dataset.friendId);
+        const friendName = item.dataset.friendName;
+        const friendPicture = item.dataset.friendPicture;
+        Profile.openConversation(friendId, friendName, friendPicture);
+      });
+    });
   },
 
   formatTime(timestamp) {

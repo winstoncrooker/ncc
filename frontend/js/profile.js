@@ -1568,8 +1568,9 @@ const Profile = {
     }
 
     try {
+      // Use refresh=true to bypass cache and get fresh cover data
       const discogsResponse = await Auth.apiRequest(
-        `/api/discogs/search?artist=${encodeURIComponent(album.artist)}&album=${encodeURIComponent(album.album)}`
+        `/api/discogs/search?artist=${encodeURIComponent(album.artist)}&album=${encodeURIComponent(album.album)}&refresh=true`
       );
 
       if (discogsResponse.ok) {
@@ -3763,7 +3764,9 @@ const Profile = {
 
     listEl.innerHTML = this.friends.map(friend => `
       <div class="friend-message-item"
-           onclick="Profile.openConversation(${friend.id}, '${this.escapeHtml(friend.name || '')}', '${friend.picture || ''}')">
+           data-friend-id="${friend.id}"
+           data-friend-name="${this.escapeHtml(friend.name || '')}"
+           data-friend-picture="${this.escapeHtml(friend.picture || '')}">
         <img src="${friend.picture || this.getDefaultAvatar(friend.name)}"
              alt="${friend.name}"
              class="avatar"
@@ -3774,6 +3777,16 @@ const Profile = {
         </div>
       </div>
     `).join('');
+
+    // Add click handlers
+    listEl.querySelectorAll('.friend-message-item').forEach(item => {
+      item.addEventListener('click', () => {
+        const friendId = parseInt(item.dataset.friendId);
+        const friendName = item.dataset.friendName;
+        const friendPicture = item.dataset.friendPicture;
+        Profile.openConversation(friendId, friendName, friendPicture);
+      });
+    });
   },
 
   /**
