@@ -495,14 +495,14 @@
 }
 
 .collection-badge[data-category="vinyl"] {
-  background: rgba(236, 72, 153, 0.1);
-  border-color: rgba(236, 72, 153, 0.3);
+  background: rgba(29, 185, 84, 0.1);
+  border-color: rgba(29, 185, 84, 0.3);
 }
 .collection-badge[data-category="vinyl"]:hover {
-  background: rgba(236, 72, 153, 0.2);
+  background: rgba(29, 185, 84, 0.2);
 }
 .collection-badge[data-category="vinyl"] .badge-count {
-  color: #ec4899;
+  color: #1db954;
 }
 
 .collection-badge[data-category="watches"] {
