@@ -257,10 +257,11 @@ const Profile = {
    */
   setupEventListeners() {
     // Helper to safely add event listeners
-    const addListener = (id, event, handler) => {
+    // Set silent=true for elements that may not exist on page load (e.g., modal content)
+    const addListener = (id, event, handler, silent = false) => {
       const el = document.getElementById(id);
       if (el) el.addEventListener(event, handler);
-      else console.warn(`Element #${id} not found`);
+      else if (!silent) console.warn(`Element #${id} not found`);
     };
 
     // Handle mobile keyboard - resize AI sidebar when keyboard opens
@@ -481,7 +482,7 @@ const Profile = {
     addListener('view-profile-close', 'click', () => this.closeModal('view-profile-modal'));
     addListener('view-profile-message', 'click', () => this.messageFromProfile());
     addListener('view-profile-unfollow', 'click', () => this.unfollowFromProfile());
-    addListener('view-collection-search', 'input', (e) => this.filterViewCollection(e.target.value));
+    addListener('view-collection-search', 'input', (e) => this.filterViewCollection(e.target.value), true);
 
     // Collection search and filters
     addListener('collection-search-input', 'input', () => this.applyCollectionFilters());
@@ -579,8 +580,8 @@ const Profile = {
       document.getElementById('hero-background').style.backgroundImage = `url(${this.profile.background_image})`;
     }
 
-    // Profile Completion
-    this.renderProfileCompletion();
+    // Note: Profile completion is rendered after all data is loaded in init()
+    // to avoid flickering when showcase/collection aren't loaded yet
   },
 
   /**
@@ -1115,8 +1116,42 @@ const Profile = {
     // Update "Add Record" buttons
     this.updateAddButtons(categorySlug);
 
+    // Update sort filter labels
+    this.updateSortFilterLabels(categorySlug);
+
     // Update AI chat welcome checklist
     this.updateAIWelcome();
+  },
+
+  /**
+   * Update sort filter dropdown labels based on category
+   */
+  updateSortFilterLabels(categorySlug) {
+    const sortSelect = document.getElementById('filter-sort');
+    if (!sortSelect) return;
+
+    const terms = this.getTerms(categorySlug);
+    const field1 = terms.field1Label || 'Artist';
+    const field2 = terms.field2Label || 'Album';
+
+    // Update the option labels
+    const options = sortSelect.querySelectorAll('option');
+    options.forEach(opt => {
+      switch (opt.value) {
+        case 'artist-asc':
+          opt.textContent = `${field1} A-Z`;
+          break;
+        case 'artist-desc':
+          opt.textContent = `${field1} Z-A`;
+          break;
+        case 'album-asc':
+          opt.textContent = `${field2} A-Z`;
+          break;
+        case 'album-desc':
+          opt.textContent = `${field2} Z-A`;
+          break;
+      }
+    });
   },
 
   /**
