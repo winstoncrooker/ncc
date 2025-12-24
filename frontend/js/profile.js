@@ -2690,7 +2690,8 @@ const Profile = {
    */
   getPlaceholderCover(album) {
     const initial = (album.artist || 'A')[0].toUpperCase();
-    return `data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect fill='%231a1a1a' width='100' height='100'/><text x='50' y='60' font-size='40' text-anchor='middle' fill='%231db954'>${initial}</text></svg>`;
+    // Use %27 for single quotes and encodeURIComponent for the initial to avoid breaking inline JS handlers
+    return `data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 100 100%27%3E%3Crect fill=%27%231a1a1a%27 width=%27100%27 height=%27100%27/%3E%3Ctext x=%2750%27 y=%2760%27 font-size=%2740%27 text-anchor=%27middle%27 fill=%27%231db954%27%3E${encodeURIComponent(initial)}%3C/text%3E%3C/svg%3E`;
   },
 
   /**
@@ -2872,7 +2873,8 @@ const Profile = {
    */
   getDefaultAvatar(name) {
     const initial = (name || 'A')[0].toUpperCase();
-    return `data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect fill='%231a1a1a' width='100' height='100'/><text x='50' y='65' font-size='45' text-anchor='middle' fill='%231db954'>${initial}</text></svg>`;
+    // Use %27 for single quotes and encodeURIComponent for the initial to avoid breaking inline JS handlers
+    return `data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 100 100%27%3E%3Crect fill=%27%231a1a1a%27 width=%27100%27 height=%27100%27/%3E%3Ctext x=%2750%27 y=%2765%27 font-size=%2745%27 text-anchor=%27middle%27 fill=%27%231db954%27%3E${encodeURIComponent(initial)}%3C/text%3E%3C/svg%3E`;
   },
 
   /**

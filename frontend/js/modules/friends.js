@@ -124,7 +124,8 @@ const FriendsModule = {
 
   getDefaultAvatar(name) {
     const initial = (name || 'U').charAt(0).toUpperCase();
-    return `data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40"><rect fill="%23333" width="40" height="40"/><text x="50%" y="50%" dy=".35em" fill="%23fff" font-family="sans-serif" font-size="20" text-anchor="middle">${initial}</text></svg>`;
+    // URL-encode to avoid breaking inline JS handlers with quotes
+    return `data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%2740%27 height=%2740%27%3E%3Crect fill=%27%23333%27 width=%2740%27 height=%2740%27/%3E%3Ctext x=%2750%25%27 y=%2750%25%27 dy=%27.35em%27 fill=%27%23fff%27 font-family=%27sans-serif%27 font-size=%2720%27 text-anchor=%27middle%27%3E${encodeURIComponent(initial)}%3C/text%3E%3C/svg%3E`;
   },
 
   openAddFriendModal() {
