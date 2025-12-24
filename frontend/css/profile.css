@@ -4181,6 +4181,20 @@
   border-radius: 10px;
   cursor: pointer;
   transition: all 0.2s ease;
+  font-size: 0.8rem;
+  color: var(--text-primary);
+}
+
+.social-option span {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.social-option svg {
+  width: 24px;
+  height: 24px;
+  fill: currentColor;
 }
 
 .social-option:hover {

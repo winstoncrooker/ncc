@@ -279,18 +279,18 @@ async def update_album(
         if body.year is not None:
             updates.append("year = ?")
             values.append(body.year)
-        # For tags, notes, condition - check if explicitly provided in request
-        # Use model_dump to detect if field was sent (even as null) vs not sent at all
-        provided_fields = body.model_dump(exclude_unset=True)
+        # For tags, notes, condition - always update if provided (even if null/empty)
+        # Using __fields_set__ to detect which fields were explicitly sent in request
+        fields_set = body.__fields_set__ if hasattr(body, '__fields_set__') else set()
 
-        if 'tags' in provided_fields:
+        if 'tags' in fields_set or body.tags is not None:
             updates.append("tags = ?")
             # Convert empty string to null
             values.append(body.tags if body.tags else None)
-        if 'condition' in provided_fields:
+        if 'condition' in fields_set or body.condition is not None:
             updates.append("condition = ?")
             values.append(body.condition if body.condition else None)
-        if 'notes' in provided_fields:
+        if 'notes' in fields_set or body.notes is not None:
             updates.append("notes = ?")
             values.append(body.notes if body.notes else None)
 
