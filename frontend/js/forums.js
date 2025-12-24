@@ -129,6 +129,17 @@ const Forums = {
       view.classList.toggle('active', view.id === `${tab}-view`);
     });
 
+    // Show/hide AI chat button based on tab
+    const aiToggleBtn = document.getElementById('ai-toggle-btn');
+    const aiSidebar = document.getElementById('ai-sidebar');
+    if (aiToggleBtn) {
+      aiToggleBtn.style.display = tab === 'forums' ? 'none' : 'flex';
+    }
+    // Close AI sidebar if open when switching to forums
+    if (tab === 'forums' && aiSidebar && aiSidebar.classList.contains('open')) {
+      aiSidebar.classList.remove('open');
+    }
+
     // Load forums data if switching to forums
     if (tab === 'forums') {
       this.loadFeed(true);
@@ -1340,12 +1351,16 @@ const Forums = {
     if (groupId === 0 && categoryId === 0) {
       this.currentCategory = null;
       this.currentGroupId = null;
+      // Reset to default accent color
+      this.applyCategoryColor(null);
     } else if (groupId) {
       this.currentGroupId = groupId;
       this.currentCategory = null;
     } else if (categorySlug) {
       this.currentCategory = categorySlug;
       this.currentGroupId = null;
+      // Apply category color scheme
+      this.applyCategoryColor(categorySlug);
     }
 
     // Reload feed with new filter
@@ -1353,6 +1368,43 @@ const Forums = {
 
     // Update active state in sidebar
     this.loadMyGroups();
+  },
+
+  /**
+   * Apply category-specific color scheme (mirrors Profile.applyCategoryColor)
+   */
+  applyCategoryColor(categorySlug) {
+    const categoryColors = {
+      'vinyl': '#1db954',         // Spotify green
+      'trading-cards': '#ff6b35', // Orange
+      'cars': '#e63946',          // Red
+      'sneakers': '#7b2cbf',      // Purple
+      'watches': '#2a9d8f',       // Teal
+      'comics': '#f77f00',        // Amber
+      'video-games': '#4361ee',   // Blue
+      'coins': '#d4a373'          // Gold
+    };
+
+    const color = categorySlug ? (categoryColors[categorySlug] || '#1db954') : '#1db954';
+
+    // Update CSS custom property
+    document.documentElement.style.setProperty('--accent', color);
+
+    // Update accent-dark (slightly darker version)
+    const darkerColor = this.darkenColor(color, 15);
+    document.documentElement.style.setProperty('--accent-dark', darkerColor);
+  },
+
+  /**
+   * Darken a hex color by a percentage
+   */
+  darkenColor(hex, percent) {
+    const num = parseInt(hex.replace('#', ''), 16);
+    const amt = Math.round(2.55 * percent);
+    const R = Math.max((num >> 16) - amt, 0);
+    const G = Math.max((num >> 8 & 0x00FF) - amt, 0);
+    const B = Math.max((num & 0x0000FF) - amt, 0);
+    return '#' + (0x1000000 + R * 0x10000 + G * 0x100 + B).toString(16).slice(1);
   },
 
   /**

@@ -266,14 +266,13 @@ async def get_analytics(
             posts_7d_result = posts_7d_result.to_py()
         posts_7d = to_int(posts_7d_result.get("count")) if posts_7d_result else 0
 
-        # Top categories by collection count
+        # All categories by collection count (no limit)
         top_cats_result = await env.DB.prepare(
             """SELECT c.name, COUNT(col.id) as count
                FROM categories c
                LEFT JOIN collections col ON col.category_id = c.id
                GROUP BY c.id
-               ORDER BY count DESC
-               LIMIT 5"""
+               ORDER BY count DESC"""
         ).all()
         if hasattr(top_cats_result, 'to_py'):
             top_cats_result = top_cats_result.to_py()
@@ -344,15 +343,19 @@ async def list_posts(
             count_result = count_result.to_py()
         total = count_result.get("count", 0) if count_result else 0
 
-        # Get posts with author info
+        # Get posts with author info and calculate actual vote counts from votes table
         result = await env.DB.prepare(
-            """SELECT p.id, p.title, p.body, p.post_type, p.upvote_count, p.downvote_count,
+            """SELECT p.id, p.title, p.body, p.post_type,
+                      COALESCE(SUM(CASE WHEN v.value = 1 THEN 1 ELSE 0 END), 0) as upvote_count,
+                      COALESCE(SUM(CASE WHEN v.value = -1 THEN 1 ELSE 0 END), 0) as downvote_count,
                       p.comment_count, p.is_pinned, p.is_locked, p.created_at,
                       u.id as author_id, u.name as author_name, u.email as author_email,
                       c.name as category_name
                FROM forum_posts p
                JOIN users u ON p.user_id = u.id
                LEFT JOIN categories c ON p.category_id = c.id
+               LEFT JOIN votes v ON v.post_id = p.id
+               GROUP BY p.id
                ORDER BY p.created_at DESC
                LIMIT ? OFFSET ?"""
         ).bind(limit, offset).all()
@@ -522,14 +525,18 @@ async def list_comments(
             count_result = count_result.to_py()
         total = count_result.get("count", 0) if count_result else 0
 
-        # Get comments with author and post info
+        # Get comments with author and post info, calculate actual vote counts
         result = await env.DB.prepare(
-            """SELECT c.id, c.post_id, c.body, c.upvote_count, c.downvote_count, c.created_at,
+            """SELECT c.id, c.post_id, c.body, c.created_at,
+                      COALESCE(SUM(CASE WHEN v.value = 1 THEN 1 ELSE 0 END), 0) as upvote_count,
+                      COALESCE(SUM(CASE WHEN v.value = -1 THEN 1 ELSE 0 END), 0) as downvote_count,
                       u.id as author_id, u.name as author_name, u.email as author_email,
                       p.title as post_title
                FROM forum_comments c
                JOIN users u ON c.user_id = u.id
                JOIN forum_posts p ON c.post_id = p.id
+               LEFT JOIN votes v ON v.comment_id = c.id
+               GROUP BY c.id
                ORDER BY c.created_at DESC
                LIMIT ? OFFSET ?"""
         ).bind(limit, offset).all()

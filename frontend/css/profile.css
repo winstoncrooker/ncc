@@ -419,8 +419,9 @@
 }
 
 .collection-badge.active {
-  background: var(--accent);
-  color: #000;
+  background: var(--bg-dark);
+  border-color: var(--accent);
+  color: var(--accent);
   font-weight: 600;
 }
 
@@ -434,7 +435,7 @@
 }
 
 .collection-badge.active .badge-count {
-  color: #000;
+  color: var(--accent);
 }
 
 .collector-score {
@@ -1028,7 +1029,7 @@
 .album-card .refresh-btn {
   position: absolute;
   top: 10px;
-  left: 10px;
+  right: 42px;
   background: rgba(0, 0, 0, 0.7);
   backdrop-filter: blur(4px);
   border: none;
@@ -2157,6 +2158,26 @@
 
   .collection-grid {
     grid-template-columns: repeat(2, 1fr);
+  }
+
+  /* Collection filters on mobile */
+  .collection-filters {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .collection-search {
+    min-width: unset;
+    width: 100%;
+  }
+
+  .filter-controls {
+    width: 100%;
+  }
+
+  .filter-select {
+    flex: 1;
+    min-width: 0;
   }
 
   /* Modal adjustments for mobile */

@@ -121,14 +121,35 @@ async def add_wishlist_item(
     env = request.scope["env"]
 
     try:
+        # Build dynamic query to avoid D1 undefined type errors
+        fields = ["user_id", "category_id", "title"]
+        values = [user_id, body.category_id, body.title]
+
+        if body.description:
+            fields.append("description")
+            values.append(body.description)
+        if body.artist:
+            fields.append("artist")
+            values.append(body.artist)
+        if body.year is not None:
+            fields.append("year")
+            values.append(body.year)
+        if body.condition_wanted:
+            fields.append("condition_wanted")
+            values.append(body.condition_wanted)
+        if body.max_price is not None:
+            fields.append("max_price")
+            values.append(body.max_price)
+        if body.priority is not None:
+            fields.append("priority")
+            values.append(body.priority)
+
+        placeholders = ", ".join(["?" for _ in fields])
+        field_names = ", ".join(fields)
+
         result = await env.DB.prepare(
-            """INSERT INTO wishlist (user_id, category_id, title, description, artist,
-                                     year, condition_wanted, max_price, priority)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id, created_at"""
-        ).bind(
-            user_id, body.category_id, body.title, body.description, body.artist,
-            body.year, body.condition_wanted, body.max_price, body.priority
-        ).first()
+            f"INSERT INTO wishlist ({field_names}) VALUES ({placeholders}) RETURNING id, created_at"
+        ).bind(*values).first()
 
         if hasattr(result, 'to_py'):
             result = result.to_py()
@@ -142,7 +163,7 @@ async def add_wishlist_item(
             year=body.year,
             condition_wanted=body.condition_wanted,
             max_price=body.max_price,
-            priority=body.priority,
+            priority=body.priority or 0,
             is_found=False,
             created_at=str(result["created_at"]) if result.get("created_at") else None
         )
