@@ -29,16 +29,33 @@ class PrivacySettings(BaseModel):
 
 
 class ExternalLinks(BaseModel):
-    """External account links"""
-    discogs: Optional[str] = None
+    """External account links - supports any social platform"""
+    model_config = {"extra": "allow"}  # Allow any additional fields
+
+    # Common platforms (optional, can add any)
     instagram: Optional[str] = None
+    tiktok: Optional[str] = None
     twitter: Optional[str] = None
     youtube: Optional[str] = None
+    facebook: Optional[str] = None
+    threads: Optional[str] = None
+    bluesky: Optional[str] = None
+    mastodon: Optional[str] = None
+    twitch: Optional[str] = None
+    discord: Optional[str] = None
+    spotify: Optional[str] = None
+    soundcloud: Optional[str] = None
+    bandcamp: Optional[str] = None
+    linkedin: Optional[str] = None
+    pinterest: Optional[str] = None
+    reddit: Optional[str] = None
+    website: Optional[str] = None
+    # Legacy fields
+    discogs: Optional[str] = None
     ebay: Optional[str] = None
     tcgplayer: Optional[str] = None
     pcgs: Optional[str] = None
     psa: Optional[str] = None
-    website: Optional[str] = None
 
 
 class ProfileResponse(BaseModel):

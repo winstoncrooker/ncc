@@ -368,10 +368,20 @@ const Forums = {
     return badges.join('');
   },
 
+  // Track votes in progress to prevent spam
+  votingInProgress: new Set(),
+
   /**
    * Vote on a post
    */
   async vote(postId, value) {
+    // Prevent spam voting - ignore if already voting on this post
+    if (this.votingInProgress.has(postId)) {
+      return;
+    }
+
+    this.votingInProgress.add(postId);
+
     try {
       const response = await fetch(`${API_BASE}/votes`, {
         method: 'POST',
@@ -430,6 +440,9 @@ const Forums = {
 
     } catch (error) {
       console.error('Error voting:', error);
+    } finally {
+      // Always remove from voting set when done
+      this.votingInProgress.delete(postId);
     }
   },
 
@@ -837,10 +850,20 @@ const Forums = {
     }
   },
 
+  // Track comment votes in progress to prevent spam
+  commentVotingInProgress: new Set(),
+
   /**
    * Vote on comment with optimistic UI update
    */
   async voteComment(commentId, value) {
+    // Prevent spam voting - ignore if already voting on this comment
+    if (this.commentVotingInProgress.has(commentId)) {
+      return;
+    }
+
+    this.commentVotingInProgress.add(commentId);
+
     try {
       const response = await fetch(`${API_BASE}/votes`, {
         method: 'POST',
@@ -873,6 +896,9 @@ const Forums = {
 
     } catch (error) {
       console.error('Error voting on comment:', error);
+    } finally {
+      // Always remove from voting set when done
+      this.commentVotingInProgress.delete(commentId);
     }
   },
 
@@ -1583,6 +1609,16 @@ const Forums = {
       // Update UI - change to Leave button
       btn.outerHTML = `<button class="leave-btn joined" onclick="Forums.leaveGroupFromDiscover(${interestId}, ${groupId}, this)">Leave</button>`;
 
+      // Update member count display instantly
+      const groupItem = document.querySelector(`.group-item[data-group-id="${groupId}"]`);
+      if (groupItem) {
+        const countEl = groupItem.querySelector('.group-count');
+        if (countEl) {
+          const currentCount = parseInt(countEl.textContent) || 0;
+          countEl.textContent = `${currentCount + 1} members`;
+        }
+      }
+
       // Refresh sidebar
       this.loadMyGroups();
 
@@ -1605,6 +1641,16 @@ const Forums = {
 
       // Update UI - change to Join button
       btn.outerHTML = `<button class="join-btn" onclick="Forums.joinGroup(${groupId}, this)">Join</button>`;
+
+      // Update member count display instantly
+      const groupItem = document.querySelector(`.group-item[data-group-id="${groupId}"]`);
+      if (groupItem) {
+        const countEl = groupItem.querySelector('.group-count');
+        if (countEl) {
+          const currentCount = parseInt(countEl.textContent) || 0;
+          countEl.textContent = `${Math.max(0, currentCount - 1)} members`;
+        }
+      }
 
       // Remove from joined set
       if (this.joinedGroupIds) this.joinedGroupIds.delete(groupId);

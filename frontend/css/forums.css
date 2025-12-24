@@ -9,10 +9,17 @@
   gap: 8px;
 }
 
+.main-tabs {
+  background: var(--bg-card, #1a1a1a);
+  border: 1px solid var(--border-color, #333);
+  border-radius: 25px;
+  padding: 4px;
+}
+
 .main-tab-btn {
   background: transparent;
   border: none;
-  color: rgba(255, 255, 255, 0.6);
+  color: var(--text-secondary, rgba(255, 255, 255, 0.6));
   font-family: 'Montserrat', sans-serif;
   font-size: 1rem;
   font-weight: 500;
@@ -23,8 +30,8 @@
 }
 
 .main-tab-btn:hover {
-  color: rgba(255, 255, 255, 0.9);
-  background: rgba(255, 255, 255, 0.1);
+  color: var(--text-primary, rgba(255, 255, 255, 0.9));
+  background: var(--bg-hover, rgba(255, 255, 255, 0.1));
 }
 
 .main-tab-btn.active {

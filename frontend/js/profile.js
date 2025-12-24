@@ -598,6 +598,7 @@ const Profile = {
       bio: !!this.profile?.bio && this.profile.bio.length > 10,
       picture: !!this.profile?.picture,
       pronouns: !!this.profile?.pronouns,
+      location: !!this.profile?.location,
       showcase: this.showcase && this.showcase.length >= 1,
       collection: this.collection && this.collection.length >= 1,
       categories: this.userCategories && this.userCategories.length >= 1
