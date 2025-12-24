@@ -293,6 +293,22 @@
         flex-wrap: wrap;
       }
     }
+
+    /* Utility classes to replace inline styles */
+    .mb-24 { margin-bottom: 24px; }
+    .mb-16 { margin-bottom: 16px; }
+    .w-100 { width: 100%; }
+    .section-title {
+      color: #1db954;
+      margin-bottom: 12px;
+      font-size: 0.9rem;
+    }
+    .categories-container {
+      display: flex;
+      gap: 24px;
+      flex-wrap: wrap;
+    }
+    .text-muted { color: rgba(255, 255, 255, 0.5); }
   </style>
 </head>
 <body>
@@ -342,16 +358,16 @@
       </div>
 
       <!-- Top Categories -->
-      <div class="stats" id="categories-stats" style="margin-bottom: 24px;">
-        <div style="width: 100%;">
-          <h3 style="color: #1db954; margin-bottom: 12px; font-size: 0.9rem;">Top Categories</h3>
-          <div id="top-categories" style="display: flex; gap: 24px; flex-wrap: wrap;">
-            <span style="color: rgba(255,255,255,0.5);">Loading...</span>
+      <div class="stats mb-24" id="categories-stats">
+        <div class="w-100">
+          <h3 class="section-title">Top Categories</h3>
+          <div id="top-categories" class="categories-container">
+            <span class="text-muted">Loading...</span>
           </div>
         </div>
       </div>
 
-      <div style="margin-bottom: 16px;">
+      <div class="mb-16">
         <button class="export-btn" onclick="exportCSV()">Export Users CSV</button>
       </div>
 

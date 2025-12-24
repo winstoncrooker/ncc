@@ -1,1 +1,1 @@
-# Utilities
+# Utils package for shared functionality

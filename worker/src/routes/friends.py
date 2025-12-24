@@ -4,10 +4,11 @@ Friend request system with accept/reject flow
 """
 
 from fastapi import APIRouter, Request, HTTPException, Depends
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import Optional
 
 from routes.auth import require_auth
+from utils.conversions import to_python_value
 
 router = APIRouter()
 
@@ -37,7 +38,7 @@ class FriendRequest(BaseModel):
 
 class SendFriendRequest(BaseModel):
     """Send friend request by name"""
-    name: str
+    name: str = Field(..., min_length=1, max_length=100)
 
 
 class RequestCount(BaseModel):
@@ -57,7 +58,7 @@ class PublicProfile(BaseModel):
     request_sent: bool = False
     request_received: bool = False
     request_id: Optional[int] = None
-    showcase: list = []
+    showcase: list[dict] = []
     collection_count: int = 0
 
 
@@ -68,13 +69,6 @@ class ShowcaseAlbum(BaseModel):
     album: str
     cover: Optional[str] = None
     year: Optional[int] = None
-
-
-def to_python_value(val):
-    """Convert JsNull and other JS types to Python equivalents"""
-    if val is None or (hasattr(val, '__class__') and 'JsNull' in str(type(val))):
-        return None
-    return val
 
 
 @router.get("/")

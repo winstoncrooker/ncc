@@ -3,51 +3,19 @@ Forum Posts API routes
 CRUD for posts and aggregated feed with hot ranking
 """
 
-from fastapi import APIRouter, Request, HTTPException, Depends, Query
-from pydantic import BaseModel
 from datetime import datetime
-import math
+from fastapi import APIRouter, Request, HTTPException, Depends, Query
+from pydantic import BaseModel, Field
 import json
 from .auth import require_auth
+from utils.scoring import calculate_hot_score
+from utils.conversions import to_python_value, convert_row, convert_rows
 
 router = APIRouter()
 
 
-def safe_value(val, default=None):
-    """Convert JsNull/JsProxy to Python None, return value otherwise."""
-    if val is None:
-        return default
-    type_str = str(type(val))
-    if 'JsProxy' in type_str or 'JsNull' in type_str:
-        return default
-    return val
-
-# Epoch for hot score calculation (Jan 1, 2024)
-EPOCH = datetime(2024, 1, 1).timestamp()
-
-
-def calculate_hot_score(upvotes: int, downvotes: int, created_at: str) -> float:
-    """
-    Calculate hot score with stronger vote weighting.
-    Higher upvotes = more visibility, with some time decay.
-    """
-    score = upvotes - downvotes
-    # Multiply vote component by 2 for stronger vote influence
-    order = math.log10(max(abs(score), 1)) * 2
-    sign = 1 if score > 0 else -1 if score < 0 else 0
-
-    # Parse created_at timestamp
-    try:
-        if isinstance(created_at, str):
-            dt = datetime.fromisoformat(created_at.replace('Z', '+00:00'))
-            seconds = dt.timestamp() - EPOCH
-        else:
-            seconds = created_at - EPOCH
-    except Exception:
-        seconds = 0
-
-    # Increased divisor (180000 = ~50 hours) so time matters less than votes
-    return round(sign * order + seconds / 180000, 7)
+# Alias for backwards compatibility
+safe_value = to_python_value
 
 
 class PostAuthor(BaseModel):
@@ -95,16 +63,16 @@ class CreatePostRequest(BaseModel):
     category_id: int
     interest_group_id: int | None = None
     post_type: str = "discussion"
-    title: str
-    body: str
-    images: list[str] = []
+    title: str = Field(..., min_length=1, max_length=300)
+    body: str = Field(..., min_length=1, max_length=50000)
+    images: list[str] = Field(default=[], max_length=10)
 
 
 class UpdatePostRequest(BaseModel):
     """Update post request"""
-    title: str | None = None
-    body: str | None = None
-    images: list[str] | None = None
+    title: str | None = Field(None, min_length=1, max_length=300)
+    body: str | None = Field(None, min_length=1, max_length=50000)
+    images: list[str] | None = Field(None, max_length=10)
 
 
 @router.get("/feed")

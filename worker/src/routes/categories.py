@@ -6,18 +6,9 @@ Lists and retrieves collecting categories
 from fastapi import APIRouter, Request, HTTPException, Depends
 from pydantic import BaseModel
 from .auth import get_current_user
+from utils.conversions import to_python_value as safe_value
 
 router = APIRouter()
-
-
-def safe_value(val, default=None):
-    """Convert JsNull/JsProxy to Python None, return value otherwise."""
-    if val is None:
-        return default
-    type_str = str(type(val))
-    if 'JsProxy' in type_str or 'JsNull' in type_str:
-        return default
-    return val
 
 
 class InterestGroupResponse(BaseModel):

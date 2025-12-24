@@ -232,6 +232,8 @@ const ChatModule = {
       // Add albums directly to collection with Discogs enrichment
       let added = 0;
       let skipped = 0;
+      let failed = 0;
+      const failedAlbums = [];
 
       for (let i = 0; i < albums.length; i++) {
         const album = albums[i];
@@ -275,7 +277,7 @@ const ChatModule = {
           console.log(`Discogs lookup failed for: ${album.artist} - ${album.album}`);
         }
 
-        // Add to collection
+        // Add to collection with proper error tracking
         try {
           const categoryId = this.getCurrentCategoryId();
           const response = await Auth.apiRequest('/api/collection/', {
@@ -294,8 +296,16 @@ const ChatModule = {
             const newAlbum = await response.json();
             this.collection.push(newAlbum);
             added++;
+          } else {
+            // Track failed additions (e.g., 400 duplicate, 500 server error)
+            failed++;
+            failedAlbums.push(`${album.artist} - ${album.album}`);
+            console.error(`Failed to add (${response.status}): ${album.artist} - ${album.album}`);
           }
         } catch (err) {
+          // Track network/parsing errors
+          failed++;
+          failedAlbums.push(`${album.artist} - ${album.album}`);
           console.error(`Failed to add: ${album.artist} - ${album.album}`, err);
         }
 
@@ -313,12 +323,20 @@ const ChatModule = {
       });
       this.renderCollection();
 
-      // Show completion message
+      // Show completion message with detailed feedback
       let message = `Added ${added} album(s) to your collection.`;
       if (skipped > 0) message += ` ${skipped} already in collection.`;
+      if (failed > 0) message += ` ${failed} failed to add.`;
       if (invalidLines.length > 0) message += ` ${invalidLines.length} line(s) couldn't be parsed.`;
 
       this.addChatMessage(message, 'assistant');
+
+      // Show which albums failed if there were any
+      if (failedAlbums.length > 0 && failedAlbums.length <= 5) {
+        this.addChatMessage(`Failed albums: ${failedAlbums.join(', ')}`, 'assistant');
+      } else if (failedAlbums.length > 5) {
+        this.addChatMessage(`Failed albums (showing first 5): ${failedAlbums.slice(0, 5).join(', ')}...`, 'assistant');
+      }
 
     } catch (error) {
       console.error('File upload error:', error);

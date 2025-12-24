@@ -3,19 +3,13 @@ Wishlist / Currently Seeking routes
 """
 
 from fastapi import APIRouter, Request, HTTPException, Depends
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import Optional
 
 from routes.auth import require_auth
+from utils.conversions import to_python_value
 
 router = APIRouter()
-
-
-def to_python_value(val):
-    """Convert JsNull/undefined to Python None"""
-    if val is None or (hasattr(val, '__class__') and ('JsNull' in str(type(val)) or 'JsUndefined' in str(type(val)))):
-        return None
-    return val
 
 
 class WishlistItem(BaseModel):
@@ -28,7 +22,7 @@ class WishlistItem(BaseModel):
     year: Optional[int] = None
     condition_wanted: Optional[str] = None
     max_price: Optional[float] = None
-    priority: int = 0  # 0=low, 1=medium, 2=high
+    priority: int = Field(0, ge=0, le=2)  # 0=low, 1=medium, 2=high
     is_found: bool = False
     created_at: Optional[str] = None
 
@@ -36,24 +30,24 @@ class WishlistItem(BaseModel):
 class WishlistCreate(BaseModel):
     """Create wishlist item"""
     category_id: int
-    title: str
-    description: Optional[str] = None
-    artist: Optional[str] = None
-    year: Optional[int] = None
-    condition_wanted: Optional[str] = None
-    max_price: Optional[float] = None
-    priority: int = 0
+    title: str = Field(..., min_length=1, max_length=200)
+    description: Optional[str] = Field(None, max_length=2000)
+    artist: Optional[str] = Field(None, max_length=200)
+    year: Optional[int] = Field(None, ge=1900, le=2100)
+    condition_wanted: Optional[str] = Field(None, max_length=50)
+    max_price: Optional[float] = Field(None, ge=0)
+    priority: int = Field(0, ge=0, le=2)
 
 
 class WishlistUpdate(BaseModel):
     """Update wishlist item"""
-    title: Optional[str] = None
-    description: Optional[str] = None
-    artist: Optional[str] = None
-    year: Optional[int] = None
-    condition_wanted: Optional[str] = None
-    max_price: Optional[float] = None
-    priority: Optional[int] = None
+    title: Optional[str] = Field(None, min_length=1, max_length=200)
+    description: Optional[str] = Field(None, max_length=2000)
+    artist: Optional[str] = Field(None, max_length=200)
+    year: Optional[int] = Field(None, ge=1900, le=2100)
+    condition_wanted: Optional[str] = Field(None, max_length=50)
+    max_price: Optional[float] = Field(None, ge=0)
+    priority: Optional[int] = Field(None, ge=0, le=2)
     is_found: Optional[bool] = None
 
 

@@ -4,10 +4,11 @@ User profile CRUD routes for Niche Collector Connector
 
 import json
 from fastapi import APIRouter, Request, HTTPException, Depends
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import Optional
 
 from routes.auth import require_auth
+from utils.conversions import to_python_value
 
 router = APIRouter()
 
@@ -75,11 +76,11 @@ class ProfileResponse(BaseModel):
 
 class ProfileUpdate(BaseModel):
     """Profile update request"""
-    name: Optional[str] = None
-    bio: Optional[str] = None
-    pronouns: Optional[str] = None
-    background_image: Optional[str] = None
-    location: Optional[str] = None
+    name: Optional[str] = Field(None, min_length=1, max_length=100)
+    bio: Optional[str] = Field(None, max_length=2000)
+    pronouns: Optional[str] = Field(None, max_length=50)
+    background_image: Optional[str] = Field(None, max_length=2000)
+    location: Optional[str] = Field(None, max_length=100)
     external_links: Optional[dict] = None
 
 
@@ -107,14 +108,7 @@ class ShowcaseReorder(BaseModel):
 
 class ShowcaseNotesUpdate(BaseModel):
     """Update showcase item notes"""
-    notes: Optional[str] = None
-
-
-def to_python_value(val):
-    """Convert JsNull and other JS types to Python equivalents"""
-    if val is None or (hasattr(val, '__class__') and 'JsNull' in str(type(val))):
-        return None
-    return val
+    notes: Optional[str] = Field(None, max_length=500)
 
 
 def parse_privacy_settings(privacy_json: str | None) -> PrivacySettings:
@@ -421,15 +415,28 @@ async def reorder_showcase(
     """
     Reorder showcase albums.
     Pass list of showcase album IDs in desired order.
+    Uses single SQL statement to prevent race conditions.
     """
     env = request.scope["env"]
 
     try:
-        # Update positions based on order in list
+        if not body.album_ids:
+            return await get_showcase(request, user_id)
+
+        # Build a single UPDATE with CASE statement for atomic reorder
+        # This prevents inconsistent state if the operation is interrupted
+        case_parts = []
         for position, showcase_id in enumerate(body.album_ids):
-            await env.DB.prepare(
-                "UPDATE showcase_albums SET position = ? WHERE id = ? AND user_id = ?"
-            ).bind(position, showcase_id, user_id).run()
+            case_parts.append(f"WHEN id = {int(showcase_id)} THEN {position}")
+
+        case_statement = " ".join(case_parts)
+        id_list = ", ".join(str(int(sid)) for sid in body.album_ids)
+
+        await env.DB.prepare(
+            f"""UPDATE showcase_albums
+                SET position = CASE {case_statement} END
+                WHERE id IN ({id_list}) AND user_id = ?"""
+        ).bind(user_id).run()
 
         # Return updated showcase
         return await get_showcase(request, user_id)

@@ -5,37 +5,11 @@ Upvote/downvote posts and comments
 
 from fastapi import APIRouter, Request, HTTPException, Depends
 from pydantic import BaseModel
-from datetime import datetime
-import math
 from .auth import require_auth
+from utils.scoring import calculate_hot_score
+from utils.conversions import convert_row
 
 router = APIRouter()
-
-# Epoch for hot score calculation (Jan 1, 2024)
-EPOCH = datetime(2024, 1, 1).timestamp()
-
-
-def calculate_hot_score(upvotes: int, downvotes: int, created_at: str) -> float:
-    """
-    Calculate hot score with stronger vote weighting.
-    Higher upvotes = more visibility, with some time decay.
-    """
-    score = upvotes - downvotes
-    # Multiply vote component by 2 for stronger vote influence
-    order = math.log10(max(abs(score), 1)) * 2
-    sign = 1 if score > 0 else -1 if score < 0 else 0
-
-    try:
-        if isinstance(created_at, str):
-            dt = datetime.fromisoformat(created_at.replace('Z', '+00:00'))
-            seconds = dt.timestamp() - EPOCH
-        else:
-            seconds = created_at - EPOCH
-    except Exception:
-        seconds = 0
-
-    # Increased divisor (180000 = ~50 hours) so time matters less than votes
-    return round(sign * order + seconds / 180000, 7)
 
 
 class VoteRequest(BaseModel):
@@ -91,15 +65,14 @@ async def vote(
 
 
 async def vote_on_post(env, user_id: int, post_id: int, value: int) -> VoteResponse:
-    """Handle voting on a post."""
+    """Handle voting on a post using atomic SQL operations to prevent race conditions."""
 
-    # Get post
+    # Get post (for created_at needed for hot score)
     post = await env.DB.prepare(
         "SELECT id, upvote_count, downvote_count, created_at FROM forum_posts WHERE id = ?"
     ).bind(post_id).first()
 
-    if post and hasattr(post, 'to_py'):
-        post = post.to_py()
+    post = convert_row(post)
 
     if not post:
         raise HTTPException(status_code=404, detail="Post not found")
@@ -109,11 +82,12 @@ async def vote_on_post(env, user_id: int, post_id: int, value: int) -> VoteRespo
         "SELECT id, value FROM votes WHERE user_id = ? AND post_id = ?"
     ).bind(user_id, post_id).first()
 
-    if existing and hasattr(existing, 'to_py'):
-        existing = existing.to_py()
+    existing = convert_row(existing)
 
-    upvotes = post["upvote_count"]
-    downvotes = post["downvote_count"]
+    # Calculate deltas for atomic update
+    upvote_delta = 0
+    downvote_delta = 0
+    new_vote = None
 
     if existing:
         old_value = existing["value"]
@@ -125,9 +99,9 @@ async def vote_on_post(env, user_id: int, post_id: int, value: int) -> VoteRespo
             ).bind(existing["id"]).run()
 
             if value == 1:
-                upvotes -= 1
+                upvote_delta = -1
             else:
-                downvotes -= 1
+                downvote_delta = -1
 
             new_vote = None
 
@@ -138,14 +112,14 @@ async def vote_on_post(env, user_id: int, post_id: int, value: int) -> VoteRespo
             ).bind(value, existing["id"]).run()
 
             if old_value == 1:
-                upvotes -= 1
+                upvote_delta = -1
             else:
-                downvotes -= 1
+                downvote_delta = -1
 
             if value == 1:
-                upvotes += 1
+                upvote_delta += 1
             else:
-                downvotes += 1
+                downvote_delta += 1
 
             new_vote = value
 
@@ -156,20 +130,35 @@ async def vote_on_post(env, user_id: int, post_id: int, value: int) -> VoteRespo
         ).bind(user_id, post_id, value).run()
 
         if value == 1:
-            upvotes += 1
+            upvote_delta = 1
         else:
-            downvotes += 1
+            downvote_delta = 1
 
         new_vote = value
 
-    # Update post counts and hot score
-    hot_score = calculate_hot_score(upvotes, downvotes, post["created_at"])
-
+    # Atomic update of post counts using SQL arithmetic
     await env.DB.prepare(
         """UPDATE forum_posts
-           SET upvote_count = ?, downvote_count = ?, hot_score = ?
+           SET upvote_count = upvote_count + ?,
+               downvote_count = downvote_count + ?
            WHERE id = ?"""
-    ).bind(upvotes, downvotes, hot_score, post_id).run()
+    ).bind(upvote_delta, downvote_delta, post_id).run()
+
+    # Fetch updated counts to calculate hot score
+    updated_post = await env.DB.prepare(
+        "SELECT upvote_count, downvote_count, created_at FROM forum_posts WHERE id = ?"
+    ).bind(post_id).first()
+
+    updated_post = convert_row(updated_post)
+
+    upvotes = updated_post["upvote_count"]
+    downvotes = updated_post["downvote_count"]
+    hot_score = calculate_hot_score(upvotes, downvotes, updated_post["created_at"])
+
+    # Update hot score
+    await env.DB.prepare(
+        "UPDATE forum_posts SET hot_score = ? WHERE id = ?"
+    ).bind(hot_score, post_id).run()
 
     return VoteResponse(
         success=True,
@@ -181,15 +170,14 @@ async def vote_on_post(env, user_id: int, post_id: int, value: int) -> VoteRespo
 
 
 async def vote_on_comment(env, user_id: int, comment_id: int, value: int) -> VoteResponse:
-    """Handle voting on a comment."""
+    """Handle voting on a comment using atomic SQL operations to prevent race conditions."""
 
     # Get comment
     comment = await env.DB.prepare(
         "SELECT id, upvote_count, downvote_count FROM forum_comments WHERE id = ?"
     ).bind(comment_id).first()
 
-    if comment and hasattr(comment, 'to_py'):
-        comment = comment.to_py()
+    comment = convert_row(comment)
 
     if not comment:
         raise HTTPException(status_code=404, detail="Comment not found")
@@ -199,11 +187,12 @@ async def vote_on_comment(env, user_id: int, comment_id: int, value: int) -> Vot
         "SELECT id, value FROM votes WHERE user_id = ? AND comment_id = ?"
     ).bind(user_id, comment_id).first()
 
-    if existing and hasattr(existing, 'to_py'):
-        existing = existing.to_py()
+    existing = convert_row(existing)
 
-    upvotes = comment["upvote_count"]
-    downvotes = comment["downvote_count"]
+    # Calculate deltas for atomic update
+    upvote_delta = 0
+    downvote_delta = 0
+    new_vote = None
 
     if existing:
         old_value = existing["value"]
@@ -215,9 +204,9 @@ async def vote_on_comment(env, user_id: int, comment_id: int, value: int) -> Vot
             ).bind(existing["id"]).run()
 
             if value == 1:
-                upvotes -= 1
+                upvote_delta = -1
             else:
-                downvotes -= 1
+                downvote_delta = -1
 
             new_vote = None
 
@@ -228,14 +217,14 @@ async def vote_on_comment(env, user_id: int, comment_id: int, value: int) -> Vot
             ).bind(value, existing["id"]).run()
 
             if old_value == 1:
-                upvotes -= 1
+                upvote_delta = -1
             else:
-                downvotes -= 1
+                downvote_delta = -1
 
             if value == 1:
-                upvotes += 1
+                upvote_delta += 1
             else:
-                downvotes += 1
+                downvote_delta += 1
 
             new_vote = value
 
@@ -246,24 +235,32 @@ async def vote_on_comment(env, user_id: int, comment_id: int, value: int) -> Vot
         ).bind(user_id, comment_id, value).run()
 
         if value == 1:
-            upvotes += 1
+            upvote_delta = 1
         else:
-            downvotes += 1
+            downvote_delta = 1
 
         new_vote = value
 
-    # Update comment counts
+    # Atomic update of comment counts using SQL arithmetic
     await env.DB.prepare(
         """UPDATE forum_comments
-           SET upvote_count = ?, downvote_count = ?
+           SET upvote_count = upvote_count + ?,
+               downvote_count = downvote_count + ?
            WHERE id = ?"""
-    ).bind(upvotes, downvotes, comment_id).run()
+    ).bind(upvote_delta, downvote_delta, comment_id).run()
+
+    # Fetch updated counts
+    updated_comment = await env.DB.prepare(
+        "SELECT upvote_count, downvote_count FROM forum_comments WHERE id = ?"
+    ).bind(comment_id).first()
+
+    updated_comment = convert_row(updated_comment)
 
     return VoteResponse(
         success=True,
         vote_value=new_vote,
-        upvote_count=upvotes,
-        downvote_count=downvotes,
+        upvote_count=updated_comment["upvote_count"],
+        downvote_count=updated_comment["downvote_count"],
         hot_score=None
     )
 
@@ -274,7 +271,7 @@ async def remove_post_vote(
     post_id: int,
     user_id: int = Depends(require_auth)
 ) -> VoteResponse:
-    """Remove vote from a post."""
+    """Remove vote from a post using atomic SQL operations."""
     env = request.scope["env"]
 
     try:
@@ -283,8 +280,7 @@ async def remove_post_vote(
             "SELECT id, value FROM votes WHERE user_id = ? AND post_id = ?"
         ).bind(user_id, post_id).first()
 
-        if existing and hasattr(existing, 'to_py'):
-            existing = existing.to_py()
+        existing = convert_row(existing)
 
         if not existing:
             # No vote to remove, return current counts
@@ -292,8 +288,7 @@ async def remove_post_vote(
                 "SELECT upvote_count, downvote_count, hot_score FROM forum_posts WHERE id = ?"
             ).bind(post_id).first()
 
-            if post and hasattr(post, 'to_py'):
-                post = post.to_py()
+            post = convert_row(post)
 
             if not post:
                 raise HTTPException(status_code=404, detail="Post not found")
@@ -307,35 +302,37 @@ async def remove_post_vote(
             )
 
         # Delete vote
+        old_value = existing["value"]
         await env.DB.prepare(
             "DELETE FROM votes WHERE id = ?"
         ).bind(existing["id"]).run()
 
-        # Update post counts
-        old_value = existing["value"]
-
-        post = await env.DB.prepare(
-            "SELECT upvote_count, downvote_count, created_at FROM forum_posts WHERE id = ?"
-        ).bind(post_id).first()
-
-        if post and hasattr(post, 'to_py'):
-            post = post.to_py()
-
-        upvotes = post["upvote_count"]
-        downvotes = post["downvote_count"]
-
-        if old_value == 1:
-            upvotes -= 1
-        else:
-            downvotes -= 1
-
-        hot_score = calculate_hot_score(upvotes, downvotes, post["created_at"])
+        # Atomic update of post counts using SQL arithmetic
+        upvote_delta = -1 if old_value == 1 else 0
+        downvote_delta = -1 if old_value == -1 else 0
 
         await env.DB.prepare(
             """UPDATE forum_posts
-               SET upvote_count = ?, downvote_count = ?, hot_score = ?
+               SET upvote_count = upvote_count + ?,
+                   downvote_count = downvote_count + ?
                WHERE id = ?"""
-        ).bind(upvotes, downvotes, hot_score, post_id).run()
+        ).bind(upvote_delta, downvote_delta, post_id).run()
+
+        # Fetch updated counts to calculate hot score
+        updated_post = await env.DB.prepare(
+            "SELECT upvote_count, downvote_count, created_at FROM forum_posts WHERE id = ?"
+        ).bind(post_id).first()
+
+        updated_post = convert_row(updated_post)
+
+        upvotes = updated_post["upvote_count"]
+        downvotes = updated_post["downvote_count"]
+        hot_score = calculate_hot_score(upvotes, downvotes, updated_post["created_at"])
+
+        # Update hot score
+        await env.DB.prepare(
+            "UPDATE forum_posts SET hot_score = ? WHERE id = ?"
+        ).bind(hot_score, post_id).run()
 
         return VoteResponse(
             success=True,
@@ -357,7 +354,7 @@ async def remove_comment_vote(
     comment_id: int,
     user_id: int = Depends(require_auth)
 ) -> VoteResponse:
-    """Remove vote from a comment."""
+    """Remove vote from a comment using atomic SQL operations."""
     env = request.scope["env"]
 
     try:
@@ -366,8 +363,7 @@ async def remove_comment_vote(
             "SELECT id, value FROM votes WHERE user_id = ? AND comment_id = ?"
         ).bind(user_id, comment_id).first()
 
-        if existing and hasattr(existing, 'to_py'):
-            existing = existing.to_py()
+        existing = convert_row(existing)
 
         if not existing:
             # No vote to remove
@@ -375,8 +371,7 @@ async def remove_comment_vote(
                 "SELECT upvote_count, downvote_count FROM forum_comments WHERE id = ?"
             ).bind(comment_id).first()
 
-            if comment and hasattr(comment, 'to_py'):
-                comment = comment.to_py()
+            comment = convert_row(comment)
 
             if not comment:
                 raise HTTPException(status_code=404, detail="Comment not found")
@@ -389,39 +384,34 @@ async def remove_comment_vote(
             )
 
         # Delete vote
+        old_value = existing["value"]
         await env.DB.prepare(
             "DELETE FROM votes WHERE id = ?"
         ).bind(existing["id"]).run()
 
-        # Update comment counts
-        old_value = existing["value"]
-
-        comment = await env.DB.prepare(
-            "SELECT upvote_count, downvote_count FROM forum_comments WHERE id = ?"
-        ).bind(comment_id).first()
-
-        if comment and hasattr(comment, 'to_py'):
-            comment = comment.to_py()
-
-        upvotes = comment["upvote_count"]
-        downvotes = comment["downvote_count"]
-
-        if old_value == 1:
-            upvotes -= 1
-        else:
-            downvotes -= 1
+        # Atomic update of comment counts using SQL arithmetic
+        upvote_delta = -1 if old_value == 1 else 0
+        downvote_delta = -1 if old_value == -1 else 0
 
         await env.DB.prepare(
             """UPDATE forum_comments
-               SET upvote_count = ?, downvote_count = ?
+               SET upvote_count = upvote_count + ?,
+                   downvote_count = downvote_count + ?
                WHERE id = ?"""
-        ).bind(upvotes, downvotes, comment_id).run()
+        ).bind(upvote_delta, downvote_delta, comment_id).run()
+
+        # Fetch updated counts
+        updated_comment = await env.DB.prepare(
+            "SELECT upvote_count, downvote_count FROM forum_comments WHERE id = ?"
+        ).bind(comment_id).first()
+
+        updated_comment = convert_row(updated_comment)
 
         return VoteResponse(
             success=True,
             vote_value=None,
-            upvote_count=upvotes,
-            downvote_count=downvotes
+            upvote_count=updated_comment["upvote_count"],
+            downvote_count=updated_comment["downvote_count"]
         )
 
     except HTTPException:

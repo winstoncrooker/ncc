@@ -676,7 +676,7 @@ const Profile = {
           </span>`;
         }
 
-        return `<a href="${this.escapeHtml(url)}" target="_blank" rel="noopener" class="external-link" title="${config.label}">
+        return `<a href="${this.sanitizeUrl(url)}" target="_blank" rel="noopener" class="external-link" title="${config.label}">
           <span class="link-icon">${config.icon}</span>
         </a>`;
       })
@@ -2713,6 +2713,28 @@ const Profile = {
     const div = document.createElement('div');
     div.textContent = text;
     return div.innerHTML;
+  },
+
+  /**
+   * Sanitize URL to prevent javascript: and other dangerous protocols
+   */
+  sanitizeUrl(url) {
+    if (!url) return '#';
+    const ALLOWED_PROTOCOLS = ['http:', 'https:', 'mailto:'];
+    try {
+      const parsed = new URL(url);
+      if (ALLOWED_PROTOCOLS.includes(parsed.protocol)) {
+        return this.escapeHtml(url);
+      }
+      return '#';
+    } catch {
+      // If URL parsing fails, it might be a relative URL or invalid
+      // Only allow if it doesn't look like a protocol
+      if (url.includes(':') && !url.startsWith('http')) {
+        return '#';
+      }
+      return this.escapeHtml(url);
+    }
   },
 
   // ============================================

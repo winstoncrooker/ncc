@@ -7,6 +7,7 @@ from pydantic import BaseModel
 from typing import Optional
 
 from routes.auth import require_auth
+from utils.conversions import to_python_value
 
 router = APIRouter()
 
@@ -44,13 +45,6 @@ class ConversationPreview(BaseModel):
 class UnreadCount(BaseModel):
     """Unread message count"""
     count: int
-
-
-def to_python_value(val):
-    """Convert JsNull and other JS types to Python equivalents"""
-    if val is None or (hasattr(val, '__class__') and 'JsNull' in str(type(val))):
-        return None
-    return val
 
 
 @router.get("/")

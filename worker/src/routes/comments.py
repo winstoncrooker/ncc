@@ -5,22 +5,13 @@ Nested comments with up to 3 levels of replies
 
 import json
 from fastapi import APIRouter, Request, HTTPException, Depends
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from .auth import require_auth
+from utils.conversions import to_python_value as safe_value
 
 router = APIRouter()
 
 MAX_DEPTH = 3  # Maximum nesting depth
-
-
-def safe_value(val, default=None):
-    """Convert JsNull/JsProxy to Python None, return value otherwise."""
-    if val is None:
-        return default
-    type_str = str(type(val))
-    if 'JsProxy' in type_str or 'JsNull' in type_str:
-        return default
-    return val
 
 
 class CommentAuthor(BaseModel):
@@ -55,14 +46,14 @@ class CommentsListResponse(BaseModel):
 
 class CreateCommentRequest(BaseModel):
     """Create comment request"""
-    body: str
+    body: str = Field(..., min_length=1, max_length=10000)
     parent_comment_id: int | None = None
-    images: list[str] = []
+    images: list[str] = Field(default=[], max_length=5)
 
 
 class UpdateCommentRequest(BaseModel):
     """Update comment request"""
-    body: str
+    body: str = Field(..., min_length=1, max_length=10000)
 
 
 @router.get("/posts/{post_id}/comments")
@@ -119,7 +110,8 @@ async def get_comments(
             if images_raw:
                 try:
                     images = json.loads(images_raw) if isinstance(images_raw, str) else images_raw
-                except:
+                except (json.JSONDecodeError, TypeError) as e:
+                    print(f"[Comments] Error parsing images JSON: {e}")
                     images = []
 
             comment = CommentResponse(

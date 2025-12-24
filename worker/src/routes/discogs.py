@@ -82,8 +82,8 @@ async def get_cached_data(env, cache_key: str) -> dict | None:
         if obj:
             text = await obj.text()
             return json.loads(text)
-    except Exception:
-        pass
+    except Exception as e:
+        print(f"[Discogs] Cache read error for {cache_key}: {type(e).__name__}: {e}")
     return None
 
 
@@ -98,8 +98,8 @@ async def save_cached_data(env, cache_key: str, data: dict) -> None:
             json.dumps(data),
             httpMetadata={"contentType": "application/json"}
         )
-    except Exception:
-        pass
+    except Exception as e:
+        print(f"[Discogs] Cache write error for {cache_key}: {type(e).__name__}: {e}")
 
 
 async def cache_image(env, url: str, cache_key: str) -> str | None:
@@ -422,7 +422,7 @@ async def serve_cached_image(request: Request, path: str):
             body = await obj.arrayBuffer()
             content_type = obj.httpMetadata.get("contentType", "application/octet-stream")
             return Response(content=bytes(body), media_type=content_type)
-    except Exception:
-        pass
+    except Exception as e:
+        print(f"[Discogs] Error serving cached image {path}: {type(e).__name__}: {e}")
 
     raise HTTPException(status_code=404, detail="Image not found")

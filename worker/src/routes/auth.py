@@ -81,9 +81,9 @@ async def is_token_blacklisted(env, token: str) -> bool:
             return False
         return True
     except Exception as e:
-        # If blacklist check fails, allow the request (fail open)
+        # If blacklist check fails, reject the request (fail closed for security)
         print(f"[Auth] Blacklist check failed: {e}")
-        return False
+        return True  # Fail closed - treat as blacklisted if we can't verify
 
 
 async def blacklist_token(env, token: str, user_id: int, expires_at: int) -> None:
@@ -377,16 +377,6 @@ async def google_callback(request: Request, code: str = None, error: str = None,
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"OAuth error: {str(e)}")
-
-
-@router.get("/debug")
-async def debug_auth(request: Request):
-    """Debug endpoint to see what headers are received"""
-    auth_header = request.headers.get("authorization", "NOT PRESENT")
-    return {
-        "authorization_header": auth_header[:50] + "..." if len(auth_header) > 50 else auth_header,
-        "all_headers": dict(request.headers)
-    }
 
 
 @router.get("/me")

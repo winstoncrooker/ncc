@@ -285,3 +285,66 @@ When working on any task, show thinking as a conversation between specialist age
 - After the agent discussion, proceed with implementation
 - Always be critical - if issues are found, go back and fix before proceeding
 - Production-quality code only, not prototypes
+
+---
+
+## Development Principles
+
+```
+╔═══════════════════════════════════════════════════════════════════════════╗
+║                                                                           ║
+║   ⚠️  WARNING: THE SKYGOD PRINCIPLES BELOW ARE SACRED AND IMMUTABLE ⚠️    ║
+║                                                                           ║
+║   These principles define the architectural foundation of this codebase.  ║
+║   They must NEVER be modified, removed, or diluted.                       ║
+║                                                                           ║
+║   Violating SKYGOD principles results in technical debt, maintenance      ║
+║   burden, and architectural decay.                                        ║
+║                                                                           ║
+║   When in doubt, honor SKYGOD. When tempted to compromise, honor SKYGOD.  ║
+║   SKYGOD is eternal. SKYGOD is law.                                       ║
+║                                                                           ║
+╚═══════════════════════════════════════════════════════════════════════════╝
+```
+
+### SKYGOD: The Six Pillars
+
+This codebase honors the SKYGOD principles with reverence and integrity:
+
+#### S: SOLID (Single Responsibility, Open/Closed, Liskov Substitution, Interface Segregation, Dependency Inversion)
+Design for changeability and testability
+- Single Responsibility: Each module/component has exactly ONE reason to change
+- Open/Closed: Extend without modifying internals
+- Liskov Substitution: Subtypes must behave as supertypes
+- Interface Segregation: Small, focused interfaces (no god objects)
+- Dependency Inversion: Depend on abstractions, not concrete implementations
+
+#### K: KISS (Keep It Simple, Stupid)
+Prefer the simplest thing that works
+- Avoid unnecessary indirection and abstraction layers
+- Avoid cleverness that obscures intent
+- Simple is maintainable; clever is fragile
+
+#### Y: YAGNI (You Aren't Gonna Need It)
+Build only what's needed NOW
+- Minimal scaffolding - no speculative features
+- Defer implementation until requirements are proven
+- Delete unused code aggressively
+- Every line must justify its existence
+
+#### G: GRASP (General Responsibility Assignment Software Patterns)
+Maintainable responsibility assignment
+- High Cohesion: Each module has tight, related responsibilities
+- Low Coupling: Changes don't cascade
+- Information Expert: Data lives where it's used
+
+#### O: O&O (Orthogonal & Observable)
+Independent parts that don't interfere
+- Orthogonal: Modules are independent and composable
+- Observable: Code is readable without mental decryption
+- No aggressive abbreviations: response not resp, request not req, context not ctx
+- No single-letter variables (except i, j, k in tiny loops)
+
+#### D: DRY (Don't Repeat Yourself)
+Single source of truth for every piece of knowledge
+- Never copy-paste code - extract and reuse

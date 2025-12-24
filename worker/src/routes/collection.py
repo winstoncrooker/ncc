@@ -3,64 +3,58 @@ User collection CRUD and sync routes
 """
 
 from fastapi import APIRouter, Request, HTTPException, Depends
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import Optional
 
 from routes.auth import require_auth, get_current_user
+from utils.conversions import to_python_value
 
 router = APIRouter()
-
-
-def to_python_value(val, expected_type=None):
-    """Convert JsNull/undefined to Python None, with optional type coercion"""
-    if val is None or (hasattr(val, '__class__') and ('JsNull' in str(type(val)) or 'JsUndefined' in str(type(val)))):
-        return None
-    return val
 
 
 class Album(BaseModel):
     """Album in user's collection"""
     id: Optional[int] = None
-    artist: str
-    album: str
-    genre: Optional[str] = None
-    cover: Optional[str] = None
-    price: Optional[float] = None
+    artist: str = Field(..., min_length=1, max_length=200)
+    album: str = Field(..., min_length=1, max_length=200)
+    genre: Optional[str] = Field(None, max_length=100)
+    cover: Optional[str] = Field(None, max_length=2000)
+    price: Optional[float] = Field(None, ge=0)
     discogs_id: Optional[int] = None
-    year: Optional[int] = None
+    year: Optional[int] = Field(None, ge=1900, le=2100)
     category_id: Optional[int] = None
-    tags: Optional[str] = None  # Comma-separated: "for_trade,grail,sealed"
-    condition: Optional[str] = None
-    notes: Optional[str] = None
+    tags: Optional[str] = Field(None, max_length=200)  # Comma-separated: "for_trade,grail,sealed"
+    condition: Optional[str] = Field(None, max_length=50)
+    notes: Optional[str] = Field(None, max_length=2000)
 
 
 class AlbumCreate(BaseModel):
     """Album creation request"""
-    artist: str
-    album: str
-    genre: Optional[str] = None
-    cover: Optional[str] = None
-    price: Optional[float] = None
+    artist: str = Field(..., min_length=1, max_length=200)
+    album: str = Field(..., min_length=1, max_length=200)
+    genre: Optional[str] = Field(None, max_length=100)
+    cover: Optional[str] = Field(None, max_length=2000)
+    price: Optional[float] = Field(None, ge=0)
     discogs_id: Optional[int] = None
-    year: Optional[int] = None
+    year: Optional[int] = Field(None, ge=1900, le=2100)
     category_id: Optional[int] = None
-    tags: Optional[str] = None
-    condition: Optional[str] = None
-    notes: Optional[str] = None
+    tags: Optional[str] = Field(None, max_length=200)
+    condition: Optional[str] = Field(None, max_length=50)
+    notes: Optional[str] = Field(None, max_length=2000)
 
 
 class AlbumUpdate(BaseModel):
     """Album update request"""
-    artist: Optional[str] = None
-    album: Optional[str] = None
-    genre: Optional[str] = None
-    cover: Optional[str] = None
-    price: Optional[float] = None
+    artist: Optional[str] = Field(None, min_length=1, max_length=200)
+    album: Optional[str] = Field(None, min_length=1, max_length=200)
+    genre: Optional[str] = Field(None, max_length=100)
+    cover: Optional[str] = Field(None, max_length=2000)
+    price: Optional[float] = Field(None, ge=0)
     discogs_id: Optional[int] = None
-    year: Optional[int] = None
-    tags: Optional[str] = None
-    condition: Optional[str] = None
-    notes: Optional[str] = None
+    year: Optional[int] = Field(None, ge=1900, le=2100)
+    tags: Optional[str] = Field(None, max_length=200)
+    condition: Optional[str] = Field(None, max_length=50)
+    notes: Optional[str] = Field(None, max_length=2000)
 
 
 class SyncRequest(BaseModel):
@@ -388,15 +382,17 @@ async def sync_collection(
         # Process albums (upsert)
         for album in body.albums:
             if album.id:
-                # Update existing
+                # Update existing - include all fields to prevent data loss
                 await env.DB.prepare(
                     """UPDATE collections
                        SET artist = ?, album = ?, genre = ?, cover = ?, price = ?,
-                           discogs_id = ?, year = ?, updated_at = CURRENT_TIMESTAMP
+                           discogs_id = ?, year = ?, category_id = ?, tags = ?,
+                           condition = ?, notes = ?, updated_at = CURRENT_TIMESTAMP
                        WHERE id = ? AND user_id = ?"""
                 ).bind(
                     album.artist, album.album, album.genre, album.cover, album.price,
-                    album.discogs_id, album.year, album.id, user_id
+                    album.discogs_id, album.year, album.category_id, album.tags,
+                    album.condition, album.notes, album.id, user_id
                 ).run()
             else:
                 # Check for existing by artist/album (case-insensitive)
@@ -406,25 +402,31 @@ async def sync_collection(
                 ).bind(user_id, album.artist, album.album).first()
 
                 if existing:
-                    # Update existing
+                    if hasattr(existing, 'to_py'):
+                        existing = existing.to_py()
+                    # Update existing - include all fields to prevent data loss
                     await env.DB.prepare(
                         """UPDATE collections
                            SET genre = ?, cover = ?, price = ?, discogs_id = ?, year = ?,
+                               category_id = ?, tags = ?, condition = ?, notes = ?,
                                updated_at = CURRENT_TIMESTAMP
                            WHERE id = ?"""
                     ).bind(
-                        album.genre, album.cover, album.price,
-                        album.discogs_id, album.year, existing["id"]
+                        album.genre, album.cover, album.price, album.discogs_id,
+                        album.year, album.category_id, album.tags, album.condition,
+                        album.notes, existing["id"]
                     ).run()
                 else:
-                    # Insert new
+                    # Insert new - include all fields
                     await env.DB.prepare(
                         """INSERT INTO collections
-                           (user_id, artist, album, genre, cover, price, discogs_id, year)
-                           VALUES (?, ?, ?, ?, ?, ?, ?, ?)"""
+                           (user_id, artist, album, genre, cover, price, discogs_id, year,
+                            category_id, tags, condition, notes)
+                           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"""
                     ).bind(
                         user_id, album.artist, album.album, album.genre,
-                        album.cover, album.price, album.discogs_id, album.year
+                        album.cover, album.price, album.discogs_id, album.year,
+                        album.category_id, album.tags, album.condition, album.notes
                     ).run()
 
         # Get updated collection

@@ -138,8 +138,11 @@ RULES:
 4. Keep responses concise (1-3 sentences)
 5. If user asks to remove an album not in their collection, politely say it's not there
 6. For ambiguous requests, ask for clarification
+7. NEVER output your thinking process, reasoning, or internal analysis to the user
+8. NEVER say things like "The user asks...", "The user wants...", "So we need to...", "Let's list them..."
+9. Just respond directly with the answer - no meta-commentary about what you're doing
 
-IMPORTANT: Your response should be friendly and natural. The action tags will be processed automatically."""
+IMPORTANT: Your response should be friendly and natural. The action tags will be processed automatically. Do NOT explain your reasoning or show your thought process - just give the answer directly."""
 
 
 def parse_actions(response: str) -> tuple[list[Album], list[Album], list[Album]]:
@@ -176,13 +179,167 @@ def parse_actions(response: str) -> tuple[list[Album], list[Album], list[Album]]
 def clean_response(response: str) -> str:
     """
     Clean the model response for display to user.
-    Removes thinking blocks and action tags.
+    Removes thinking blocks, chain-of-thought reasoning, and action tags.
     """
     cleaned = response
 
     # Remove <think>...</think> blocks (Thinker model reasoning)
     cleaned = re.sub(r'<think>[\s\S]*?</think>', '', cleaned, flags=re.IGNORECASE)
     cleaned = re.sub(r'<thinking>[\s\S]*?</thinking>', '', cleaned, flags=re.IGNORECASE)
+
+    # Check if response STARTS with reasoning (polluted from the beginning)
+    # If so, try to extract any usable content or provide fallback
+    polluted_starts = [
+        r'^\.?\s*According to',
+        r'^\.?\s*The user',
+        r'^\.?\s*We have a user',
+        r'^\.?\s*We need',
+        r'^\.?\s*We should',
+        r'^\.?\s*We can',
+        r'^\.?\s*We must',
+        r'^\.?\s*We have',
+        r'^\.?\s*Should be',
+        r'^\.?\s*No action',
+        r'^\.?\s*Let\'s',
+        r'^\.?\s*Let me',
+        r'^\.?\s*First,',
+        r'^\.?\s*So,?\s+we',
+        r'^\.?\s*So,?\s+the',
+        r'^\.?\s*The collection',
+        r'^\.?\s*This is a',
+        r'^\.?\s*I need to',
+        r'^\.?\s*I should',
+        r'^\.?\s*Looking at',
+        r'^\.?\s*Based on the rules',
+        r'^\.?\s*Since the',
+        r'^\.?\s*Given that',
+        r'^\.?\s*Now,',
+        r'^\.?\s*Okay,',
+        r'^\.?\s*Alright,',
+    ]
+
+    is_polluted = any(re.match(p, cleaned.strip(), re.IGNORECASE) for p in polluted_starts)
+
+    if is_polluted:
+        # Try to extract useful content from the polluted response
+        # Look for album recommendations in various formats
+        extraction_patterns = [
+            # 'Album Name' by Artist
+            r"'([^']+)'\s+by\s+([A-Za-z][A-Za-z\s]+?)(?:\.|,|\"|'|$)",
+            # "Album Name" by Artist
+            r'"([^"]+)"\s+by\s+([A-Za-z][A-Za-z\s]+?)(?:\.|,|\"|\'|$)',
+            # Artist - Album pattern
+            r"([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)\s+-\s+([A-Z][^,\.\n]+)",
+            # How about X?
+            r"How about ['\"]?([^'\"?]+)['\"]?\?",
+            # Consider X
+            r"Consider ['\"]?([^'\"\.]+)['\"]?",
+            # try X
+            r"[Yy]ou might like ['\"]?([^'\"\.]+)['\"]?",
+        ]
+
+        for i, pattern in enumerate(extraction_patterns):
+            match = re.search(pattern, cleaned)
+            if match:
+                groups = match.groups()
+                if len(groups) >= 2:
+                    # Patterns 0-1: 'Album' by Artist (album first)
+                    # Pattern 2: Artist - Album (artist first)
+                    if i == 2:
+                        # Artist - Album pattern
+                        artist, album = groups[0].strip(), groups[1].strip()
+                    else:
+                        album, artist = groups[0].strip(), groups[1].strip()
+
+                    # Clean up any trailing punctuation or parentheses
+                    album = re.sub(r'\s*\([^)]*$', '', album).strip()
+
+                    if len(album) > 2 and len(artist) > 2:
+                        cleaned = f"How about '{album}' by {artist}? Great addition to your collection!"
+                        break
+                elif len(groups) == 1 and len(groups[0]) > 5:
+                    extracted = groups[0].strip()
+                    cleaned = f"You might enjoy {extracted}!"
+                    break
+        else:
+            # No extractable content, return context-aware fallback
+            return "I'd love to help with a recommendation! Could you tell me what genres or artists you're into?"
+
+    # AGGRESSIVE: Truncate from the start of obvious reasoning blocks
+    reasoning_start_markers = [
+        r'[\.\s]+According to rules',
+        r'[\.\s]+The user asks',
+        r'[\.\s]+The user wants',
+        r'[\.\s]+The user has',
+        r'[\.\s]+The user didn\'t',
+        r'[\.\s]+We need to',
+        r'[\.\s]+We should',
+        r'[\.\s]+We can say',
+        r'[\.\s]+We can respond',
+        r'[\.\s]+We can answer',
+        r'[\.\s]+We must',
+        r'[\.\s]+Should be',
+        r'[\.\s]+No action tags',
+        r'[\.\s]+So we',
+        r'[\.\s]+The question',
+        r'[\.\s]+Let\'s think',
+        r'[\.\s]+Let me think',
+        r'[\.\s]+Must be',
+        r'[\.\s]+But we need',
+        r'[\.\s]+The collection',
+        r'[\.\s]+Or we could',
+        r'[\.\s]+Or \"',
+        r'\n\nWe need',
+        r'\n\nWe should',
+        r'\n\nThe user',
+    ]
+
+    for marker in reasoning_start_markers:
+        match = re.search(marker, cleaned, re.IGNORECASE)
+        if match:
+            cleaned = cleaned[:match.start()]
+
+    # Remove any remaining inline reasoning fragments
+    inline_reasoning = [
+        r'\. According to rules[^\.]*\.',
+        r'\. The user asks[^\.]*\.',
+        r'\. We need to[^\.]*\.',
+        r'\. No action tags[^\.]*\.',
+        r'\. Should be[^\.]*\.',
+    ]
+
+    for pattern in inline_reasoning:
+        cleaned = re.sub(pattern, '.', cleaned, flags=re.IGNORECASE)
+
+    # Remove bullet lists of albums that look like internal analysis
+    # (e.g., "- Pink Floyd - Dark Side of the Moon (Progressive Rock)")
+    lines = cleaned.split('\n')
+    filtered_lines = []
+    consecutive_list_items = 0
+    temp_list_items = []
+
+    for line in lines:
+        stripped = line.strip()
+        # Check if this looks like internal album listing with genre analysis
+        is_analysis_list = (
+            re.match(r'^-\s+[A-Za-z].*-.*\(.*\)', stripped) or  # Album with (Genre)
+            re.match(r'^-\s+[A-Za-z].*-.*\?', stripped)  # Album with question
+        )
+        if is_analysis_list:
+            consecutive_list_items += 1
+            temp_list_items.append(line)
+        else:
+            # If we had fewer than 3 analysis-style items, keep them
+            if consecutive_list_items < 3:
+                filtered_lines.extend(temp_list_items)
+            consecutive_list_items = 0
+            temp_list_items = []
+            filtered_lines.append(line)
+
+    if consecutive_list_items < 3:
+        filtered_lines.extend(temp_list_items)
+
+    cleaned = '\n'.join(filtered_lines)
 
     # Remove action tags from display
     cleaned = re.sub(r'\{\{?ADD:[^}]+\}\}?', '', cleaned, flags=re.IGNORECASE)
@@ -270,8 +427,8 @@ async def search_discogs_for_album(artist: str, album: str, discogs_key: str, di
             if best_result.get("year"):
                 try:
                     year = int(best_result["year"])
-                except:
-                    pass
+                except (ValueError, TypeError):
+                    print(f"[Discogs] Could not parse year: {best_result.get('year')}")
 
             print(f"[Discogs] Found: {best_result.get('title')} (score: {best_score})")
 
