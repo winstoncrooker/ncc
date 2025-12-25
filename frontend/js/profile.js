@@ -920,11 +920,11 @@ const Profile = {
       } else {
         const errorText = await response.text();
         console.error('Error saving tags:', errorText);
-        alert('Failed to save tags');
+        Auth.showError('Failed to save tags');
       }
     } catch (error) {
       console.error('Error saving tags:', error);
-      alert('Failed to save tags');
+      Auth.showError('Failed to save tags');
     }
   },
 
@@ -946,11 +946,11 @@ const Profile = {
       } else {
         const errorText = await response.text();
         console.error('Error clearing tags:', errorText);
-        alert('Failed to clear tags');
+        Auth.showError('Failed to clear tags');
       }
     } catch (error) {
       console.error('Error clearing tags:', error);
-      alert('Failed to clear tags');
+      Auth.showError('Failed to clear tags');
     }
   },
 
@@ -1831,7 +1831,7 @@ const Profile = {
         }
       } catch (err) {
         console.error('Image upload error:', err);
-        alert('Failed to upload image. Try using an image URL instead.');
+        Auth.showError('Failed to upload image. Try using an image URL instead.');
         btn.textContent = 'Save';
         btn.disabled = false;
         return;
@@ -1839,7 +1839,7 @@ const Profile = {
     }
 
     if (!imageUrl) {
-      alert('Please enter an image URL or upload a file');
+      Auth.showWarning('Please enter an image URL or upload a file');
       return;
     }
 
@@ -1864,7 +1864,7 @@ const Profile = {
       }
     } catch (err) {
       console.error('Save image error:', err);
-      alert('Failed to save image');
+      Auth.showError('Failed to save image');
     }
 
     btn.textContent = 'Save';
@@ -2015,7 +2015,7 @@ const Profile = {
       } else {
         const errorText = await response.text();
         console.error('Failed to clear note:', errorText);
-        alert('Failed to clear note');
+        Auth.showError('Failed to clear note');
       }
     } catch (error) {
       console.error('Error clearing showcase note:', error);
@@ -2088,11 +2088,11 @@ const Profile = {
         this.closeModal('edit-profile-modal');
       } else {
         const error = await profileResponse.json();
-        alert(error.detail || 'Failed to save profile');
+        Auth.showError(error.detail || 'Failed to save profile');
       }
     } catch (error) {
       console.error('Error saving profile:', error);
-      alert('Failed to save profile');
+      Auth.showError('Failed to save profile');
     }
   },
 
@@ -2278,11 +2278,11 @@ const Profile = {
         this.closeCropper();
       } else {
         const error = await response.json();
-        alert(error.detail || 'Failed to upload image');
+        Auth.showError(error.detail || 'Failed to upload image');
       }
     } catch (error) {
       console.error('Upload error:', error);
-      alert('Failed to upload image');
+      Auth.showError('Failed to upload image');
     } finally {
       // Reset button state
       btnText.style.display = 'inline';
@@ -2336,7 +2336,7 @@ const Profile = {
     const cover = document.getElementById('manual-cover').value.trim();
 
     if (!artist || !album) {
-      alert('Artist and album are required');
+      Auth.showWarning('Artist and album are required');
       return;
     }
 
@@ -2359,11 +2359,11 @@ const Profile = {
         this.closeModal('add-record-modal');
       } else {
         const error = await response.json();
-        alert(error.detail || 'Failed to add album');
+        Auth.showError(error.detail || 'Failed to add album');
       }
     } catch (error) {
       console.error('Error adding album:', error);
-      alert('Failed to add album');
+      Auth.showError('Failed to add album');
     }
   },
 
@@ -2463,11 +2463,11 @@ const Profile = {
         this.closeModal('add-record-modal');
       } else {
         const error = await response.json();
-        alert(error.detail || 'Failed to add album');
+        Auth.showError(error.detail || 'Failed to add album');
       }
     } catch (error) {
       console.error('Error adding album:', error);
-      alert('Failed to add album');
+      Auth.showError('Failed to add album');
     }
   },
 
@@ -2486,7 +2486,7 @@ const Profile = {
         this.openAddRecordModal();
         return;
       }
-      alert('All your albums are already in your showcase!');
+      Auth.showInfo('All your albums are already in your showcase!');
       return;
     }
 
@@ -2512,13 +2512,13 @@ const Profile = {
 
     // Check if already in showcase
     if (this.showcase.find(s => s.collection_id === collectionId)) {
-      alert(`This ${terms.itemSingular} is already in your showcase`);
+      Auth.showWarning(`This ${terms.itemSingular} is already in your showcase`);
       return;
     }
 
     // Check showcase limit
     if (this.showcase.length >= 8) {
-      alert(`Showcase limit reached (max 8 ${terms.itemPlural}). Remove one to add another.`);
+      Auth.showWarning(`Showcase limit reached (max 8 ${terms.itemPlural}). Remove one to add another.`);
       return;
     }
 
@@ -2535,7 +2535,7 @@ const Profile = {
         this.closeModal('showcase-modal');
       } else {
         const error = await response.json();
-        alert(error.detail || 'Failed to add to showcase');
+        Auth.showError(error.detail || 'Failed to add to showcase');
       }
     } catch (error) {
       console.error('Error adding to showcase:', error);
@@ -2679,7 +2679,7 @@ const Profile = {
   async addWishlistItem() {
     const categoryId = this.userCategories?.find(c => c.slug === this.currentCategorySlug)?.id;
     if (!categoryId) {
-      alert('Please select a category first');
+      Auth.showWarning('Please select a category first');
       return;
     }
 
@@ -2707,11 +2707,11 @@ const Profile = {
         this.closeModal('add-wishlist-modal');
       } else {
         const error = await response.json();
-        alert(error.detail || 'Failed to add item');
+        Auth.showError(error.detail || 'Failed to add item');
       }
     } catch (error) {
       console.error('Error adding wishlist item:', error);
-      alert('Failed to add item');
+      Auth.showError('Failed to add item');
     }
   },
 
@@ -2741,14 +2741,14 @@ const Profile = {
         this.renderWishlist();
         const error = await response.json();
         console.error('Error marking item found:', error);
-        alert(error.detail || 'Failed to mark item as found');
+        Auth.showError(error.detail || 'Failed to mark item as found');
       }
     } catch (error) {
       // Revert on error
       if (item) item.is_found = false;
       this.renderWishlist();
       console.error('Error marking item found:', error);
-      alert('Failed to mark item as found');
+      Auth.showError('Failed to mark item as found');
     }
   },
 
@@ -2778,14 +2778,14 @@ const Profile = {
         this.renderWishlist();
         const error = await response.json();
         console.error('Error marking item unfound:', error);
-        alert(error.detail || 'Failed to mark item as unfound');
+        Auth.showError(error.detail || 'Failed to mark item as unfound');
       }
     } catch (error) {
       // Revert on error
       if (item) item.is_found = true;
       this.renderWishlist();
       console.error('Error marking item unfound:', error);
-      alert('Failed to mark item as unfound');
+      Auth.showError('Failed to mark item as unfound');
     }
   },
 
@@ -2815,7 +2815,7 @@ const Profile = {
         }
         const error = await response.json();
         console.error('Error deleting wishlist item:', error);
-        alert(error.detail || 'Failed to delete item');
+        Auth.showError(error.detail || 'Failed to delete item');
       }
     } catch (error) {
       // Revert on error
@@ -2824,7 +2824,7 @@ const Profile = {
         this.renderWishlist();
       }
       console.error('Error deleting wishlist item:', error);
-      alert('Failed to delete item');
+      Auth.showError('Failed to delete item');
     }
   },
 
@@ -2978,11 +2978,11 @@ const Profile = {
         await this.loadFriends();
       } else {
         const error = await response.json();
-        alert(error.detail || 'Failed to accept request');
+        Auth.showError(error.detail || 'Failed to accept request');
       }
     } catch (error) {
       console.error('Error accepting request:', error);
-      alert('Failed to accept request');
+      Auth.showError('Failed to accept request');
     }
   },
 
@@ -3002,11 +3002,11 @@ const Profile = {
         this.renderFriendRequests();
       } else {
         const error = await response.json();
-        alert(error.detail || 'Failed to reject request');
+        Auth.showError(error.detail || 'Failed to reject request');
       }
     } catch (error) {
       console.error('Error rejecting request:', error);
-      alert('Failed to reject request');
+      Auth.showError('Failed to reject request');
     }
   },
 
@@ -3127,14 +3127,14 @@ const Profile = {
       if (response.ok) {
         // Request sent successfully
         this.closeModal('add-friend-modal');
-        alert('Friend request sent!');
+        Auth.showSuccess('Friend request sent!');
       } else {
         const error = await response.json();
-        alert(error.detail || 'Failed to send request');
+        Auth.showError(error.detail || 'Failed to send request');
       }
     } catch (error) {
       console.error('Error sending request:', error);
-      alert('Failed to send request');
+      Auth.showError('Failed to send request');
     }
   },
 
@@ -3758,7 +3758,7 @@ const Profile = {
         this.renderViewProfile(this.viewedProfile);
       } else {
         const error = await response.json();
-        alert(error.detail || 'Failed to send request');
+        Auth.showError(error.detail || 'Failed to send request');
       }
     } catch (error) {
       console.error('Error sending request:', error);
@@ -3786,7 +3786,7 @@ const Profile = {
         this.renderViewProfile(this.viewedProfile);
       } else {
         const error = await response.json();
-        alert(error.detail || 'Failed to accept request');
+        Auth.showError(error.detail || 'Failed to accept request');
       }
     } catch (error) {
       console.error('Error accepting request:', error);
@@ -3807,7 +3807,7 @@ const Profile = {
         this.closeModal('view-profile-modal');
       } else {
         const error = await response.json();
-        alert(error.detail || 'Failed to reject request');
+        Auth.showError(error.detail || 'Failed to reject request');
       }
     } catch (error) {
       console.error('Error rejecting request:', error);
@@ -4097,12 +4097,12 @@ const Profile = {
         this.renderMessages();
       } else {
         const error = await response.json();
-        alert(error.detail || 'Failed to send message');
+        Auth.showError(error.detail || 'Failed to send message');
         input.value = content; // Restore message
       }
     } catch (error) {
       console.error('Error sending message:', error);
-      alert('Failed to send message');
+      Auth.showError('Failed to send message');
       input.value = content;
     }
   }

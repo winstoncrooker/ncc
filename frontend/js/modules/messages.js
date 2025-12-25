@@ -196,11 +196,11 @@ const MessagesModule = {
         await this.loadConversationMessages(this.currentConversation.userId);
       } else {
         const error = await response.json();
-        alert(error.detail || 'Failed to send message');
+        Auth.showError(error.detail || 'Failed to send message');
       }
     } catch (error) {
       console.error('Error sending message:', error);
-      alert('Failed to send message');
+      Auth.showError('Failed to send message');
     }
   }
 };

@@ -204,3 +204,109 @@
     justify-content: center;
   }
 }
+
+/* Toast Notifications */
+.app-toast {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%) translateY(100px);
+  background: #1a1a1a;
+  border: 1px solid #333;
+  border-radius: 12px;
+  padding: 14px 20px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  z-index: 100000;
+  opacity: 0;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  max-width: calc(100vw - 32px);
+  min-width: 280px;
+}
+
+.app-toast.show {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+.app-toast .toast-icon {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.app-toast .toast-message {
+  flex: 1;
+  font-size: 0.95rem;
+  color: #fff;
+  line-height: 1.4;
+}
+
+.app-toast .toast-close {
+  flex-shrink: 0;
+  background: transparent;
+  border: none;
+  color: #666;
+  font-size: 1.4rem;
+  cursor: pointer;
+  padding: 0 4px;
+  line-height: 1;
+  transition: color 0.2s;
+}
+
+.app-toast .toast-close:hover {
+  color: #fff;
+}
+
+/* Toast Types */
+.app-toast-error {
+  border-color: #ff4757;
+  background: linear-gradient(135deg, #1a1a1a 0%, #2a1a1a 100%);
+}
+
+.app-toast-error .toast-icon {
+  color: #ff4757;
+}
+
+.app-toast-success {
+  border-color: #1db954;
+  background: linear-gradient(135deg, #1a1a1a 0%, #1a2a1a 100%);
+}
+
+.app-toast-success .toast-icon {
+  color: #1db954;
+}
+
+.app-toast-warning {
+  border-color: #ffa502;
+  background: linear-gradient(135deg, #1a1a1a 0%, #2a2a1a 100%);
+}
+
+.app-toast-warning .toast-icon {
+  color: #ffa502;
+}
+
+.app-toast-info {
+  border-color: #3498db;
+  background: linear-gradient(135deg, #1a1a1a 0%, #1a1a2a 100%);
+}
+
+.app-toast-info .toast-icon {
+  color: #3498db;
+}
+
+@media (max-width: 480px) {
+  .app-toast {
+    left: 16px;
+    right: 16px;
+    transform: translateX(0) translateY(100px);
+    min-width: auto;
+  }
+
+  .app-toast.show {
+    transform: translateX(0) translateY(0);
+  }
+}

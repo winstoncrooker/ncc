@@ -73,11 +73,11 @@ const FriendsModule = {
         await this.loadFriends();
       } else {
         const error = await response.json();
-        alert(error.detail || 'Failed to accept request');
+        Auth.showError(error.detail || 'Failed to accept request');
       }
     } catch (error) {
       console.error('Error accepting request:', error);
-      alert('Failed to accept request');
+      Auth.showError('Failed to accept request');
     }
   },
 
@@ -90,11 +90,11 @@ const FriendsModule = {
         await this.loadFriendRequests();
       } else {
         const error = await response.json();
-        alert(error.detail || 'Failed to reject request');
+        Auth.showError(error.detail || 'Failed to reject request');
       }
     } catch (error) {
       console.error('Error rejecting request:', error);
-      alert('Failed to reject request');
+      Auth.showError('Failed to reject request');
     }
   },
 
@@ -179,14 +179,14 @@ const FriendsModule = {
       });
       if (response.ok) {
         this.closeModal('add-friend-modal');
-        alert('Friend request sent!');
+        Auth.showSuccess('Friend request sent!');
       } else {
         const error = await response.json();
-        alert(error.detail || 'Failed to send request');
+        Auth.showError(error.detail || 'Failed to send request');
       }
     } catch (error) {
       console.error('Error sending request:', error);
-      alert('Failed to send request');
+      Auth.showError('Failed to send request');
     }
   },
 

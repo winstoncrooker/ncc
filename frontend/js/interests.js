@@ -268,7 +268,7 @@ const Interests = {
       console.error('Error saving interests:', error);
       continueBtn.disabled = false;
       continueBtn.textContent = 'Finish';
-      alert('Failed to save your interests. Please try again.');
+      Auth.showError('Failed to save your interests. Please try again.');
     }
   },
 

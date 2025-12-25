@@ -970,7 +970,7 @@ const Forums = {
 
     } catch (error) {
       console.error('Error deleting comment:', error);
-      alert('Failed to delete comment');
+      Auth.showError('Failed to delete comment');
     }
   },
 
@@ -1131,7 +1131,7 @@ const Forums = {
     const body = document.getElementById('post-body').value.trim();
 
     if (!categorySlug || !categoryId || !title || !body) {
-      alert('Please fill in all required fields');
+      Auth.showWarning('Please fill in all required fields');
       return;
     }
 
@@ -1179,7 +1179,7 @@ const Forums = {
 
     } catch (error) {
       console.error('Error creating post:', error);
-      alert(`Failed to create post: ${error.message}`);
+      Auth.showError(`Failed to create post: ${error.message}`);
     } finally {
       submitBtn.textContent = originalText;
       submitBtn.disabled = false;
@@ -1199,7 +1199,7 @@ const Forums = {
 
     toAdd.forEach(file => {
       if (file.size > 5 * 1024 * 1024) {
-        alert(`Image ${file.name} is too large (max 5MB)`);
+        Auth.showWarning(`Image ${file.name} is too large (max 5MB)`);
         return;
       }
 
@@ -1278,7 +1278,7 @@ const Forums = {
 
     toAdd.forEach(file => {
       if (file.size > 5 * 1024 * 1024) {
-        alert(`Image ${file.name} is too large (max 5MB)`);
+        Auth.showWarning(`Image ${file.name} is too large (max 5MB)`);
         return;
       }
 
@@ -1556,12 +1556,25 @@ const Forums = {
       // Add to joined set
       this.joinedCategorySlugs.add(categorySlug);
 
+      // Update category member count instantly
+      const categoryEl = document.querySelector(`.discover-category[data-slug="${categorySlug}"]`);
+      if (categoryEl) {
+        const countEl = categoryEl.querySelector('.category-count');
+        if (countEl) {
+          const currentCount = parseInt(countEl.textContent) || 0;
+          countEl.textContent = `${currentCount + 1} members`;
+        }
+      }
+
+      // Show success feedback
+      Auth.showSuccess('Joined category!');
+
       // Refresh sidebar
       this.loadMyGroups();
 
     } catch (error) {
       console.error('Error joining category:', error);
-      alert('Failed to join category');
+      Auth.showError('Failed to join category');
     }
   },
 
@@ -1595,9 +1608,22 @@ const Forums = {
         groupsContainer.innerHTML = '';
       }
 
+      // Update category member count instantly
+      const categoryEl = document.querySelector(`.discover-category[data-slug="${categorySlug}"]`);
+      if (categoryEl) {
+        const countEl = categoryEl.querySelector('.category-count');
+        if (countEl) {
+          const currentCount = parseInt(countEl.textContent) || 0;
+          countEl.textContent = `${Math.max(0, currentCount - 1)} members`;
+        }
+      }
+
       // Remove from joined set
       this.joinedCategorySlugs.delete(categorySlug);
       delete this.interestIdsByCategory[categorySlug];
+
+      // Show feedback
+      Auth.showInfo('Left category');
 
       // Refresh sidebar
       this.loadMyGroups();
@@ -1609,7 +1635,7 @@ const Forums = {
 
     } catch (error) {
       console.error('Error leaving category:', error);
-      alert('Failed to leave category');
+      Auth.showError('Failed to leave category');
     }
   },
 
@@ -1696,13 +1722,27 @@ const Forums = {
           const currentCount = parseInt(countEl.textContent) || 0;
           countEl.textContent = `${currentCount + 1} members`;
         }
+
+        // Also update the parent category's member count
+        const categoryEl = groupItem.closest('.discover-category');
+        if (categoryEl) {
+          const catCountEl = categoryEl.querySelector('.category-count');
+          if (catCountEl) {
+            const catCount = parseInt(catCountEl.textContent) || 0;
+            catCountEl.textContent = `${catCount + 1} members`;
+          }
+        }
       }
+
+      // Show success feedback
+      Auth.showSuccess('Joined group!');
 
       // Refresh sidebar
       this.loadMyGroups();
 
     } catch (error) {
       console.error('Error joining group:', error);
+      Auth.showError('Failed to join group');
     }
   },
 
@@ -1729,18 +1769,31 @@ const Forums = {
           const currentCount = parseInt(countEl.textContent) || 0;
           countEl.textContent = `${Math.max(0, currentCount - 1)} members`;
         }
+
+        // Also update the parent category's member count
+        const categoryEl = groupItem.closest('.discover-category');
+        if (categoryEl) {
+          const catCountEl = categoryEl.querySelector('.category-count');
+          if (catCountEl) {
+            const catCount = parseInt(catCountEl.textContent) || 0;
+            catCountEl.textContent = `${Math.max(0, catCount - 1)} members`;
+          }
+        }
       }
 
       // Remove from joined set
       if (this.joinedGroupIds) this.joinedGroupIds.delete(groupId);
       if (this.interestIdsByGroup) delete this.interestIdsByGroup[groupId];
 
+      // Show feedback
+      Auth.showInfo('Left group');
+
       // Refresh sidebar
       this.loadMyGroups();
 
     } catch (error) {
       console.error('Error leaving group:', error);
-      alert('Failed to leave group');
+      Auth.showError('Failed to leave group');
     }
   },
 
@@ -1770,7 +1823,7 @@ const Forums = {
 
     } catch (error) {
       console.error('Error leaving group:', error);
-      alert('Failed to leave group');
+      Auth.showError('Failed to leave group');
     }
   },
 
