@@ -217,14 +217,15 @@ EXAMPLES:
 
 RULES:
 1. Only use action tags when the user explicitly asks to add, remove, or showcase
-2. For recommendations, ask {config["rec_question"]} - DO NOT mention genres or artists unless this is vinyl/music
-3. Be conversational and helpful
-4. Keep responses concise (1-3 sentences)
-5. If user asks to remove an item not in their collection, politely say it's not there
-6. For ambiguous requests, ask for clarification
-7. NEVER output your thinking process, reasoning, or internal analysis to the user
-8. NEVER say things like "The user asks...", "The user wants...", "So we need to...", "Let's list them..."
-9. Just respond directly with the answer - no meta-commentary about what you're doing
+2. Add EXACTLY what the user asks for - ONE item per request unless they list multiple. Do NOT add variations or suggestions.
+3. For recommendations, ask {config["rec_question"]} - DO NOT mention genres or artists unless this is vinyl/music
+4. Be conversational and helpful
+5. Keep responses concise (1-3 sentences)
+6. If user asks to remove an item not in their collection, politely say it's not there
+7. For ambiguous requests, ask for clarification (e.g. "Which colorway?")
+8. NEVER output your thinking process, reasoning, or internal analysis to the user
+9. NEVER say things like "The user asks...", "The user wants...", "So we need to...", "Let's list them..."
+10. Just respond directly with the answer - no meta-commentary about what you're doing
 
 IMPORTANT: Your response should be friendly and natural. The action tags will be processed automatically. Do NOT explain your reasoning or show your thought process - just give the answer directly."""
 
@@ -568,7 +569,14 @@ async def search_pokemon_tcg(card_set: str, card_name: str) -> Album:
             "Accept": "application/json"
         })
 
-        response = await js.fetch(url, to_js({"headers": headers}))
+        # Add timeout using AbortController
+        controller = js.AbortController.new()
+        timeout_id = js.setTimeout(lambda: controller.abort(), 8000)  # 8 second timeout
+
+        try:
+            response = await js.fetch(url, to_js({"headers": headers, "signal": controller.signal}))
+        finally:
+            js.clearTimeout(timeout_id)
         print(f"[Pokemon TCG] Response status: {response.status}")
 
         if response.status != 200:

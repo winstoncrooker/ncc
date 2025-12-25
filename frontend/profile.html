@@ -626,18 +626,18 @@
         <form id="manual-add-form">
           <div class="form-row">
             <div class="form-group">
-              <label for="manual-artist">Artist *</label>
+              <label for="manual-artist" id="manual-artist-label">Artist *</label>
               <input type="text" id="manual-artist" required placeholder="Artist name">
             </div>
             <div class="form-group">
-              <label for="manual-album">Album *</label>
+              <label for="manual-album" id="manual-album-label">Album *</label>
               <input type="text" id="manual-album" required placeholder="Album title">
             </div>
           </div>
           <div class="form-row">
-            <div class="form-group">
-              <label for="manual-year">Year</label>
-              <input type="number" id="manual-year" min="1900" max="2030" placeholder="Release year">
+            <div class="form-group" id="manual-year-group">
+              <label for="manual-year" id="manual-year-label">Year</label>
+              <input type="text" id="manual-year" placeholder="Release year">
             </div>
             <div class="form-group">
               <label for="manual-cover">Cover Image URL</label>

@@ -2335,6 +2335,50 @@ const Profile = {
     }
   },
 
+  // Category-specific form field configurations
+  categoryFormConfig: {
+    'vinyl': {
+      field1Label: 'Artist *', field1Placeholder: 'Artist name',
+      field2Label: 'Album *', field2Placeholder: 'Album title',
+      field3Label: 'Year', field3Placeholder: 'Release year'
+    },
+    'coins': {
+      field1Label: 'Country/Type *', field1Placeholder: 'e.g. USA, Ancient Rome',
+      field2Label: 'Coin *', field2Placeholder: 'e.g. Morgan Dollar, Denarius',
+      field3Label: 'Year', field3Placeholder: 'e.g. 1921'
+    },
+    'trading-cards': {
+      field1Label: 'Set/Game *', field1Placeholder: 'e.g. Pokemon Base Set, MTG Alpha',
+      field2Label: 'Card Name *', field2Placeholder: 'e.g. Charizard, Black Lotus',
+      field3Label: 'Card #', field3Placeholder: 'e.g. 4/102'
+    },
+    'sneakers': {
+      field1Label: 'Brand *', field1Placeholder: 'e.g. Nike, Adidas',
+      field2Label: 'Model/Colorway *', field2Placeholder: 'e.g. Air Jordan 1 Chicago',
+      field3Label: 'Size', field3Placeholder: 'e.g. 10.5'
+    },
+    'watches': {
+      field1Label: 'Brand *', field1Placeholder: 'e.g. Rolex, Omega',
+      field2Label: 'Model *', field2Placeholder: 'e.g. Submariner, Speedmaster',
+      field3Label: 'Reference', field3Placeholder: 'e.g. 116610LN'
+    },
+    'comics': {
+      field1Label: 'Series *', field1Placeholder: 'e.g. Amazing Spider-Man',
+      field2Label: 'Title/Issue *', field2Placeholder: 'e.g. #300 - Venom',
+      field3Label: 'Issue #', field3Placeholder: 'e.g. 300'
+    },
+    'video-games': {
+      field1Label: 'Platform *', field1Placeholder: 'e.g. PS5, Switch, N64',
+      field2Label: 'Title *', field2Placeholder: 'e.g. The Legend of Zelda',
+      field3Label: 'Region', field3Placeholder: 'e.g. NTSC, PAL'
+    },
+    'cars': {
+      field1Label: 'Make *', field1Placeholder: 'e.g. Ford, Toyota',
+      field2Label: 'Model *', field2Placeholder: 'e.g. Mustang GT, Supra',
+      field3Label: 'Year', field3Placeholder: 'e.g. 1969'
+    }
+  },
+
   /**
    * Open add record modal
    */
@@ -2345,6 +2389,23 @@ const Profile = {
     document.getElementById('manual-cover').value = '';
     document.getElementById('search-results').innerHTML = '';
     document.getElementById('discogs-query').value = '';
+
+    // Customize form fields based on category
+    const config = this.categoryFormConfig[this.currentCategorySlug] || this.categoryFormConfig['vinyl'];
+
+    const artistLabel = document.getElementById('manual-artist-label');
+    const albumLabel = document.getElementById('manual-album-label');
+    const yearLabel = document.getElementById('manual-year-label');
+    const artistInput = document.getElementById('manual-artist');
+    const albumInput = document.getElementById('manual-album');
+    const yearInput = document.getElementById('manual-year');
+
+    if (artistLabel) artistLabel.textContent = config.field1Label;
+    if (albumLabel) albumLabel.textContent = config.field2Label;
+    if (yearLabel) yearLabel.textContent = config.field3Label;
+    if (artistInput) artistInput.placeholder = config.field1Placeholder;
+    if (albumInput) albumInput.placeholder = config.field2Placeholder;
+    if (yearInput) yearInput.placeholder = config.field3Placeholder;
 
     // Only show Discogs search tab for vinyl category
     const isVinyl = this.currentCategorySlug === 'vinyl';
