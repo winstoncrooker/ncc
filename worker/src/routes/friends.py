@@ -152,18 +152,46 @@ async def send_friend_request(
         # Check if request already exists (in either direction)
         existing_request = await env.DB.prepare(
             """SELECT id, sender_id, status FROM friend_requests
-               WHERE ((sender_id = ? AND recipient_id = ?) OR (sender_id = ? AND recipient_id = ?))
-               AND status = 'pending'"""
+               WHERE ((sender_id = ? AND recipient_id = ?) OR (sender_id = ? AND recipient_id = ?))"""
         ).bind(user_id, target_id, target_id, user_id).first()
 
         if existing_request and hasattr(existing_request, 'to_py'):
             existing_request = existing_request.to_py()
 
         if existing_request:
-            if existing_request["sender_id"] == user_id:
-                raise HTTPException(status_code=400, detail="You already sent a request to this user")
-            else:
-                raise HTTPException(status_code=400, detail="This user already sent you a request - check your pending requests!")
+            if existing_request["status"] == "pending":
+                if existing_request["sender_id"] == user_id:
+                    raise HTTPException(status_code=400, detail="You already sent a request to this user")
+                else:
+                    raise HTTPException(status_code=400, detail="This user already sent you a request - check your pending requests!")
+            elif existing_request["status"] == "rejected":
+                # Allow re-sending if previous request was rejected - reset to pending
+                await env.DB.prepare(
+                    """UPDATE friend_requests
+                       SET status = 'pending', sender_id = ?, recipient_id = ?,
+                           created_at = CURRENT_TIMESTAMP, responded_at = NULL
+                       WHERE id = ?"""
+                ).bind(user_id, target_id, existing_request["id"]).run()
+
+                # Get sender info for response
+                sender = await env.DB.prepare(
+                    "SELECT name, picture FROM users WHERE id = ?"
+                ).bind(user_id).first()
+                if sender and hasattr(sender, 'to_py'):
+                    sender = sender.to_py()
+
+                return FriendRequest(
+                    id=existing_request["id"],
+                    sender_id=user_id,
+                    sender_name=to_python_value(sender.get("name")) if sender else None,
+                    sender_picture=to_python_value(sender.get("picture")) if sender else None,
+                    recipient_id=target_id,
+                    recipient_name=to_python_value(target.get("name")),
+                    recipient_picture=to_python_value(target.get("picture")),
+                    status="pending",
+                    created_at=str(existing_request.get("created_at", ""))
+                )
+            # If accepted, they're already friends (handled above)
 
         # Get sender info
         sender = await env.DB.prepare(
