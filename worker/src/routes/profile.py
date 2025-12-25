@@ -94,6 +94,7 @@ class ShowcaseAlbum(BaseModel):
     cover: Optional[str] = None
     year: Optional[int] = None
     notes: Optional[str] = None
+    tags: Optional[str] = None
 
 
 class ShowcaseAdd(BaseModel):
@@ -252,7 +253,7 @@ async def get_showcase(
     try:
         if category_id:
             results = await env.DB.prepare(
-                """SELECT s.id, s.collection_id, s.position, s.notes, c.artist, c.album, c.cover, c.year
+                """SELECT s.id, s.collection_id, s.position, s.notes, c.artist, c.album, c.cover, c.year, c.tags
                    FROM showcase_albums s
                    JOIN collections c ON s.collection_id = c.id
                    WHERE s.user_id = ? AND c.category_id = ?
@@ -260,7 +261,7 @@ async def get_showcase(
             ).bind(user_id, category_id).all()
         else:
             results = await env.DB.prepare(
-                """SELECT s.id, s.collection_id, s.position, s.notes, c.artist, c.album, c.cover, c.year
+                """SELECT s.id, s.collection_id, s.position, s.notes, c.artist, c.album, c.cover, c.year, c.tags
                    FROM showcase_albums s
                    JOIN collections c ON s.collection_id = c.id
                    WHERE s.user_id = ?
@@ -280,7 +281,8 @@ async def get_showcase(
                 album=row["album"],
                 cover=to_python_value(row.get("cover")),
                 year=to_python_value(row.get("year")),
-                notes=to_python_value(row.get("notes"))
+                notes=to_python_value(row.get("notes")),
+                tags=to_python_value(row.get("tags"))
             ))
 
         return albums
@@ -303,7 +305,7 @@ async def add_to_showcase(
     try:
         # Verify album belongs to user and get its category
         album = await env.DB.prepare(
-            "SELECT id, artist, album, cover, year, category_id FROM collections WHERE id = ? AND user_id = ?"
+            "SELECT id, artist, album, cover, year, category_id, tags FROM collections WHERE id = ? AND user_id = ?"
         ).bind(body.collection_id, user_id).first()
 
         if album and hasattr(album, 'to_py'):
@@ -366,8 +368,9 @@ async def add_to_showcase(
             position=next_pos,
             artist=album["artist"],
             album=album["album"],
-            cover=to_python_value(album["cover"]),
-            year=to_python_value(album["year"])
+            cover=to_python_value(album.get("cover")),
+            year=to_python_value(album.get("year")),
+            tags=to_python_value(album.get("tags"))
         )
     except HTTPException:
         raise

@@ -1044,6 +1044,48 @@ const Profile = {
   },
 
   /**
+   * Update collector score instantly without re-fetching stats
+   * @param {number} showcaseDelta - Change in showcase count (+1, -1, 0)
+   * @param {number} collectionDelta - Change in collection count (+1, -1, 0)
+   */
+  updateCollectorScoreInstantly(showcaseDelta = 0, collectionDelta = 0) {
+    if (!this.collectionStats) return;
+
+    // Update local stats
+    if (showcaseDelta !== 0) {
+      this.collectionStats.total_showcase = (this.collectionStats.total_showcase || 0) + showcaseDelta;
+    }
+    if (collectionDelta !== 0) {
+      this.collectionStats.total_albums = (this.collectionStats.total_albums || 0) + collectionDelta;
+      // Also update category breakdown for current category
+      const currentCat = this.userCategories?.find(c => c.slug === this.currentCategorySlug);
+      if (currentCat && this.collectionStats.category_breakdown) {
+        this.collectionStats.category_breakdown[currentCat.id] =
+          (this.collectionStats.category_breakdown[currentCat.id] || 0) + collectionDelta;
+      }
+    }
+
+    // Update the score display
+    const scoreEl = document.querySelector('.collector-score span:last-child');
+    if (scoreEl) {
+      const newScore = this.calculateCollectorScore(this.collectionStats);
+      scoreEl.textContent = newScore;
+    }
+
+    // Also update collection count badge
+    if (collectionDelta !== 0) {
+      const currentCat = this.userCategories?.find(c => c.slug === this.currentCategorySlug);
+      if (currentCat) {
+        const badge = document.querySelector(`.collection-badge[data-category="${currentCat.slug}"] .badge-count`);
+        if (badge) {
+          const currentCount = parseInt(badge.textContent) || 0;
+          badge.textContent = Math.max(0, currentCount + collectionDelta);
+        }
+      }
+    }
+  },
+
+  /**
    * Load user's joined categories for the profile switcher
    */
   async loadUserCategories() {
@@ -1914,6 +1956,7 @@ const Profile = {
         <img src="${album.cover || this.getPlaceholderCover(album)}"
              alt="${album.album}" loading="lazy"
              onerror="this.src='${this.getPlaceholderCover(album)}'">
+        ${this.renderItemTags(album.tags)}
         ${album.notes ? `<div class="showcase-note">${this.escapeHtml(album.notes)}</div>` : ''}
         <div class="album-info">
           <p class="album-title">${this.escapeHtml(album.album)}</p>
@@ -2357,6 +2400,8 @@ const Profile = {
         const newAlbum = await response.json();
         this.addAlbumSorted(newAlbum);
         this.closeModal('add-record-modal');
+        // Update collector score instantly
+        this.updateCollectorScoreInstantly(0, 1);
       } else {
         const error = await response.json();
         Auth.showError(error.detail || 'Failed to add album');
@@ -2461,6 +2506,8 @@ const Profile = {
         const newAlbum = await response.json();
         this.addAlbumSorted(newAlbum);
         this.closeModal('add-record-modal');
+        // Update collector score instantly
+        this.updateCollectorScoreInstantly(0, 1);
       } else {
         const error = await response.json();
         Auth.showError(error.detail || 'Failed to add album');
@@ -2533,6 +2580,8 @@ const Profile = {
         this.showcase.push(newShowcase);
         this.renderShowcase();
         this.closeModal('showcase-modal');
+        // Update collector score instantly
+        this.updateCollectorScoreInstantly(1, 0);
       } else {
         const error = await response.json();
         Auth.showError(error.detail || 'Failed to add to showcase');
@@ -2555,6 +2604,8 @@ const Profile = {
         // Immediately remove from local state and re-render
         this.showcase = this.showcase.filter(s => s.id !== showcaseId);
         this.renderShowcase();
+        // Update collector score instantly
+        this.updateCollectorScoreInstantly(-1, 0);
       }
     } catch (error) {
       console.error('Error removing from showcase:', error);
@@ -2571,11 +2622,15 @@ const Profile = {
       });
 
       if (response.ok) {
+        // Check if item was in showcase before removing
+        const wasInShowcase = this.showcase.some(s => s.collection_id === albumId);
         // Immediately remove from local state and re-render
         this.collection = this.collection.filter(a => a.id !== albumId);
         this.showcase = this.showcase.filter(s => s.collection_id !== albumId);
         this.renderCollection();
         this.renderShowcase();
+        // Update collector score instantly (item removed from collection, maybe also showcase)
+        this.updateCollectorScoreInstantly(wasInShowcase ? -1 : 0, -1);
       }
     } catch (error) {
       console.error('Error removing album:', error);
