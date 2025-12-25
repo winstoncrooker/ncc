@@ -3,18 +3,10 @@
  * Enables offline support and caching
  */
 
-const CACHE_NAME = 'niche-collector-v64';
+const CACHE_NAME = 'niche-collector-v65';
+// Only cache CSS and fonts - JS/HTML always fetched fresh to avoid stale auth issues
 const STATIC_ASSETS = [
-  '/',
-  '/index.html',
-  '/profile.html',
   '/style.css',
-  '/js/config.js',
-  '/js/auth.js',
-  '/js/profile.js',
-  '/js/forums.js',
-  '/js/interests.js',
-  '/js/templates/index.js',
   '/css/auth.css',
   '/css/profile.css',
   '/css/forums.css'
@@ -67,6 +59,11 @@ self.addEventListener('fetch', (event) => {
 
   // Skip API requests (always fetch from network)
   if (url.pathname.startsWith('/api/')) {
+    return;
+  }
+
+  // Skip HTML and JS files - always fetch fresh to avoid stale auth issues
+  if (url.pathname.endsWith('.html') || url.pathname.endsWith('.js') || url.pathname === '/' || url.pathname === '/profile') {
     return;
   }
 
