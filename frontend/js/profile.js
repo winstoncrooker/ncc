@@ -2593,7 +2593,9 @@ const Profile = {
   async loadWishlist() {
     const categoryId = this.userCategories?.find(c => c.slug === this.currentCategorySlug)?.id;
     try {
-      const url = categoryId ? `/api/wishlist?category_id=${categoryId}` : '/api/wishlist';
+      // Include found items so user can mark them unfound if needed
+      let url = categoryId ? `/api/wishlist?category_id=${categoryId}` : '/api/wishlist';
+      url += (url.includes('?') ? '&' : '?') + 'include_found=true';
       const response = await Auth.apiRequest(url);
       if (response.ok) {
         this.wishlist = await response.json();
@@ -2646,7 +2648,9 @@ const Profile = {
           ${item.max_price ? `<span class="wishlist-price">Max $${item.max_price.toFixed(2)}</span>` : ''}
         </div>
         <div class="wishlist-actions">
-          ${!item.is_found ? `<button class="wishlist-found-btn" onclick="Profile.markWishlistFound(${item.id})">Mark Found</button>` : ''}
+          ${!item.is_found
+            ? `<button class="wishlist-found-btn" onclick="Profile.markWishlistFound(${item.id})">Mark Found</button>`
+            : `<button class="wishlist-unfound-btn" onclick="Profile.markWishlistUnfound(${item.id})">Mark Unfound</button>`}
           <button class="wishlist-delete-btn" onclick="Profile.deleteWishlistItem(${item.id})">&times;</button>
         </div>
       </div>
@@ -2717,23 +2721,69 @@ const Profile = {
       console.error('markWishlistFound: No itemId provided');
       return;
     }
+    // Update locally first for instant feedback
+    const item = this.wishlist.find(i => i.id === itemId);
+    if (item) {
+      item.is_found = true;
+      this.renderWishlist();
+    }
     try {
       const response = await Auth.apiRequest(`/api/wishlist/${itemId}`, {
         method: 'PUT',
         body: JSON.stringify({ is_found: true })
       });
 
-      if (response.ok) {
-        // Reload from server to stay in sync
-        await this.loadWishlist();
-      } else {
+      if (!response.ok) {
+        // Revert on error
+        if (item) item.is_found = false;
+        this.renderWishlist();
         const error = await response.json();
         console.error('Error marking item found:', error);
         alert(error.detail || 'Failed to mark item as found');
       }
     } catch (error) {
+      // Revert on error
+      if (item) item.is_found = false;
+      this.renderWishlist();
       console.error('Error marking item found:', error);
       alert('Failed to mark item as found');
+    }
+  },
+
+  /**
+   * Mark wishlist item as unfound (undo found)
+   */
+  async markWishlistUnfound(itemId) {
+    if (!itemId) {
+      console.error('markWishlistUnfound: No itemId provided');
+      return;
+    }
+    // Update locally first for instant feedback
+    const item = this.wishlist.find(i => i.id === itemId);
+    if (item) {
+      item.is_found = false;
+      this.renderWishlist();
+    }
+    try {
+      const response = await Auth.apiRequest(`/api/wishlist/${itemId}`, {
+        method: 'PUT',
+        body: JSON.stringify({ is_found: false })
+      });
+
+      if (!response.ok) {
+        // Revert on error
+        if (item) item.is_found = true;
+        this.renderWishlist();
+        const error = await response.json();
+        console.error('Error marking item unfound:', error);
+        alert(error.detail || 'Failed to mark item as unfound');
+      }
+    } catch (error) {
+      // Revert on error
+      if (item) item.is_found = true;
+      this.renderWishlist();
+      console.error('Error marking item unfound:', error);
+      alert('Failed to mark item as unfound');
     }
   },
 
@@ -2745,20 +2795,32 @@ const Profile = {
       console.error('deleteWishlistItem: No itemId provided');
       return;
     }
+    // Remove locally first for instant feedback
+    const itemIndex = this.wishlist.findIndex(i => i.id === itemId);
+    const removedItem = itemIndex >= 0 ? this.wishlist.splice(itemIndex, 1)[0] : null;
+    this.renderWishlist();
+
     try {
       const response = await Auth.apiRequest(`/api/wishlist/${itemId}`, {
         method: 'DELETE'
       });
 
-      if (response.ok) {
-        // Reload from server to stay in sync
-        await this.loadWishlist();
-      } else {
+      if (!response.ok) {
+        // Revert on error
+        if (removedItem) {
+          this.wishlist.splice(itemIndex, 0, removedItem);
+          this.renderWishlist();
+        }
         const error = await response.json();
         console.error('Error deleting wishlist item:', error);
         alert(error.detail || 'Failed to delete item');
       }
     } catch (error) {
+      // Revert on error
+      if (removedItem) {
+        this.wishlist.splice(itemIndex, 0, removedItem);
+        this.renderWishlist();
+      }
       console.error('Error deleting wishlist item:', error);
       alert('Failed to delete item');
     }
