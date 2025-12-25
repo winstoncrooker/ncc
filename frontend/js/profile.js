@@ -2701,6 +2701,10 @@ const Profile = {
    * Mark wishlist item as found
    */
   async markWishlistFound(itemId) {
+    if (!itemId) {
+      console.error('markWishlistFound: No itemId provided');
+      return;
+    }
     try {
       const response = await Auth.apiRequest(`/api/wishlist/${itemId}`, {
         method: 'PUT',
@@ -2708,12 +2712,17 @@ const Profile = {
       });
 
       if (response.ok) {
-        const item = this.wishlist.find(i => i.id === itemId);
-        if (item) item.is_found = true;
+        // Remove from local list since found items are filtered out
+        this.wishlist = this.wishlist.filter(i => i.id !== itemId);
         this.renderWishlist();
+      } else {
+        const error = await response.json();
+        console.error('Error marking item found:', error);
+        alert('Failed to mark item as found');
       }
     } catch (error) {
       console.error('Error marking item found:', error);
+      alert('Failed to mark item as found');
     }
   },
 
@@ -2721,6 +2730,10 @@ const Profile = {
    * Delete wishlist item
    */
   async deleteWishlistItem(itemId) {
+    if (!itemId) {
+      console.error('deleteWishlistItem: No itemId provided');
+      return;
+    }
     try {
       const response = await Auth.apiRequest(`/api/wishlist/${itemId}`, {
         method: 'DELETE'
@@ -2729,9 +2742,14 @@ const Profile = {
       if (response.ok) {
         this.wishlist = this.wishlist.filter(i => i.id !== itemId);
         this.renderWishlist();
+      } else {
+        const error = await response.json();
+        console.error('Error deleting wishlist item:', error);
+        alert('Failed to delete item');
       }
     } catch (error) {
       console.error('Error deleting wishlist item:', error);
+      alert('Failed to delete item');
     }
   },
 
