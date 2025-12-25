@@ -11,12 +11,28 @@ const Auth = {
   /**
    * Initialize auth - check URL for OAuth callback params
    */
+  // Mobile debug helper
+  mobileLog(msg) {
+    console.log(msg);
+    // Show on screen for mobile debugging
+    let debugEl = document.getElementById('mobile-debug');
+    if (!debugEl) {
+      debugEl = document.createElement('div');
+      debugEl.id = 'mobile-debug';
+      debugEl.style.cssText = 'position:fixed;bottom:0;left:0;right:0;background:#000;color:#0f0;font-size:10px;padding:5px;max-height:150px;overflow:auto;z-index:99999;font-family:monospace;';
+      document.body.appendChild(debugEl);
+    }
+    debugEl.innerHTML += msg + '<br>';
+    debugEl.scrollTop = debugEl.scrollHeight;
+  },
+
   init() {
     // Check for OAuth callback params in URL
     const params = new URLSearchParams(window.location.search);
     const token = params.get('token');
     const authError = params.get('auth_error');
 
+    this.mobileLog('[Auth] init: token in URL=' + !!token + ', stored=' + !!this.getToken());
     console.log('[Auth] init called, token in URL:', !!token, 'stored token:', !!this.getToken());
 
     if (authError) {
@@ -35,7 +51,7 @@ const Auth = {
         picture: params.get('picture') || null
       };
 
-      console.log('[Auth] Storing token and user:', user.email);
+      this.mobileLog('[Auth] Storing token for: ' + user.email);
 
       // Test localStorage availability (can fail in private browsing)
       try {
@@ -44,18 +60,19 @@ const Auth = {
 
         // Verify it was stored
         const storedToken = this.getToken();
-        console.log('[Auth] Token stored successfully:', !!storedToken);
+        this.mobileLog('[Auth] Token stored: ' + !!storedToken);
         if (!storedToken) {
-          console.error('[Auth] Token failed to persist in localStorage');
+          this.mobileLog('[Auth] ERROR: Token failed to persist!');
         }
       } catch (e) {
-        console.error('[Auth] localStorage error:', e);
+        this.mobileLog('[Auth] localStorage ERROR: ' + e.message);
         alert('Unable to save login. Please disable private browsing or enable cookies.');
         return false;
       }
 
       // Clean up URL (remove auth params)
       this.cleanUrl();
+      this.mobileLog('[Auth] URL cleaned, dispatching success');
 
       // Trigger auth success event
       window.dispatchEvent(new CustomEvent('auth:success', { detail: user }));
@@ -63,7 +80,7 @@ const Auth = {
       return true;
     }
 
-    console.log('[Auth] No token in URL, isAuthenticated:', this.isAuthenticated());
+    this.mobileLog('[Auth] No URL token, isAuth=' + this.isAuthenticated());
     return this.isAuthenticated();
   },
 
@@ -178,9 +195,11 @@ const Auth = {
     });
 
     console.log('[Auth] API response:', endpoint, response.status);
+    this.mobileLog('[Auth] API ' + endpoint + ' => ' + response.status);
 
     // Handle 401 - token expired
     if (response.status === 401) {
+      this.mobileLog('[Auth] 401! Logging out...');
       console.log('[Auth] Got 401, logging out');
       this.logout();
       window.dispatchEvent(new CustomEvent('auth:expired'));
