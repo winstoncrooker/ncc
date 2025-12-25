@@ -1083,6 +1083,9 @@ const Profile = {
         }
       }
     }
+
+    // Update profile completion since collection/showcase counts may have changed
+    this.renderProfileCompletion();
   },
 
   /**
@@ -2128,6 +2131,7 @@ const Profile = {
           this.profile.privacy = await privacyResponse.json();
         }
         this.renderProfile();
+        this.renderProfileCompletion();
         this.closeModal('edit-profile-modal');
       } else {
         const error = await profileResponse.json();
@@ -2313,6 +2317,8 @@ const Profile = {
         if (this.cropperType === 'profile') {
           document.getElementById('profile-picture').src = data.url;
           if (this.profile) this.profile.picture = data.url;
+          // Update profile completion since picture was added
+          this.renderProfileCompletion();
         } else {
           document.getElementById('hero-background').style.backgroundImage = `url(${data.url})`;
           if (this.profile) this.profile.background_image = data.url;
