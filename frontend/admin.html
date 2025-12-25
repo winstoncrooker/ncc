@@ -145,6 +145,86 @@
       font-size: 0.85rem;
     }
 
+    .expand-btn {
+      background: transparent;
+      border: 1px solid #555;
+      color: rgba(255, 255, 255, 0.6);
+      width: 28px;
+      height: 28px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+      transition: all 0.2s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .expand-btn:hover {
+      background: #333;
+      color: #fff;
+    }
+
+    .expand-btn.expanded {
+      background: #1db954;
+      border-color: #1db954;
+      color: #fff;
+    }
+
+    .memberships-row {
+      display: none;
+    }
+
+    .memberships-row.show {
+      display: table-row;
+    }
+
+    .memberships-row td {
+      background: #151515;
+      padding: 12px 16px;
+    }
+
+    .memberships-content {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .membership-tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: #252525;
+      padding: 6px 12px;
+      border-radius: 16px;
+      font-size: 0.8rem;
+    }
+
+    .membership-tag .icon {
+      font-size: 1rem;
+    }
+
+    .membership-tag .category-name {
+      color: #1db954;
+    }
+
+    .membership-tag .group-name {
+      color: rgba(255, 255, 255, 0.8);
+    }
+
+    .membership-tag .separator {
+      color: rgba(255, 255, 255, 0.3);
+    }
+
+    .no-memberships {
+      color: rgba(255, 255, 255, 0.4);
+      font-style: italic;
+    }
+
+    .loading-memberships {
+      color: rgba(255, 255, 255, 0.5);
+    }
+
     .loading {
       text-align: center;
       padding: 48px;
@@ -446,6 +526,7 @@
           <table>
             <thead>
               <tr>
+                <th style="width: 40px;"></th>
                 <th>ID</th>
                 <th>User</th>
                 <th>Email</th>
@@ -454,7 +535,10 @@
             </thead>
             <tbody>
               ${data.users.map(user => `
-                <tr>
+                <tr class="user-main-row" data-user-id="${user.id}">
+                  <td>
+                    <button class="expand-btn" onclick="toggleMemberships(${user.id}, this)" title="Show groups">▼</button>
+                  </td>
                   <td class="user-id">${user.id}</td>
                   <td>
                     <div class="user-row">
@@ -467,6 +551,13 @@
                   </td>
                   <td class="user-email">${escapeHtml(user.email || '-')}</td>
                   <td class="user-date">${formatDate(user.created_at)}</td>
+                </tr>
+                <tr class="memberships-row" id="memberships-row-${user.id}">
+                  <td colspan="5">
+                    <div class="memberships-content" id="memberships-content-${user.id}">
+                      <span class="loading-memberships">Loading...</span>
+                    </div>
+                  </td>
                 </tr>
               `).join('')}
             </tbody>
@@ -759,6 +850,101 @@
         console.error('Error deleting comment:', error);
         alert('Failed to delete comment');
       }
+    }
+
+    // Cache for loaded memberships
+    const membershipsCache = {};
+
+    async function toggleMemberships(userId, btn) {
+      const row = document.getElementById(`memberships-row-${userId}`);
+      const content = document.getElementById(`memberships-content-${userId}`);
+      const isExpanded = row.classList.contains('show');
+
+      if (isExpanded) {
+        // Collapse
+        row.classList.remove('show');
+        btn.classList.remove('expanded');
+        btn.textContent = '▼';
+        return;
+      }
+
+      // Expand
+      row.classList.add('show');
+      btn.classList.add('expanded');
+      btn.textContent = '▲';
+
+      // Check cache
+      if (membershipsCache[userId]) {
+        renderMemberships(userId, membershipsCache[userId]);
+        return;
+      }
+
+      // Fetch memberships
+      try {
+        const response = await Auth.apiRequest(`/api/admin/users/${userId}/memberships`);
+        if (response.ok) {
+          const data = await response.json();
+          membershipsCache[userId] = data.memberships;
+          renderMemberships(userId, data.memberships);
+        } else {
+          content.innerHTML = '<span class="no-memberships">Failed to load</span>';
+        }
+      } catch (error) {
+        console.error('Error loading memberships:', error);
+        content.innerHTML = '<span class="no-memberships">Failed to load</span>';
+      }
+    }
+
+    function renderMemberships(userId, memberships) {
+      const content = document.getElementById(`memberships-content-${userId}`);
+
+      if (!memberships || memberships.length === 0) {
+        content.innerHTML = '<span class="no-memberships">No group memberships</span>';
+        return;
+      }
+
+      // Group by category
+      const byCategory = {};
+      memberships.forEach(m => {
+        const catKey = m.category_id || 'unknown';
+        if (!byCategory[catKey]) {
+          byCategory[catKey] = {
+            name: m.category_name || 'Unknown',
+            icon: m.category_icon || '📁',
+            groups: []
+          };
+        }
+        if (m.group_name) {
+          byCategory[catKey].groups.push(m.group_name);
+        }
+      });
+
+      let html = '';
+      Object.values(byCategory).forEach(cat => {
+        if (cat.groups.length > 0) {
+          // Category with groups
+          cat.groups.forEach(groupName => {
+            html += `
+              <div class="membership-tag">
+                <span class="icon">${escapeHtml(cat.icon)}</span>
+                <span class="category-name">${escapeHtml(cat.name)}</span>
+                <span class="separator">›</span>
+                <span class="group-name">${escapeHtml(groupName)}</span>
+              </div>
+            `;
+          });
+        } else {
+          // Just category membership (no specific group)
+          html += `
+            <div class="membership-tag">
+              <span class="icon">${escapeHtml(cat.icon)}</span>
+              <span class="category-name">${escapeHtml(cat.name)}</span>
+            </div>
+          `;
+        }
+      });
+
+      content.innerHTML = html;
     }
 
     // Load users and analytics on page load

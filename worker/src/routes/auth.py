@@ -345,30 +345,32 @@ async def google_callback(request: Request, code: str = None, error: str = None,
                     "UPDATE users SET google_id = ?, name = ?, picture = ? WHERE id = ?"
                 ).bind(google_id, name, picture, user_id).run()
             else:
-                # Create new user - handle name conflicts
-                unique_name = name
-                suffix = 1
-                while True:
-                    try:
+                # Create new user - if name conflicts, leave blank for user to set later
+                try:
+                    result = await env.DB.prepare(
+                        """INSERT INTO users (email, google_id, name, picture, password_hash)
+                           VALUES (?, ?, ?, ?, '') RETURNING id"""
+                    ).bind(email, google_id, name, picture).first()
+
+                    if hasattr(result, 'to_py'):
+                        result = result.to_py()
+
+                    user_id = result["id"]
+                except Exception as e:
+                    if "UNIQUE constraint failed: users.name" in str(e):
+                        # Name taken - create user without a name, they can set it later
                         result = await env.DB.prepare(
                             """INSERT INTO users (email, google_id, name, picture, password_hash)
-                               VALUES (?, ?, ?, ?, '') RETURNING id"""
-                        ).bind(email, google_id, unique_name, picture).first()
+                               VALUES (?, ?, NULL, ?, '') RETURNING id"""
+                        ).bind(email, google_id, picture).first()
 
                         if hasattr(result, 'to_py'):
                             result = result.to_py()
 
                         user_id = result["id"]
-                        name = unique_name  # Update name for redirect URL
-                        break
-                    except Exception as e:
-                        if "UNIQUE constraint failed: users.name" in str(e):
-                            suffix += 1
-                            unique_name = f"{name} {suffix}"
-                            if suffix > 99:
-                                raise HTTPException(status_code=400, detail="Could not generate unique name")
-                        else:
-                            raise
+                        name = None  # Clear name for redirect URL
+                    else:
+                        raise
 
         # Create JWT token - must convert secret to string
         jwt_secret = str(env.JWT_SECRET) if hasattr(env, 'JWT_SECRET') else None

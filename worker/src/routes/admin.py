@@ -609,3 +609,70 @@ async def delete_comment(
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error deleting comment: {str(e)}")
+
+
+class UserMembershipItem(BaseModel):
+    """User membership in category or group"""
+    interest_id: int
+    category_id: int | None = None
+    category_name: str | None = None
+    category_icon: str | None = None
+    group_id: int | None = None
+    group_name: str | None = None
+
+
+class UserMembershipsResponse(BaseModel):
+    """User memberships response"""
+    user_id: int
+    memberships: list[UserMembershipItem]
+
+
+@router.get("/users/{target_user_id}/memberships")
+async def get_user_memberships(
+    request: Request,
+    target_user_id: int,
+    user_id: int = Depends(require_auth)
+) -> UserMembershipsResponse:
+    """Get a user's category and group memberships (admin only)."""
+    env = request.scope["env"]
+    await check_admin(env, user_id)
+
+    try:
+        result = await env.DB.prepare(
+            """SELECT ui.id as interest_id,
+                      COALESCE(ui.category_id, ig.category_id) as category_id,
+                      COALESCE(c.name, gc.name) as category_name,
+                      COALESCE(c.icon, gc.icon) as category_icon,
+                      ui.interest_group_id as group_id,
+                      ig.name as group_name
+               FROM user_interests ui
+               LEFT JOIN categories c ON ui.category_id = c.id
+               LEFT JOIN interest_groups ig ON ui.interest_group_id = ig.id
+               LEFT JOIN categories gc ON ig.category_id = gc.id
+               WHERE ui.user_id = ?
+               ORDER BY COALESCE(c.name, gc.name), ig.name"""
+        ).bind(target_user_id).all()
+
+        if hasattr(result, 'to_py'):
+            result = result.to_py()
+
+        memberships = []
+        for row in result.get("results", []):
+            memberships.append(UserMembershipItem(
+                interest_id=row["interest_id"],
+                category_id=to_python(row.get("category_id")),
+                category_name=to_python(row.get("category_name")),
+                category_icon=to_python(row.get("category_icon")),
+                group_id=to_python(row.get("group_id")),
+                group_name=to_python(row.get("group_name"))
+            ))
+
+        return UserMembershipsResponse(
+            user_id=target_user_id,
+            memberships=memberships
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error fetching memberships: {str(e)}")
