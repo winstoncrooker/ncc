@@ -36,8 +36,23 @@ const Auth = {
       };
 
       console.log('[Auth] Storing token and user:', user.email);
-      this.setToken(token);
-      this.setUser(user);
+
+      // Test localStorage availability (can fail in private browsing)
+      try {
+        this.setToken(token);
+        this.setUser(user);
+
+        // Verify it was stored
+        const storedToken = this.getToken();
+        console.log('[Auth] Token stored successfully:', !!storedToken);
+        if (!storedToken) {
+          console.error('[Auth] Token failed to persist in localStorage');
+        }
+      } catch (e) {
+        console.error('[Auth] localStorage error:', e);
+        alert('Unable to save login. Please disable private browsing or enable cookies.');
+        return false;
+      }
 
       // Clean up URL (remove auth params)
       this.cleanUrl();

@@ -204,10 +204,12 @@ const Profile = {
     if (window.ChatModule) Object.assign(this, window.ChatModule);
 
     // Handle OAuth callback first (extracts token from URL if present)
-    Auth.init();
+    const authResult = Auth.init();
+    console.log('[Profile] Auth.init result:', authResult, 'isAuthenticated:', Auth.isAuthenticated());
 
     // Then check authentication
     if (!Auth.isAuthenticated()) {
+      console.log('[Profile] Not authenticated, redirecting to login');
       window.location.href = '/';
       return;
     }
