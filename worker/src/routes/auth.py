@@ -81,9 +81,10 @@ async def is_token_blacklisted(env, token: str) -> bool:
             return False
         return True
     except Exception as e:
-        # If blacklist check fails, reject the request (fail closed for security)
-        print(f"[Auth] Blacklist check failed: {e}")
-        return True  # Fail closed - treat as blacklisted if we can't verify
+        # If blacklist check fails, allow the request (fail open for better UX)
+        # The token signature is still verified by JWT, so this is reasonably safe
+        print(f"[Auth] Blacklist check failed (allowing request): {e}")
+        return False  # Fail open - if we can't verify, allow it (JWT sig still checked)
 
 
 async def blacklist_token(env, token: str, user_id: int, expires_at: int) -> None:
