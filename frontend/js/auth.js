@@ -4,13 +4,13 @@
  */
 
 const Auth = {
+  // Version for debugging
+  VERSION: '2.1',
+
   // Storage keys
   TOKEN_KEY: 'ncc_token',
   USER_KEY: 'ncc_user',
 
-  /**
-   * Initialize auth - check URL for OAuth callback params
-   */
   // Mobile debug helper
   mobileLog(msg) {
     console.log(msg);
@@ -32,7 +32,9 @@ const Auth = {
     const token = params.get('token');
     const authError = params.get('auth_error');
 
-    this.mobileLog('[Auth] init: token in URL=' + !!token + ', stored=' + !!this.getToken());
+    this.mobileLog('[Auth] init() called');
+    this.mobileLog('[Auth] token in URL: ' + (token ? 'yes (' + token.substring(0, 15) + '...)' : 'no'));
+    this.mobileLog('[Auth] stored token: ' + (this.getToken() ? 'yes' : 'no'));
     console.log('[Auth] init called, token in URL:', !!token, 'stored token:', !!this.getToken());
 
     if (authError) {
@@ -72,16 +74,21 @@ const Auth = {
 
       // Clean up URL (remove auth params)
       this.cleanUrl();
-      this.mobileLog('[Auth] URL cleaned, dispatching success');
+
+      // Verify token still stored after URL clean
+      const tokenAfterClean = this.getToken();
+      this.mobileLog('[Auth] URL cleaned, token still stored: ' + !!tokenAfterClean);
 
       // Trigger auth success event
       window.dispatchEvent(new CustomEvent('auth:success', { detail: user }));
+      this.mobileLog('[Auth] auth:success event dispatched, returning true');
 
       return true;
     }
 
-    this.mobileLog('[Auth] No URL token, isAuth=' + this.isAuthenticated());
-    return this.isAuthenticated();
+    const isAuth = this.isAuthenticated();
+    this.mobileLog('[Auth] No URL token, isAuthenticated=' + isAuth);
+    return isAuth;
   },
 
   /**
@@ -296,6 +303,17 @@ const Auth = {
 // Expose Auth globally (but don't auto-init - let pages handle it)
 if (typeof window !== 'undefined') {
   window.Auth = Auth;
+
+  // Immediate debug on script load
+  Auth.mobileLog('[Auth v' + Auth.VERSION + '] Script loaded');
+  Auth.mobileLog('[Auth] URL: ' + window.location.pathname + window.location.search.substring(0, 50));
+  Auth.mobileLog('[Auth] localStorage available: ' + (typeof localStorage !== 'undefined'));
+  try {
+    const existingToken = localStorage.getItem(Auth.TOKEN_KEY);
+    Auth.mobileLog('[Auth] Existing token: ' + (existingToken ? existingToken.substring(0, 20) + '...' : 'none'));
+  } catch (e) {
+    Auth.mobileLog('[Auth] localStorage error: ' + e.message);
+  }
 }
 
 // Export for module usage

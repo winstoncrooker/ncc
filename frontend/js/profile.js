@@ -203,16 +203,23 @@ const Profile = {
     // MessagesModule and FriendsModule have different API structures and are disabled for now
     if (window.ChatModule) Object.assign(this, window.ChatModule);
 
+    Auth.mobileLog('[Profile] init() starting');
+
     // Handle OAuth callback first (extracts token from URL if present)
     const authResult = Auth.init();
-    console.log('[Profile] Auth.init result:', authResult, 'isAuthenticated:', Auth.isAuthenticated());
+    const isAuth = Auth.isAuthenticated();
+    Auth.mobileLog('[Profile] Auth.init returned: ' + authResult + ', isAuth: ' + isAuth);
+    console.log('[Profile] Auth.init result:', authResult, 'isAuthenticated:', isAuth);
 
     // Then check authentication
-    if (!Auth.isAuthenticated()) {
+    if (!isAuth) {
+      Auth.mobileLog('[Profile] NOT AUTHENTICATED - redirecting to /');
       console.log('[Profile] Not authenticated, redirecting to login');
       window.location.href = '/';
       return;
     }
+
+    Auth.mobileLog('[Profile] Authenticated! Loading profile...');
 
     // Setup event listeners
     this.setupEventListeners();
@@ -253,6 +260,8 @@ const Profile = {
     if (typeof Forums !== 'undefined') {
       Forums.restoreSavedTab();
     }
+
+    Auth.mobileLog('[Profile] init() complete - profile loaded successfully');
   },
 
   /**
