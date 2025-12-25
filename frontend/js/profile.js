@@ -600,7 +600,7 @@ const Profile = {
     const stats = this.collectionStats;
     const fields = {
       name: !!this.profile?.name,
-      bio: !!this.profile?.bio && this.profile.bio.length > 10,
+      bio: !!this.profile?.bio && this.profile.bio.length >= 10,
       picture: !!this.profile?.picture,
       pronouns: !!this.profile?.pronouns,
       location: !!this.profile?.location,
@@ -1025,20 +1025,15 @@ const Profile = {
   calculateCollectorScore(stats) {
     let score = 0;
 
-    // Points for collection size
+    // Points for collection size (2 pts per item, max 200)
     score += Math.min(stats.total_albums * 2, 200);
 
-    // Points for showcase items (use total from stats, not current category)
+    // Points for showcase items (10 pts each)
     score += (stats.total_showcase || 0) * 10;
 
-    // Points for diversity (multiple categories)
+    // Points for diversity (25 pts per category with items)
     const categoryCount = Object.keys(stats.category_breakdown || {}).length;
     score += categoryCount * 25;
-
-    // Points for profile completion
-    if (this.profile?.bio) score += 15;
-    if (this.profile?.picture) score += 10;
-    if (this.profile?.pronouns) score += 5;
 
     return score;
   },
