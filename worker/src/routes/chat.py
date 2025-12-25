@@ -735,23 +735,36 @@ async def search_for_item(
         return await search_discogs_for_album(field1, field2, discogs_key, discogs_secret)
 
     elif category_slug == "trading-cards":
-        # Detect if it's Pokemon or MTG
-        pokemon_keywords = ["pokemon", "pikachu", "charizard", "base set", "jungle", "fossil", "neo", "ex", "gx", "vmax", "v star"]
-        mtg_keywords = ["magic", "mtg", "black lotus", "mox", "dual land", "alpha", "beta", "unlimited"]
-
+        # Detect card type based on keywords
         query_lower = f"{field1} {field2}".lower()
+
+        pokemon_keywords = ["pokemon", "pikachu", "charizard", "bulbasaur", "squirtle", "base set",
+                          "jungle", "fossil", "neo", "ex", "gx", "vmax", "v star", "scarlet", "violet"]
+        mtg_keywords = ["magic", "mtg", "black lotus", "mox", "dual land", "alpha", "beta",
+                       "unlimited", "mana", "planeswalker", "commander"]
+        yugioh_keywords = ["yugioh", "yu-gi-oh", "yu gi oh", "dark magician", "blue eyes",
+                          "exodia", "duel monsters"]
+        sports_keywords = ["topps", "panini", "upper deck", "bowman", "prizm", "donruss",
+                          "nba", "nfl", "mlb", "nhl", "rookie", "autograph", "jersey"]
 
         is_pokemon = any(kw in query_lower for kw in pokemon_keywords)
         is_mtg = any(kw in query_lower for kw in mtg_keywords)
+        is_yugioh = any(kw in query_lower for kw in yugioh_keywords)
+        is_sports = any(kw in query_lower for kw in sports_keywords)
 
-        if is_mtg and not is_pokemon:
+        if is_pokemon:
+            return await search_pokemon_tcg(field1, field2)
+        elif is_mtg:
             return await search_scryfall(field1, field2)
+        elif is_yugioh or is_sports:
+            # No free API for Yu-Gi-Oh or sports cards - user needs to add photo
+            print(f"[Search] No API for {'Yu-Gi-Oh' if is_yugioh else 'sports'} cards")
+            return Album(artist=field1, album=field2)
         else:
-            # Default to Pokemon (more common)
+            # Unknown card type - try Pokemon first, then MTG as fallback
             result = await search_pokemon_tcg(field1, field2)
-            # If no image found, try Scryfall as fallback
             if not result.cover:
-                return await search_scryfall(field1, field2)
+                result = await search_scryfall(field1, field2)
             return result
 
     elif category_slug == "video-games":
