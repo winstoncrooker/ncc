@@ -1943,6 +1943,23 @@
   color: var(--text-primary);
 }
 
+.btn-clear {
+  background: transparent;
+  border: 1px solid #ff6b6b;
+  color: #ff6b6b;
+  padding: 12px 28px;
+  border-radius: 25px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-clear:hover {
+  background: rgba(255, 107, 107, 0.1);
+  border-color: #ff5252;
+  color: #ff5252;
+}
+
 /* Tabs */
 .modal-tabs {
   display: flex;

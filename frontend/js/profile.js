@@ -612,13 +612,14 @@ const Profile = {
     const total = Object.keys(fields).length;
     const percent = Math.round((completed / total) * 100);
 
-    // Show progress bar only if incomplete
+    // Always show progress bar
+    completionEl.style.display = 'flex';
+    fillEl.style.width = `${percent}%`;
     if (percent < 100) {
-      completionEl.style.display = 'flex';
-      fillEl.style.width = `${percent}%`;
       textEl.textContent = `Profile ${percent}% complete`;
     } else {
-      completionEl.style.display = 'none';
+      textEl.textContent = `Profile complete! 🎉`;
+      fillEl.style.background = 'linear-gradient(90deg, #1db954, #1ed760)';
     }
   },
 
@@ -870,6 +871,7 @@ const Profile = {
         </div>
         <div class="tag-modal-actions">
           <button class="btn-cancel" onclick="Profile.closeTagModal()">Cancel</button>
+          <button class="btn-clear" onclick="Profile.clearItemTags(${albumId})">Clear All</button>
           <button class="btn-save" onclick="Profile.saveItemTags(${albumId})">Save</button>
         </div>
       </div>
@@ -917,6 +919,27 @@ const Profile = {
       }
     } catch (error) {
       console.error('Error saving tags:', error);
+    }
+  },
+
+  /**
+   * Clear all tags from an item
+   */
+  async clearItemTags(albumId) {
+    try {
+      const response = await Auth.apiRequest(`/api/collection/${albumId}`, {
+        method: 'PUT',
+        body: JSON.stringify({ tags: null })
+      });
+
+      if (response.ok) {
+        const album = this.collection.find(a => a.id === albumId);
+        if (album) album.tags = null;
+        this.renderCollection();
+        this.closeTagModal();
+      }
+    } catch (error) {
+      console.error('Error clearing tags:', error);
     }
   },
 
@@ -1906,6 +1929,7 @@ const Profile = {
         <span class="char-count"><span id="note-char-count">${(album.notes || '').length}</span>/200</span>
         <div class="note-modal-actions">
           <button class="btn-cancel" onclick="Profile.closeShowcaseNoteModal()">Cancel</button>
+          <button class="btn-clear" onclick="Profile.clearShowcaseNote(${showcaseId})">Clear</button>
           <button class="btn-save" onclick="Profile.saveShowcaseNote(${showcaseId})">Save</button>
         </div>
       </div>
@@ -1959,6 +1983,29 @@ const Profile = {
       }
     } catch (error) {
       console.error('Error saving showcase note:', error);
+    }
+  },
+
+  /**
+   * Clear showcase note
+   */
+  async clearShowcaseNote(showcaseId) {
+    try {
+      const response = await Auth.apiRequest(`/api/profile/me/showcase/${showcaseId}/notes`, {
+        method: 'PUT',
+        body: JSON.stringify({ notes: null })
+      });
+
+      if (response.ok) {
+        const album = this.showcase.find(a => a.id === showcaseId);
+        if (album) album.notes = null;
+        this.renderShowcase();
+        this.closeShowcaseNoteModal();
+      } else {
+        console.error('Failed to clear note:', await response.text());
+      }
+    } catch (error) {
+      console.error('Error clearing showcase note:', error);
     }
   },
 
