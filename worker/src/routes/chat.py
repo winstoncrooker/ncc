@@ -462,12 +462,18 @@ async def search_pokemon_tcg(card_set: str, card_name: str) -> Album:
 
     try:
         # Pokemon TCG API - search by name
-        search_name = card_name.replace(" ", "+")
-        url = f"https://api.pokemontcg.io/v2/cards?q=name:{search_name}&pageSize=10"
+        encoded_name = quote_plus(card_name)
+        url = f"https://api.pokemontcg.io/v2/cards?q=name:{encoded_name}&pageSize=10"
+        print(f"[Pokemon TCG] URL: {url}")
 
-        response = await js.fetch(url, to_js({
-            "headers": to_js({"Content-Type": "application/json"})
-        }))
+        headers = to_js({
+            "Content-Type": "application/json",
+            "User-Agent": "NicheCollectorConnector/1.0",
+            "Accept": "application/json"
+        })
+
+        response = await js.fetch(url, to_js({"headers": headers}))
+        print(f"[Pokemon TCG] Response status: {response.status}")
 
         if response.status != 200:
             print(f"[Pokemon TCG] Error: {response.status}")
@@ -753,6 +759,7 @@ async def search_for_item(
         is_sports = any(kw in query_lower for kw in sports_keywords)
 
         if is_pokemon:
+            # Pokemon cards - only use Pokemon TCG API, no Scryfall fallback
             return await search_pokemon_tcg(field1, field2)
         elif is_mtg:
             return await search_scryfall(field1, field2)
@@ -761,10 +768,14 @@ async def search_for_item(
             print(f"[Search] No API for {'Yu-Gi-Oh' if is_yugioh else 'sports'} cards")
             return Album(artist=field1, album=field2)
         else:
-            # Unknown card type - try Pokemon first, then MTG as fallback
+            # Unknown card type - try Pokemon first (no MTG fallback to avoid mixing results)
             result = await search_pokemon_tcg(field1, field2)
             if not result.cover:
-                result = await search_scryfall(field1, field2)
+                # If Pokemon didn't find it, try Scryfall for MTG
+                # But check first if it looks like a real MTG card name
+                mtg_card_patterns = ["dragon", "wizard", "knight", "elemental", "zombie", "goblin", "angel", "demon"]
+                if any(p in field2.lower() for p in mtg_card_patterns):
+                    result = await search_scryfall(field1, field2)
             return result
 
     elif category_slug == "video-games":
