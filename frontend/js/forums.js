@@ -124,8 +124,9 @@ const Forums = {
       btn.classList.toggle('active', btn.dataset.tab === tab);
     });
 
-    // Update views
+    // Update views - clear any inline display styles so CSS classes work properly
     document.querySelectorAll('.tab-view').forEach(view => {
+      view.style.display = ''; // Clear inline style
       view.classList.toggle('active', view.id === `${tab}-view`);
     });
 
@@ -134,8 +135,14 @@ const Forums = {
     if (friendProfilePage) {
       friendProfilePage.style.display = 'none';
       if (typeof Profile !== 'undefined') {
-        Profile.closeFriendProfile();
+        Profile.closeFriendFullProfile();
       }
+    }
+
+    // Close view profile modal if open
+    const viewProfileModal = document.getElementById('view-profile-modal');
+    if (viewProfileModal) {
+      viewProfileModal.classList.remove('open');
     }
 
     // Show/hide AI chat button based on tab
