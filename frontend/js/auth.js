@@ -11,31 +11,11 @@ const Auth = {
   TOKEN_KEY: 'ncc_token',
   USER_KEY: 'ncc_user',
 
-  // Mobile debug helper
-  mobileLog(msg) {
-    console.log(msg);
-    // Show on screen for mobile debugging
-    let debugEl = document.getElementById('mobile-debug');
-    if (!debugEl) {
-      debugEl = document.createElement('div');
-      debugEl.id = 'mobile-debug';
-      debugEl.style.cssText = 'position:fixed;bottom:0;left:0;right:0;background:#000;color:#0f0;font-size:10px;padding:5px;max-height:150px;overflow:auto;z-index:99999;font-family:monospace;';
-      document.body.appendChild(debugEl);
-    }
-    debugEl.innerHTML += msg + '<br>';
-    debugEl.scrollTop = debugEl.scrollHeight;
-  },
-
   init() {
     // Check for OAuth callback params in URL
     const params = new URLSearchParams(window.location.search);
     const token = params.get('token');
     const authError = params.get('auth_error');
-
-    this.mobileLog('[Auth] init() called');
-    this.mobileLog('[Auth] token in URL: ' + (token ? 'yes (' + token.substring(0, 15) + '...)' : 'no'));
-    this.mobileLog('[Auth] stored token: ' + (this.getToken() ? 'yes' : 'no'));
-    console.log('[Auth] init called, token in URL:', !!token, 'stored token:', !!this.getToken());
 
     if (authError) {
       console.error('[Auth] OAuth error:', authError);
@@ -53,21 +33,12 @@ const Auth = {
         picture: params.get('picture') || null
       };
 
-      this.mobileLog('[Auth] Storing token for: ' + user.email);
-
       // Test localStorage availability (can fail in private browsing)
       try {
         this.setToken(token);
         this.setUser(user);
-
-        // Verify it was stored
-        const storedToken = this.getToken();
-        this.mobileLog('[Auth] Token stored: ' + !!storedToken);
-        if (!storedToken) {
-          this.mobileLog('[Auth] ERROR: Token failed to persist!');
-        }
       } catch (e) {
-        this.mobileLog('[Auth] localStorage ERROR: ' + e.message);
+        console.error('[Auth] localStorage error:', e.message);
         alert('Unable to save login. Please disable private browsing or enable cookies.');
         return false;
       }
@@ -75,20 +46,13 @@ const Auth = {
       // Clean up URL (remove auth params)
       this.cleanUrl();
 
-      // Verify token still stored after URL clean
-      const tokenAfterClean = this.getToken();
-      this.mobileLog('[Auth] URL cleaned, token still stored: ' + !!tokenAfterClean);
-
       // Trigger auth success event
       window.dispatchEvent(new CustomEvent('auth:success', { detail: user }));
-      this.mobileLog('[Auth] auth:success event dispatched, returning true');
 
       return true;
     }
 
-    const isAuth = this.isAuthenticated();
-    this.mobileLog('[Auth] No URL token, isAuthenticated=' + isAuth);
-    return isAuth;
+    return this.isAuthenticated();
   },
 
   /**
@@ -202,14 +166,20 @@ const Auth = {
     });
 
     console.log('[Auth] API response:', endpoint, response.status);
-    this.mobileLog('[Auth] API ' + endpoint + ' => ' + response.status);
 
-    // Handle 401 - token expired
+    // Handle 401 - verify token is actually invalid before logging out
     if (response.status === 401) {
-      this.mobileLog('[Auth] 401! Logging out...');
-      console.log('[Auth] Got 401, logging out');
-      this.logout();
-      window.dispatchEvent(new CustomEvent('auth:expired'));
+      // Only auto-logout for auth-critical endpoints
+      // For other endpoints, the caller can handle the 401
+      const isAuthEndpoint = endpoint.startsWith('/api/auth/') || endpoint === '/api/profile/me';
+      if (isAuthEndpoint) {
+        console.log('[Auth] Got 401 on auth endpoint, logging out');
+        this.logout();
+        window.dispatchEvent(new CustomEvent('auth:expired'));
+      } else {
+        console.log('[Auth] Got 401 on non-auth endpoint:', endpoint);
+        // Don't auto-logout - let the specific feature handle the error
+      }
     }
 
     return response;
@@ -303,17 +273,6 @@ const Auth = {
 // Expose Auth globally (but don't auto-init - let pages handle it)
 if (typeof window !== 'undefined') {
   window.Auth = Auth;
-
-  // Immediate debug on script load
-  Auth.mobileLog('[Auth v' + Auth.VERSION + '] Script loaded');
-  Auth.mobileLog('[Auth] URL: ' + window.location.pathname + window.location.search.substring(0, 50));
-  Auth.mobileLog('[Auth] localStorage available: ' + (typeof localStorage !== 'undefined'));
-  try {
-    const existingToken = localStorage.getItem(Auth.TOKEN_KEY);
-    Auth.mobileLog('[Auth] Existing token: ' + (existingToken ? existingToken.substring(0, 20) + '...' : 'none'));
-  } catch (e) {
-    Auth.mobileLog('[Auth] localStorage error: ' + e.message);
-  }
 }
 
 // Export for module usage
