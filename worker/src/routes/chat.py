@@ -107,37 +107,120 @@ def build_system_prompt(collection: list[Album], category_slug: Optional[str] = 
     # Get category-specific prompt if available
     category_prompt = CATEGORY_AI_PROMPTS.get(category_slug, CATEGORY_AI_PROMPTS.get("vinyl", ""))
 
+    # Category-specific terminology and examples
+    category_config = {
+        "vinyl": {
+            "item_name": "albums",
+            "field1": "Artist",
+            "field2": "Album",
+            "examples": [
+                ('Add Maggot Brain by Funkadelic', 'I\'ve added that classic! {{ADD:Funkadelic|Maggot Brain}}'),
+                ('Remove Dark Side of the Moon', 'Removed from your collection. {{REMOVE:Pink Floyd|Dark Side of the Moon}}'),
+            ],
+            "rec_question": "what genres or artists you're into"
+        },
+        "coins": {
+            "item_name": "coins",
+            "field1": "Country/Type",
+            "field2": "Year/Denomination",
+            "examples": [
+                ('Add a 1921 Morgan Dollar', 'Added to your collection! {{ADD:USA Morgan Dollar|1921}}'),
+                ('Remove the Walking Liberty half', 'Removed from your collection. {{REMOVE:USA Walking Liberty|Half Dollar}}'),
+            ],
+            "rec_question": "what countries, eras, or types of coins interest you"
+        },
+        "trading-cards": {
+            "item_name": "cards",
+            "field1": "Set/Brand",
+            "field2": "Card Name",
+            "examples": [
+                ('Add a Base Set Charizard', 'Added to your collection! {{ADD:Pokemon Base Set|Charizard}}'),
+                ('Remove the Black Lotus', 'Removed from your collection. {{REMOVE:MTG Alpha|Black Lotus}}'),
+            ],
+            "rec_question": "what games or sets you collect"
+        },
+        "cars": {
+            "item_name": "vehicles",
+            "field1": "Make",
+            "field2": "Model/Year",
+            "examples": [
+                ('Add my 1969 Mustang', 'Added to your garage! {{ADD:Ford|1969 Mustang}}'),
+                ('Remove the Supra', 'Removed from your collection. {{REMOVE:Toyota|Supra}}'),
+            ],
+            "rec_question": "what types of cars interest you (JDM, muscle, classics, etc.)"
+        },
+        "sneakers": {
+            "item_name": "pairs",
+            "field1": "Brand",
+            "field2": "Model/Colorway",
+            "examples": [
+                ('Add Jordan 1 Chicago', 'Added to your collection! {{ADD:Nike|Air Jordan 1 Chicago}}'),
+                ('Remove the Yeezys', 'Removed from your collection. {{REMOVE:Adidas|Yeezy 350}}'),
+            ],
+            "rec_question": "what brands or silhouettes you're into"
+        },
+        "watches": {
+            "item_name": "watches",
+            "field1": "Brand",
+            "field2": "Model",
+            "examples": [
+                ('Add my Submariner', 'Added to your collection! {{ADD:Rolex|Submariner}}'),
+                ('Remove the Speedmaster', 'Removed from your collection. {{REMOVE:Omega|Speedmaster}}'),
+            ],
+            "rec_question": "what styles or brands interest you"
+        },
+        "comics": {
+            "item_name": "comics",
+            "field1": "Publisher/Series",
+            "field2": "Issue",
+            "examples": [
+                ('Add Amazing Spider-Man 300', 'Added to your collection! {{ADD:Marvel Amazing Spider-Man|#300}}'),
+                ('Remove Detective Comics 27', 'Removed from your collection. {{REMOVE:DC Detective Comics|#27}}'),
+            ],
+            "rec_question": "what publishers, characters, or eras you collect"
+        },
+        "video-games": {
+            "item_name": "games",
+            "field1": "Platform",
+            "field2": "Title",
+            "examples": [
+                ('Add Zelda Ocarina of Time', 'Added to your collection! {{ADD:N64|The Legend of Zelda: Ocarina of Time}}'),
+                ('Remove Mario Kart', 'Removed from your collection. {{REMOVE:Switch|Mario Kart 8}}'),
+            ],
+            "rec_question": "what platforms or genres you enjoy"
+        },
+    }
+
+    config = category_config.get(category_slug, category_config["vinyl"])
+
     if category_slug and category_slug != "vinyl" and category_slug in CATEGORY_AI_PROMPTS:
-        # For non-vinyl categories, use the category-specific prompt
         base_prompt = category_prompt
     else:
-        # Default vinyl prompt
         base_prompt = """You are a helpful vinyl record collection assistant. You help users manage their vinyl collection."""
+
+    examples_text = "\n".join([f'- User: "{ex[0]}" → "{ex[1]}"' for ex in config["examples"]])
 
     return f"""{base_prompt}
 
-CURRENT COLLECTION ({len(collection)} albums):
+CURRENT COLLECTION ({len(collection)} {config["item_name"]}):
 {collection_list}
 
 ACTIONS YOU CAN PERFORM:
-When the user asks you to add, remove, or showcase albums, include the appropriate action tags in your response.
+When the user asks you to add, remove, or showcase items, include the appropriate action tags in your response.
 
-ADD ALBUM: When user wants to add an album, use: {{{{ADD:Artist Name|Album Title}}}}
-REMOVE ALBUM: When user wants to remove an album, use: {{{{REMOVE:Artist Name|Album Title}}}}
-SHOWCASE ALBUM: When user wants to feature an album in showcase, use: {{{{SHOWCASE:Artist Name|Album Title}}}}
+ADD: {{{{ADD:{config["field1"]}|{config["field2"]}}}}}
+REMOVE: {{{{REMOVE:{config["field1"]}|{config["field2"]}}}}}
+SHOWCASE: {{{{SHOWCASE:{config["field1"]}|{config["field2"]}}}}}
 
 EXAMPLES:
-- User: "Add Maggot Brain by Funkadelic" → "I've added that classic to your collection! {{{{ADD:Funkadelic|Maggot Brain}}}}"
-- User: "Remove Dark Side of the Moon" → "Removed from your collection. {{{{REMOVE:Pink Floyd|Dark Side of the Moon}}}}"
-- User: "Add these albums: Abbey Road by The Beatles and Thriller by Michael Jackson" → "Added both albums! {{{{ADD:The Beatles|Abbey Road}}}} {{{{ADD:Michael Jackson|Thriller}}}}"
-- User: "Showcase Kind of Blue" → "Added to your showcase! {{{{SHOWCASE:Miles Davis|Kind of Blue}}}}"
+{examples_text}
 
 RULES:
 1. Only use action tags when the user explicitly asks to add, remove, or showcase
-2. For recommendations, just describe the albums without action tags
+2. For recommendations, ask {config["rec_question"]} - DO NOT mention genres or artists unless this is vinyl/music
 3. Be conversational and helpful
 4. Keep responses concise (1-3 sentences)
-5. If user asks to remove an album not in their collection, politely say it's not there
+5. If user asks to remove an item not in their collection, politely say it's not there
 6. For ambiguous requests, ask for clarification
 7. NEVER output your thinking process, reasoning, or internal analysis to the user
 8. NEVER say things like "The user asks...", "The user wants...", "So we need to...", "Let's list them..."
@@ -181,12 +264,25 @@ def parse_actions(response: str) -> tuple[list[Album], list[Album], list[Album]]
     return albums_to_add, albums_to_remove, albums_to_showcase
 
 
-def clean_response(response: str) -> str:
+CATEGORY_REC_FALLBACKS = {
+    "vinyl": "I'd love to help with a recommendation! Could you tell me what genres or artists you're into?",
+    "coins": "I'd love to help! What countries, eras, or types of coins interest you?",
+    "trading-cards": "I'd love to help! What games or sets do you collect? (Pokemon, MTG, sports cards, etc.)",
+    "cars": "I'd love to help! What types of vehicles interest you? (JDM, muscle cars, classics, etc.)",
+    "sneakers": "I'd love to help! What brands or silhouettes are you into?",
+    "watches": "I'd love to help! What styles or brands interest you?",
+    "comics": "I'd love to help! What publishers, characters, or eras do you collect?",
+    "video-games": "I'd love to help! What platforms or types of games do you enjoy?",
+}
+
+
+def clean_response(response: str, category_slug: Optional[str] = None) -> str:
     """
     Clean the model response for display to user.
     Removes thinking blocks, chain-of-thought reasoning, and action tags.
     """
     cleaned = response
+    fallback_msg = CATEGORY_REC_FALLBACKS.get(category_slug, CATEGORY_REC_FALLBACKS["vinyl"])
 
     # Remove <think>...</think> blocks (Thinker model reasoning)
     cleaned = re.sub(r'<think>[\s\S]*?</think>', '', cleaned, flags=re.IGNORECASE)
@@ -268,7 +364,7 @@ def clean_response(response: str) -> str:
                     break
         else:
             # No extractable content, return context-aware fallback
-            return "I'd love to help with a recommendation! Could you tell me what genres or artists you're into?"
+            return fallback_msg
 
     # AGGRESSIVE: Truncate from the start of obvious reasoning blocks
     reasoning_start_markers = [
@@ -879,7 +975,7 @@ async def chat(request: Request, body: ChatMessage) -> ChatResponse:
                 items_without_images.append(f"{enriched.artist} - {enriched.album}")
 
         # Clean response for display
-        cleaned_response = clean_response(raw_response)
+        cleaned_response = clean_response(raw_response, category)
 
         # Add note if some items couldn't find images
         if items_without_images:
