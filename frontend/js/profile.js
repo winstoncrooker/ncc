@@ -2613,23 +2613,24 @@ const Profile = {
     const section = document.getElementById('wishlist-section');
     const grid = document.getElementById('wishlist-grid');
     const countEl = document.getElementById('wishlist-count');
-    const emptyEl = document.getElementById('wishlist-empty');
 
     if (!section || !grid) return;
 
     // Always show section on own profile page
     section.style.display = 'block';
 
-    countEl.textContent = this.wishlist.length;
+    if (countEl) countEl.textContent = this.wishlist.length;
 
     if (this.wishlist.length === 0) {
-      emptyEl.style.display = 'block';
-      grid.innerHTML = '';
-      grid.appendChild(emptyEl);
+      grid.innerHTML = `
+        <div class="wishlist-empty" id="wishlist-empty">
+          <div class="empty-icon">🔍</div>
+          <p>No items on your wishlist</p>
+          <span>Add items you're looking for!</span>
+        </div>
+      `;
       return;
     }
-
-    emptyEl.style.display = 'none';
     const priorityLabels = ['Low', 'Medium', 'Grail!'];
     const priorityClasses = ['low', 'medium', 'high'];
 
