@@ -908,7 +908,7 @@ const Profile = {
     try {
       const response = await Auth.apiRequest(`/api/collection/${albumId}`, {
         method: 'PUT',
-        body: JSON.stringify({ tags: tags || null })
+        body: JSON.stringify({ tags: tags || "" })
       });
 
       if (response.ok) {
@@ -916,9 +916,14 @@ const Profile = {
         if (album) album.tags = tags || null;
         this.renderCollection();
         this.closeTagModal();
+      } else {
+        const errorText = await response.text();
+        console.error('Error saving tags:', errorText);
+        alert('Failed to save tags');
       }
     } catch (error) {
       console.error('Error saving tags:', error);
+      alert('Failed to save tags');
     }
   },
 
@@ -929,7 +934,7 @@ const Profile = {
     try {
       const response = await Auth.apiRequest(`/api/collection/${albumId}`, {
         method: 'PUT',
-        body: JSON.stringify({ tags: null })
+        body: JSON.stringify({ tags: "" })
       });
 
       if (response.ok) {
@@ -937,9 +942,14 @@ const Profile = {
         if (album) album.tags = null;
         this.renderCollection();
         this.closeTagModal();
+      } else {
+        const errorText = await response.text();
+        console.error('Error clearing tags:', errorText);
+        alert('Failed to clear tags');
       }
     } catch (error) {
       console.error('Error clearing tags:', error);
+      alert('Failed to clear tags');
     }
   },
 
@@ -1993,7 +2003,7 @@ const Profile = {
     try {
       const response = await Auth.apiRequest(`/api/profile/me/showcase/${showcaseId}/notes`, {
         method: 'PUT',
-        body: JSON.stringify({ notes: null })
+        body: JSON.stringify({ notes: "" })
       });
 
       if (response.ok) {
@@ -2002,7 +2012,9 @@ const Profile = {
         this.renderShowcase();
         this.closeShowcaseNoteModal();
       } else {
-        console.error('Failed to clear note:', await response.text());
+        const errorText = await response.text();
+        console.error('Failed to clear note:', errorText);
+        alert('Failed to clear note');
       }
     } catch (error) {
       console.error('Error clearing showcase note:', error);
@@ -2712,13 +2724,12 @@ const Profile = {
       });
 
       if (response.ok) {
-        // Remove from local list since found items are filtered out
-        this.wishlist = this.wishlist.filter(i => i.id !== itemId);
-        this.renderWishlist();
+        // Reload from server to stay in sync
+        await this.loadWishlist();
       } else {
         const error = await response.json();
         console.error('Error marking item found:', error);
-        alert('Failed to mark item as found');
+        alert(error.detail || 'Failed to mark item as found');
       }
     } catch (error) {
       console.error('Error marking item found:', error);
@@ -2740,12 +2751,12 @@ const Profile = {
       });
 
       if (response.ok) {
-        this.wishlist = this.wishlist.filter(i => i.id !== itemId);
-        this.renderWishlist();
+        // Reload from server to stay in sync
+        await this.loadWishlist();
       } else {
         const error = await response.json();
         console.error('Error deleting wishlist item:', error);
-        alert('Failed to delete item');
+        alert(error.detail || 'Failed to delete item');
       }
     } catch (error) {
       console.error('Error deleting wishlist item:', error);

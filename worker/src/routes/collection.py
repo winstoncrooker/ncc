@@ -279,14 +279,14 @@ async def update_album(
 
         if 'tags' in fields_set or body.tags is not None:
             updates.append("tags = ?")
-            # Convert empty string to null
-            values.append(body.tags if body.tags else None)
+            # Use empty string instead of None to avoid D1 type errors
+            values.append(body.tags if body.tags else "")
         if 'condition' in fields_set or body.condition is not None:
             updates.append("condition = ?")
-            values.append(body.condition if body.condition else None)
+            values.append(body.condition if body.condition else "")
         if 'notes' in fields_set or body.notes is not None:
             updates.append("notes = ?")
-            values.append(body.notes if body.notes else None)
+            values.append(body.notes if body.notes else "")
 
         if updates:
             updates.append("updated_at = CURRENT_TIMESTAMP")

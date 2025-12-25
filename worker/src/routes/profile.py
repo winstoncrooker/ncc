@@ -465,10 +465,11 @@ async def update_showcase_notes(
         if not existing:
             raise HTTPException(status_code=404, detail="Showcase item not found")
 
-        # Update notes
+        # Update notes - use empty string for NULL to avoid D1 type errors
+        notes_value = body.notes if body.notes else ""
         await env.DB.prepare(
             "UPDATE showcase_albums SET notes = ? WHERE id = ? AND user_id = ?"
-        ).bind(body.notes, showcase_id, user_id).run()
+        ).bind(notes_value, showcase_id, user_id).run()
 
         # Return updated item
         result = await env.DB.prepare(
