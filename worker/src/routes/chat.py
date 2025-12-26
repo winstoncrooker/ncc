@@ -64,7 +64,7 @@ BIO HELP: Help write bios about their gaming journey, favorite consoles, now pla
 
     "coins": """You are a numismatic expert. Help users manage their coin collection.
 
-ACTIONS: {{ADD:Country|Denomination Year}}, {{REMOVE:Country|Denomination Year}}, {{SHOWCASE:Country|Denomination Year}}
+ACTIONS: {{ADD:Country Denomination|Year}}, {{REMOVE:Country Denomination|Year}}, {{SHOWCASE:Country Denomination|Year}}
 EXPERTISE: US coins, world coins, ancient, grading (PCGS/NGC), bullion.
 BIO HELP: Help write bios about their numismatic interests, collecting focus, favorite coins."""
 }
@@ -121,11 +121,11 @@ def build_system_prompt(collection: list[Album], category_slug: Optional[str] = 
         },
         "coins": {
             "item_name": "coins",
-            "field1": "Country/Type",
-            "field2": "Year/Denomination",
+            "field1": "Country Denomination",
+            "field2": "Year",
             "examples": [
                 ('Add a 1921 Morgan Dollar', 'Added to your collection! {{ADD:USA Morgan Dollar|1921}}'),
-                ('Remove the Walking Liberty half', 'Removed from your collection. {{REMOVE:USA Walking Liberty|Half Dollar}}'),
+                ('Remove the Walking Liberty half', 'Removed. {{REMOVE:USA Walking Liberty Half Dollar|1942}}'),
             ],
             "rec_question": "what countries, eras, or types of coins interest you"
         },
@@ -258,8 +258,10 @@ def parse_actions(response: str) -> tuple[list[Album], list[Album], list[Album]]
 
             # Validate: must have meaningful content and not a duplicate
             if artist and album and len(artist) > 1 and len(album) > 1 and key not in seen:
-                # Skip if it looks like template/placeholder
-                if artist.lower() not in ['artist', 'artist name'] and album.lower() not in ['album', 'album title']:
+                # Skip if it looks like template/placeholder from any category
+                placeholder_field1s = ['artist', 'artist name', 'country denomination', 'set', 'set/brand', 'year', 'brand', 'publisher', 'platform']
+                placeholder_field2s = ['album', 'album title', 'year', 'card name', 'make model', 'model colorway', 'model reference', 'series issue', 'title']
+                if artist.lower() not in placeholder_field1s and album.lower() not in placeholder_field2s:
                     target_list.append(Album(artist=artist, album=album))
                     seen.add(key)
 

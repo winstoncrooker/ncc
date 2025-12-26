@@ -4009,6 +4009,29 @@
   text-overflow: ellipsis;
 }
 
+/* Friend profile tags and notes */
+.friend-showcase-grid .item-tags,
+.friend-collection-grid .item-tags {
+  margin-top: 4px;
+}
+
+.friend-showcase-grid .item-tags .tag-badge,
+.friend-collection-grid .item-tags .tag-badge {
+  font-size: 0.6rem;
+  padding: 2px 6px;
+}
+
+.friend-showcase-grid .showcase-note {
+  position: static;
+  background: rgba(255, 215, 0, 0.1);
+  padding: 4px 6px;
+  margin-top: 4px;
+  font-size: 0.65rem;
+  color: #ffd700;
+  border-radius: 4px;
+  font-style: italic;
+}
+
 /* View Full Profile button */
 .btn-view-full {
   padding: 8px 16px;

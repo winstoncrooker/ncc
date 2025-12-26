@@ -3439,6 +3439,8 @@ const Profile = {
                 <div class="showcase-info">
                   <span class="showcase-album">${this.escapeHtml(album.album)}</span>
                   <span class="showcase-artist">${this.escapeHtml(album.artist)}</span>
+                  ${this.renderItemTags(album.tags)}
+                  ${album.notes ? `<div class="showcase-note">${this.escapeHtml(album.notes)}</div>` : ''}
                 </div>
               </div>
             `).join('') : '<p class="empty-msg">No items in showcase</p>'}
@@ -3458,6 +3460,7 @@ const Profile = {
                 <div class="collection-info">
                   <span class="collection-album">${this.escapeHtml(album.album)}</span>
                   <span class="collection-artist">${this.escapeHtml(album.artist)}</span>
+                  ${this.renderItemTags(album.tags)}
                 </div>
               </div>
             `).join('') : '<p class="empty-msg">No items in collection</p>'}

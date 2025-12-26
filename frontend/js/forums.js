@@ -15,6 +15,7 @@ const Forums = {
   currentPostId: null,
   pendingPostImages: [],      // Images to upload with new post
   pendingCommentImages: [],   // Images to upload with new comment
+  pendingReplyImages: {},     // Images to upload with replies (keyed by parent comment ID)
 
   /**
    * Initialize forums
@@ -132,10 +133,18 @@ const Forums = {
 
     // Close friend profile page if open (fixes navigation bug)
     const friendProfilePage = document.getElementById('friend-profile-page');
-    if (friendProfilePage) {
+    if (friendProfilePage && friendProfilePage.style.display !== 'none') {
       friendProfilePage.style.display = 'none';
-      if (typeof Profile !== 'undefined') {
-        Profile.closeFriendFullProfile();
+      // Just reset the state, don't call closeFriendFullProfile which sets conflicting inline styles
+      if (typeof Profile !== 'undefined' && Profile.friendProfileState) {
+        Profile.friendProfileState = {
+          userId: null,
+          profile: null,
+          categories: [],
+          currentCategoryId: null,
+          showcase: [],
+          collection: []
+        };
       }
     }
 
@@ -822,6 +831,18 @@ const Forums = {
           </div>
           <div class="reply-form" id="reply-form-${comment.id}" style="display:none">
             <textarea placeholder="Reply..." rows="2"></textarea>
+            <div class="reply-image-upload">
+              <input type="file" id="reply-image-input-${comment.id}" accept="image/*" multiple style="display: none;" onchange="Forums.handleReplyImageSelect(event, ${comment.id})">
+              <button type="button" class="btn-upload-small" onclick="document.getElementById('reply-image-input-${comment.id}').click()">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                  <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                  <polyline points="21 15 16 10 5 21"></polyline>
+                </svg>
+                Add Image
+              </button>
+              <div class="image-previews reply-image-previews" id="reply-image-previews-${comment.id}"></div>
+            </div>
             <div class="reply-actions">
               <button class="btn-cancel" onclick="Forums.hideReplyForm(${comment.id})">Cancel</button>
               <button class="btn-save" onclick="Forums.submitReply(${comment.id})">Reply</button>
@@ -988,6 +1009,73 @@ const Forums = {
     const form = document.getElementById(`reply-form-${commentId}`);
     form.style.display = 'none';
     form.querySelector('textarea').value = '';
+    // Clear pending images for this reply
+    delete this.pendingReplyImages[commentId];
+    const previewContainer = document.getElementById(`reply-image-previews-${commentId}`);
+    if (previewContainer) previewContainer.innerHTML = '';
+  },
+
+  /**
+   * Handle image selection for reply
+   */
+  handleReplyImageSelect(e, commentId) {
+    const files = Array.from(e.target.files);
+    if (files.length === 0) return;
+
+    // Initialize array for this comment if needed
+    if (!this.pendingReplyImages[commentId]) {
+      this.pendingReplyImages[commentId] = [];
+    }
+
+    // Limit to 4 images
+    const remaining = 4 - this.pendingReplyImages[commentId].length;
+    const toAdd = files.slice(0, remaining);
+
+    toAdd.forEach(file => {
+      if (file.size > 5 * 1024 * 1024) {
+        Auth.showWarning(`Image ${file.name} is too large (max 5MB)`);
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        this.pendingReplyImages[commentId].push({
+          file,
+          dataUrl: event.target.result
+        });
+        this.renderReplyImagePreviews(commentId);
+      };
+      reader.readAsDataURL(file);
+    });
+
+    // Clear input
+    e.target.value = '';
+  },
+
+  /**
+   * Render reply image previews
+   */
+  renderReplyImagePreviews(commentId) {
+    const container = document.getElementById(`reply-image-previews-${commentId}`);
+    if (!container) return;
+
+    const images = this.pendingReplyImages[commentId] || [];
+    container.innerHTML = images.map((img, idx) => `
+      <div class="image-preview">
+        <img src="${img.dataUrl}" alt="Preview">
+        <button type="button" class="remove-image" onclick="Forums.removeReplyImage(${commentId}, ${idx})">&times;</button>
+      </div>
+    `).join('');
+  },
+
+  /**
+   * Remove a pending reply image
+   */
+  removeReplyImage(commentId, index) {
+    if (this.pendingReplyImages[commentId]) {
+      this.pendingReplyImages[commentId].splice(index, 1);
+      this.renderReplyImagePreviews(commentId);
+    }
   },
 
   /**
@@ -1000,22 +1088,45 @@ const Forums = {
 
     if (!body || !this.currentPostId) return;
 
+    const submitBtn = form.querySelector('.btn-save');
+    const originalText = submitBtn.textContent;
+    submitBtn.textContent = 'Posting...';
+    submitBtn.disabled = true;
+
     try {
+      // Upload any pending images first
+      const imageUrls = [];
+      const pendingImages = this.pendingReplyImages[parentCommentId] || [];
+      for (const img of pendingImages) {
+        try {
+          const url = await this.uploadImage(img.dataUrl, 'comment');
+          imageUrls.push(url);
+        } catch (uploadError) {
+          console.error('Error uploading image:', uploadError);
+        }
+      }
+
       const response = await fetch(`${API_BASE}/posts/${this.currentPostId}/comments`, {
         method: 'POST',
         headers: {
           ...Auth.getAuthHeaders(),
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({ body, parent_comment_id: parentCommentId })
+        body: JSON.stringify({ body, parent_comment_id: parentCommentId, images: imageUrls })
       });
 
       if (!response.ok) throw new Error('Failed to submit reply');
+
+      // Clear pending images
+      delete this.pendingReplyImages[parentCommentId];
 
       this.openPost(this.currentPostId);
 
     } catch (error) {
       console.error('Error submitting reply:', error);
+    } finally {
+      submitBtn.textContent = originalText;
+      submitBtn.disabled = false;
     }
   },
 
