@@ -3349,20 +3349,35 @@ const Profile = {
       const profile = await profileRes.json();
       const categories = categoriesRes.ok ? await categoriesRes.json() : [];
 
+      // Determine initial category - prefer featured category, fall back to first
+      let initialCategoryId = null;
+      let initialCategorySlug = null;
+
+      if (profile.featured_category_id && categories.some(c => c.id === profile.featured_category_id)) {
+        // Use featured category if it exists in their categories
+        initialCategoryId = profile.featured_category_id;
+        const featuredCat = categories.find(c => c.id === profile.featured_category_id);
+        initialCategorySlug = featuredCat?.slug;
+      } else if (categories.length > 0) {
+        // Fall back to first category
+        initialCategoryId = categories[0].id;
+        initialCategorySlug = categories[0].slug;
+      }
+
       // Store state
       this.friendProfileState = {
         userId,
         profile,
         categories,
-        currentCategoryId: categories.length > 0 ? categories[0].id : null,
+        currentCategoryId: initialCategoryId,
         showcase: [],
         collection: [],
         wishlist: []
       };
 
-      // Apply friend's first category color
-      if (categories.length > 0 && categories[0].slug) {
-        this.applyCategoryColor(categories[0].slug);
+      // Apply the initial category's color
+      if (initialCategorySlug) {
+        this.applyCategoryColor(initialCategorySlug);
       }
 
       // Load category-specific data
