@@ -122,7 +122,14 @@ const Auth = {
    */
   getUser() {
     const data = localStorage.getItem(this.USER_KEY);
-    return data ? JSON.parse(data) : null;
+    if (!data) return null;
+    try {
+      return JSON.parse(data);
+    } catch (e) {
+      console.error('Error parsing user data from localStorage:', e);
+      localStorage.removeItem(this.USER_KEY);
+      return null;
+    }
   },
 
   /**
@@ -233,11 +240,23 @@ const Auth = {
       info: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>'
     };
 
-    toast.innerHTML = `
-      <span class="toast-icon">${icons[type] || icons.info}</span>
-      <span class="toast-message">${message}</span>
-      <button class="toast-close" onclick="this.parentElement.remove()">&times;</button>
-    `;
+    // Build toast safely - icons are trusted, message uses textContent
+    const iconSpan = document.createElement('span');
+    iconSpan.className = 'toast-icon';
+    iconSpan.innerHTML = icons[type] || icons.info;
+
+    const msgSpan = document.createElement('span');
+    msgSpan.className = 'toast-message';
+    msgSpan.textContent = message; // Safe - prevents XSS
+
+    const closeBtn = document.createElement('button');
+    closeBtn.className = 'toast-close';
+    closeBtn.innerHTML = '&times;';
+    closeBtn.onclick = () => toast.remove();
+
+    toast.appendChild(iconSpan);
+    toast.appendChild(msgSpan);
+    toast.appendChild(closeBtn);
 
     document.body.appendChild(toast);
 

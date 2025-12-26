@@ -3,9 +3,10 @@ Together.ai Chat API proxy for AI collection assistant
 Uses ServiceNow-AI/Apriel-1.6-15b-Thinker model
 """
 
-from fastapi import APIRouter, Request, HTTPException
+from fastapi import APIRouter, Request, HTTPException, Depends
 from pydantic import BaseModel
 from typing import Optional
+from routes.auth import require_auth
 import js
 from pyodide.ffi import to_js
 import re
@@ -896,10 +897,11 @@ async def search_for_item(
 
 
 @router.post("/")
-async def chat(request: Request, body: ChatMessage) -> ChatResponse:
+async def chat(request: Request, body: ChatMessage, user_id: int = Depends(require_auth)) -> ChatResponse:
     """
     Send a message to the AI assistant.
     Returns response and any album actions to perform.
+    Requires authentication to prevent abuse.
     """
     env = request.scope["env"]
 

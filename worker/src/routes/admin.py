@@ -85,8 +85,13 @@ class ModCommentsResponse(BaseModel):
     total: int
 
 
-# Admin emails (add your email here)
-ADMIN_EMAILS = ["winstoncrooker8@gmail.com", "christophercrooker@gmail.com"]
+# Admin emails are read from environment variable ADMIN_EMAILS (comma-separated)
+# Fallback to empty list if not set (no admins)
+def get_admin_emails(env) -> list[str]:
+    """Get admin emails from environment variable."""
+    if hasattr(env, 'ADMIN_EMAILS'):
+        return [e.strip() for e in str(env.ADMIN_EMAILS).split(',') if e.strip()]
+    return []
 
 
 @router.get("/users")
@@ -126,7 +131,8 @@ async def list_users(
             raise HTTPException(status_code=403, detail="Admin access required - no email")
 
         email_lower = email.lower().strip()
-        admin_emails_lower = [e.lower().strip() for e in ADMIN_EMAILS]
+        admin_emails = get_admin_emails(env)
+        admin_emails_lower = [e.lower().strip() for e in admin_emails]
 
         if email_lower not in admin_emails_lower:
             raise HTTPException(status_code=403, detail=f"Admin access required - email '{email_lower}' not in admin list")
@@ -188,7 +194,8 @@ async def check_admin(env, user_id: int):
         raise HTTPException(status_code=403, detail="Admin access required")
 
     email = admin_check.get("email", "") if isinstance(admin_check, dict) else None
-    if not email or email.lower().strip() not in [e.lower().strip() for e in ADMIN_EMAILS]:
+    admin_emails = get_admin_emails(env)
+    if not email or email.lower().strip() not in [e.lower().strip() for e in admin_emails]:
         raise HTTPException(status_code=403, detail="Admin access required")
 
 

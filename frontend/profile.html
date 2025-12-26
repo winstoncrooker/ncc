@@ -458,7 +458,7 @@
           </div>
         </div>
         <div class="view-profile-showcase">
-          <h3>Showcase</h3>
+          <h3 id="view-showcase-title">Showcase</h3>
           <div class="view-showcase-grid" id="view-showcase-grid"></div>
         </div>
       </div>
@@ -504,6 +504,19 @@
             <div class="social-picker-options" id="social-picker-options">
               <!-- Options populated by JS -->
             </div>
+          </div>
+        </div>
+
+        <!-- Featured Category Section -->
+        <div class="featured-category-section">
+          <h4 style="color: #1db954; margin: 16px 0 12px; font-size: 0.9rem;">Profile Preview</h4>
+          <div class="form-group">
+            <label for="featured-category">Featured Showcase</label>
+            <select id="featured-category" class="privacy-select">
+              <option value="0">All Categories</option>
+              <!-- Categories populated by JS -->
+            </select>
+            <small style="color: #888; margin-top: 4px; display: block;">Choose which collection appears on your profile preview</small>
           </div>
         </div>
 
@@ -836,6 +849,7 @@
   <input type="file" id="bg-upload-input" accept="image/*" style="display:none">
 
   <script src="js/config.js"></script>
+  <script src="js/utils.js"></script>
   <script src="js/auth.js"></script>
   <script src="js/templates/index.js"></script>
   <script src="js/interests.js"></script>

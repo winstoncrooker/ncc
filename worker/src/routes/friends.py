@@ -60,6 +60,8 @@ class PublicProfile(BaseModel):
     request_id: Optional[int] = None
     showcase: list[dict] = []
     collection_count: int = 0
+    featured_category_id: Optional[int] = None  # Which category's showcase is shown
+    featured_category_name: Optional[str] = None  # Name of featured category
 
 
 class ShowcaseAlbum(BaseModel):
@@ -550,9 +552,9 @@ async def get_public_profile(
     env = request.scope["env"]
 
     try:
-        # Get user profile
+        # Get user profile including featured category
         user = await env.DB.prepare(
-            """SELECT id, name, picture, bio, pronouns, background_image
+            """SELECT id, name, picture, bio, pronouns, background_image, featured_category_id
                FROM users WHERE id = ?"""
         ).bind(target_user_id).first()
 
@@ -588,14 +590,37 @@ async def get_public_profile(
             else:
                 request_received = True
 
-        # Get their showcase
-        showcase_results = await env.DB.prepare(
-            """SELECT s.id, c.artist, c.album, c.cover, c.year
-               FROM showcase_albums s
-               JOIN collections c ON s.collection_id = c.id
-               WHERE s.user_id = ?
-               ORDER BY s.position ASC"""
-        ).bind(target_user_id).all()
+        # Get their showcase - filtered by featured category if set
+        featured_category_id = to_python_value(user.get("featured_category_id"))
+        featured_category_name = None
+
+        # Get category name if featured category is set
+        if featured_category_id:
+            cat_result = await env.DB.prepare(
+                "SELECT name FROM categories WHERE id = ?"
+            ).bind(featured_category_id).first()
+            if cat_result and hasattr(cat_result, 'to_py'):
+                cat_result = cat_result.to_py()
+            if cat_result:
+                featured_category_name = to_python_value(cat_result.get("name"))
+
+        if featured_category_id:
+            showcase_results = await env.DB.prepare(
+                """SELECT s.id, c.artist, c.album, c.cover, c.year
+                   FROM showcase_albums s
+                   JOIN collections c ON s.collection_id = c.id
+                   WHERE s.user_id = ? AND c.category_id = ?
+                   ORDER BY s.position ASC"""
+            ).bind(target_user_id, featured_category_id).all()
+        else:
+            # No featured category - show all showcase items
+            showcase_results = await env.DB.prepare(
+                """SELECT s.id, c.artist, c.album, c.cover, c.year
+                   FROM showcase_albums s
+                   JOIN collections c ON s.collection_id = c.id
+                   WHERE s.user_id = ?
+                   ORDER BY s.position ASC"""
+            ).bind(target_user_id).all()
 
         showcase = []
         for row in showcase_results.results:
@@ -631,7 +656,9 @@ async def get_public_profile(
             request_received=bool(request_received),
             request_id=request_id,
             showcase=[s.model_dump() for s in showcase],
-            collection_count=collection_count
+            collection_count=collection_count,
+            featured_category_id=featured_category_id,
+            featured_category_name=featured_category_name
         )
     except HTTPException:
         raise
@@ -648,10 +675,40 @@ async def get_user_collection(
 ) -> list[dict]:
     """
     Get a user's full collection, optionally filtered by category.
+    Requires friendship or public profile setting.
     """
     env = request.scope["env"]
 
     try:
+        # Authorization check - must be self, friend, or target has public profile
+        if target_user_id != user_id:
+            # Check if they are friends
+            friendship = await env.DB.prepare(
+                """SELECT id FROM friends
+                   WHERE (user_id = ? AND friend_id = ?) OR (user_id = ? AND friend_id = ?)"""
+            ).bind(user_id, target_user_id, target_user_id, user_id).first()
+
+            if not friendship:
+                # Check if target user has public collection
+                target_user = await env.DB.prepare(
+                    "SELECT privacy_settings FROM users WHERE id = ?"
+                ).bind(target_user_id).first()
+
+                if target_user and hasattr(target_user, 'to_py'):
+                    target_user = target_user.to_py()
+
+                privacy = {}
+                if target_user and target_user.get("privacy_settings"):
+                    try:
+                        import json
+                        privacy = json.loads(target_user["privacy_settings"])
+                    except:
+                        pass
+
+                # Default to friends-only if no privacy setting
+                if privacy.get("collection_visibility", "friends") != "public":
+                    raise HTTPException(status_code=403, detail="Collection is not public")
+
         if category_id:
             results = await env.DB.prepare(
                 """SELECT id, artist, album, cover, year

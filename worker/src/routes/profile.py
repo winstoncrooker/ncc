@@ -72,6 +72,7 @@ class ProfileResponse(BaseModel):
     external_links: Optional[ExternalLinks] = None
     created_at: Optional[str] = None
     privacy: Optional[PrivacySettings] = None
+    featured_category_id: Optional[int] = None
 
 
 class ProfileUpdate(BaseModel):
@@ -82,6 +83,7 @@ class ProfileUpdate(BaseModel):
     background_image: Optional[str] = Field(None, max_length=2000)
     location: Optional[str] = Field(None, max_length=100)
     external_links: Optional[dict] = None
+    featured_category_id: Optional[int] = None  # Category to show on profile preview
 
 
 class ShowcaseAlbum(BaseModel):
@@ -148,7 +150,8 @@ async def get_profile(
     try:
         user = await env.DB.prepare(
             """SELECT id, email, name, picture, bio, pronouns, background_image,
-                      location, external_links, created_at, privacy_settings
+                      location, external_links, created_at, privacy_settings,
+                      featured_category_id
                FROM users WHERE id = ?"""
         ).bind(user_id).first()
 
@@ -172,7 +175,8 @@ async def get_profile(
             location=to_python_value(user.get("location")),
             external_links=external_links,
             created_at=str(user["created_at"]) if to_python_value(user.get("created_at")) else None,
-            privacy=privacy
+            privacy=privacy,
+            featured_category_id=to_python_value(user.get("featured_category_id"))
         )
     except HTTPException:
         raise
@@ -224,6 +228,16 @@ async def update_profile(
         if body.external_links is not None:
             updates.append("external_links = ?")
             values.append(json.dumps(body.external_links))
+        if body.featured_category_id is not None:
+            # Allow setting to 0 or null to clear, otherwise validate category exists
+            if body.featured_category_id > 0:
+                category = await env.DB.prepare(
+                    "SELECT id FROM categories WHERE id = ?"
+                ).bind(body.featured_category_id).first()
+                if not category:
+                    raise HTTPException(status_code=400, detail="Invalid category")
+            updates.append("featured_category_id = ?")
+            values.append(body.featured_category_id if body.featured_category_id > 0 else None)
 
         if updates:
             query = f"UPDATE users SET {', '.join(updates)} WHERE id = ?"
@@ -426,20 +440,22 @@ async def reorder_showcase(
         if not body.album_ids:
             return await get_showcase(request, user_id)
 
-        # Build a single UPDATE with CASE statement for atomic reorder
-        # This prevents inconsistent state if the operation is interrupted
-        case_parts = []
-        for position, showcase_id in enumerate(body.album_ids):
-            case_parts.append(f"WHEN id = {int(showcase_id)} THEN {position}")
+        # Validate all IDs are integers to prevent injection
+        validated_ids = []
+        for sid in body.album_ids:
+            try:
+                validated_ids.append(int(sid))
+            except (ValueError, TypeError):
+                raise HTTPException(status_code=400, detail="Invalid showcase ID")
 
-        case_statement = " ".join(case_parts)
-        id_list = ", ".join(str(int(sid)) for sid in body.album_ids)
-
-        await env.DB.prepare(
-            f"""UPDATE showcase_albums
-                SET position = CASE {case_statement} END
-                WHERE id IN ({id_list}) AND user_id = ?"""
-        ).bind(user_id).run()
+        # Update each position individually with parameterized queries
+        # This is safer than building dynamic SQL with f-strings
+        for position, showcase_id in enumerate(validated_ids):
+            await env.DB.prepare(
+                """UPDATE showcase_albums
+                   SET position = ?
+                   WHERE id = ? AND user_id = ?"""
+            ).bind(position, showcase_id, user_id).run()
 
         # Return updated showcase
         return await get_showcase(request, user_id)

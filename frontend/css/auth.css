@@ -29,6 +29,11 @@
   background: #eee;
 }
 
+.google-login-btn:focus {
+  outline: 2px solid #1db954;
+  outline-offset: 2px;
+}
+
 .google-login-btn svg {
   flex-shrink: 0;
 }

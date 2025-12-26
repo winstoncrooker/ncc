@@ -28,6 +28,19 @@
   --shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
 }
 
+/* Global button focus states for accessibility */
+button:focus,
+[class*="-btn"]:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* Remove default focus outline when using mouse (keep for keyboard) */
+button:focus:not(:focus-visible),
+[class*="-btn"]:focus:not(:focus-visible) {
+  outline: none;
+}
+
 /* Light mode specific overrides for elements using rgba(255,255,255,...) */
 [data-theme="light"] .member-since {
   background: rgba(0, 0, 0, 0.05);
@@ -1188,10 +1201,7 @@
   pointer-events: none;
 }
 
-@keyframes spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
-}
+/* @keyframes spin is defined in auth.css */
 
 .album-card .image-btn {
   position: absolute;
@@ -2182,9 +2192,7 @@
   vertical-align: middle;
 }
 
-@keyframes spin {
-  to { transform: rotate(360deg); }
-}
+/* @keyframes spin is defined in auth.css */
 
 /* ============================================
    RESPONSIVE

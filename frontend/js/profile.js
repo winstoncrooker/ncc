@@ -2076,6 +2076,9 @@ const Profile = {
     // Load social links dynamically
     this.populateSocialLinksEditor();
 
+    // Load featured category dropdown
+    this.populateFeaturedCategoryDropdown();
+
     // Load privacy settings
     const privacy = this.profile?.privacy || {};
     document.getElementById('privacy-visibility').value = privacy.profile_visibility || 'public';
@@ -2084,6 +2087,31 @@ const Profile = {
     document.getElementById('privacy-searchable').checked = privacy.searchable !== false;
 
     document.getElementById('edit-profile-modal').classList.add('open');
+  },
+
+  /**
+   * Populate featured category dropdown with user's categories
+   */
+  populateFeaturedCategoryDropdown() {
+    const select = document.getElementById('featured-category');
+    if (!select) return;
+
+    // Keep the "All Categories" option and add user's categories
+    select.innerHTML = '<option value="0">All Categories</option>';
+
+    // Add each category the user has joined
+    if (this.userCategories && this.userCategories.length > 0) {
+      this.userCategories.forEach(cat => {
+        const option = document.createElement('option');
+        option.value = cat.id;
+        option.textContent = cat.name;
+        select.appendChild(option);
+      });
+    }
+
+    // Set current value
+    const currentValue = this.profile?.featured_category_id || 0;
+    select.value = currentValue;
   },
 
   /**
@@ -2098,6 +2126,9 @@ const Profile = {
     // Get social links from dynamic form
     const external_links = this.getSocialLinksFromForm();
 
+    // Get featured category
+    const featured_category_id = parseInt(document.getElementById('featured-category').value) || 0;
+
     // Get privacy settings
     const privacy = {
       profile_visibility: document.getElementById('privacy-visibility').value,
@@ -2110,7 +2141,7 @@ const Profile = {
       // Save profile
       const profileResponse = await Auth.apiRequest('/api/profile/me', {
         method: 'PUT',
-        body: JSON.stringify({ name, pronouns, bio, location, external_links })
+        body: JSON.stringify({ name, pronouns, bio, location, external_links, featured_category_id })
       });
 
       // Save privacy settings separately
@@ -3586,6 +3617,14 @@ const Profile = {
       `;
     }
 
+    // Showcase title - show category name if featured
+    const showcaseTitle = document.getElementById('view-showcase-title');
+    if (profile.featured_category_name) {
+      showcaseTitle.textContent = `${profile.featured_category_name} Showcase`;
+    } else {
+      showcaseTitle.textContent = 'Showcase';
+    }
+
     // Showcase
     const showcaseGrid = document.getElementById('view-showcase-grid');
     if (profile.showcase && profile.showcase.length > 0) {
@@ -3994,6 +4033,12 @@ const Profile = {
    * Start polling for updates (messages, friend requests, friends)
    */
   startPolling() {
+    // Clear any existing interval to prevent duplicates
+    if (this.pollingInterval) {
+      clearInterval(this.pollingInterval);
+      this.pollingInterval = null;
+    }
+
     // Poll every 5 seconds for live updates
     this.pollingInterval = setInterval(async () => {
       // Load friend requests (for live accept notifications)
