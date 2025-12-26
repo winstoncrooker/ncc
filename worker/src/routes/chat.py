@@ -220,16 +220,22 @@ RULES:
 1. Only use action tags when the user explicitly asks to add, remove, or showcase
 2. Add EXACTLY what the user asks for - if they say "add X", add only X. Do NOT add extra variations or suggestions on your own.
 3. If user lists multiple items OR uploads a file with a list, add ALL of them with separate action tags.
-4. For recommendations, ask {config["rec_question"]} - DO NOT mention genres or artists unless this is vinyl/music
-5. Be conversational and helpful
-6. Keep responses concise (1-3 sentences for single items, summary for bulk adds)
-7. If user asks to remove an item not in their collection, politely say it's not there
-8. For ambiguous requests (e.g. "add dunks" without specifying colorway), ask for clarification
-9. NEVER output your thinking process, reasoning, or internal analysis to the user
-10. NEVER say things like "The user asks...", "The user wants...", "So we need to...", "Let's list them..."
-11. Just respond directly with the answer - no meta-commentary about what you're doing
+4. Keep responses concise (1-3 sentences for single items, summary for bulk adds)
+5. If user asks to remove an item not in their collection, politely say it's not there
+6. For ambiguous add requests (e.g. "add dunks" without specifying colorway), ask for clarification
+7. NEVER output your thinking process, reasoning, or internal analysis to the user
+8. NEVER say things like "The user asks...", "The user wants...", "So we need to...", "Let's list them..."
+9. Just respond directly with the answer - no meta-commentary about what you're doing
 
-IMPORTANT: Your response should be friendly and natural. The action tags will be processed automatically. Do NOT explain your reasoning or show your thought process - just give the answer directly."""
+CASUAL CONVERSATION:
+- If user says hi, hello, hey, etc - greet them back warmly and ask how you can help today
+- ANSWER their questions directly! If they ask "what's a good starter X?" - give them actual recommendations with specific names
+- If they tell you their preferences (e.g. "I like Nike"), respond to that and offer specific suggestions
+- Have natural back-and-forth conversation - don't just repeat the same question
+- Share your knowledge! You're an expert - give advice, recommendations, history, tips
+- It's okay to chat casually without every response being about managing the collection
+
+IMPORTANT: Your response should be friendly and natural. Be helpful and knowledgeable. The action tags will be processed automatically. Do NOT explain your reasoning or show your thought process - just give the answer directly."""
 
 
 def parse_actions(response: str) -> tuple[list[Album], list[Album], list[Album]]:
@@ -293,35 +299,31 @@ def clean_response(response: str, category_slug: Optional[str] = None) -> str:
     cleaned = re.sub(r'<think>[\s\S]*?</think>', '', cleaned, flags=re.IGNORECASE)
     cleaned = re.sub(r'<thinking>[\s\S]*?</thinking>', '', cleaned, flags=re.IGNORECASE)
 
-    # Check if response STARTS with reasoning (polluted from the beginning)
-    # If so, try to extract any usable content or provide fallback
+    # Check if response STARTS with obvious AI reasoning (not normal conversation)
+    # Only catch clear reasoning dumps, not normal conversational starters
     polluted_starts = [
-        r'^\.?\s*According to',
-        r'^\.?\s*The user',
+        r'^\.?\s*According to the rules',
+        r'^\.?\s*The user asks',
+        r'^\.?\s*The user wants',
+        r'^\.?\s*The user is asking',
         r'^\.?\s*We have a user',
-        r'^\.?\s*We need',
-        r'^\.?\s*We should',
-        r'^\.?\s*We can',
-        r'^\.?\s*We must',
-        r'^\.?\s*We have',
-        r'^\.?\s*Should be',
-        r'^\.?\s*No action',
-        r'^\.?\s*Let\'s',
-        r'^\.?\s*Let me',
-        r'^\.?\s*First,',
-        r'^\.?\s*So,?\s+we',
-        r'^\.?\s*So,?\s+the',
-        r'^\.?\s*The collection',
-        r'^\.?\s*This is a',
-        r'^\.?\s*I need to',
-        r'^\.?\s*I should',
-        r'^\.?\s*Looking at',
+        r'^\.?\s*We need to check',
+        r'^\.?\s*We should check',
+        r'^\.?\s*We must follow',
+        r'^\.?\s*Should be no action',
+        r'^\.?\s*No action tags',
+        r'^\.?\s*Let\'s think',
+        r'^\.?\s*Let\'s analyze',
+        r'^\.?\s*First,\s+I need',
+        r'^\.?\s*So,?\s+we need',
+        r'^\.?\s*So,?\s+the user',
+        r'^\.?\s*The collection contains',
+        r'^\.?\s*I need to analyze',
+        r'^\.?\s*I should check',
+        r'^\.?\s*Looking at the rules',
         r'^\.?\s*Based on the rules',
-        r'^\.?\s*Since the',
-        r'^\.?\s*Given that',
-        r'^\.?\s*Now,',
-        r'^\.?\s*Okay,',
-        r'^\.?\s*Alright,',
+        r'^\.?\s*Since the user',
+        r'^\.?\s*Given that the',
     ]
 
     is_polluted = any(re.match(p, cleaned.strip(), re.IGNORECASE) for p in polluted_starts)
@@ -371,33 +373,22 @@ def clean_response(response: str, category_slug: Optional[str] = None) -> str:
             # No extractable content, return context-aware fallback
             return fallback_msg
 
-    # AGGRESSIVE: Truncate from the start of obvious reasoning blocks
+    # Truncate from the start of obvious AI reasoning blocks (not normal conversation)
     reasoning_start_markers = [
-        r'[\.\s]+According to rules',
-        r'[\.\s]+The user asks',
-        r'[\.\s]+The user wants',
-        r'[\.\s]+The user has',
-        r'[\.\s]+The user didn\'t',
-        r'[\.\s]+We need to',
-        r'[\.\s]+We should',
-        r'[\.\s]+We can say',
-        r'[\.\s]+We can respond',
-        r'[\.\s]+We can answer',
-        r'[\.\s]+We must',
-        r'[\.\s]+Should be',
-        r'[\.\s]+No action tags',
-        r'[\.\s]+So we',
-        r'[\.\s]+The question',
-        r'[\.\s]+Let\'s think',
-        r'[\.\s]+Let me think',
-        r'[\.\s]+Must be',
-        r'[\.\s]+But we need',
-        r'[\.\s]+The collection',
-        r'[\.\s]+Or we could',
-        r'[\.\s]+Or \"',
-        r'\n\nWe need',
-        r'\n\nWe should',
-        r'\n\nThe user',
+        r'[\.\s]+According to the rules',
+        r'[\.\s]+The user asks for',
+        r'[\.\s]+The user wants me to',
+        r'[\.\s]+The user is asking',
+        r'[\.\s]+We need to check',
+        r'[\.\s]+We should check',
+        r'[\.\s]+We must follow',
+        r'[\.\s]+Should be no action',
+        r'[\.\s]+No action tags needed',
+        r'[\.\s]+Let\'s think about',
+        r'[\.\s]+Let me think about',
+        r'[\.\s]+The collection contains',
+        r'\n\nWe need to check',
+        r'\n\nThe user is asking',
     ]
 
     for marker in reasoning_start_markers:
@@ -405,13 +396,12 @@ def clean_response(response: str, category_slug: Optional[str] = None) -> str:
         if match:
             cleaned = cleaned[:match.start()]
 
-    # Remove any remaining inline reasoning fragments
+    # Remove any remaining inline reasoning fragments (specific AI reasoning phrases)
     inline_reasoning = [
-        r'\. According to rules[^\.]*\.',
-        r'\. The user asks[^\.]*\.',
-        r'\. We need to[^\.]*\.',
-        r'\. No action tags[^\.]*\.',
-        r'\. Should be[^\.]*\.',
+        r'\. According to the rules[^\.]*\.',
+        r'\. The user asks for[^\.]*\.',
+        r'\. No action tags needed[^\.]*\.',
+        r'\. Should be no action[^\.]*\.',
     ]
 
     for pattern in inline_reasoning:
