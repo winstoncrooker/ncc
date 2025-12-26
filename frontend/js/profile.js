@@ -3356,20 +3356,28 @@ const Profile = {
         categories,
         currentCategoryId: categories.length > 0 ? categories[0].id : null,
         showcase: [],
-        collection: []
+        collection: [],
+        wishlist: []
       };
+
+      // Apply friend's first category color
+      if (categories.length > 0 && categories[0].slug) {
+        this.applyCategoryColor(categories[0].slug);
+      }
 
       // Load category-specific data
       if (this.friendProfileState.currentCategoryId) {
         await this.loadFriendCategoryData(userId, this.friendProfileState.currentCategoryId);
       } else {
         // Load all data if no categories
-        const [showcaseRes, collectionRes] = await Promise.all([
+        const [showcaseRes, collectionRes, wishlistRes] = await Promise.all([
           Auth.apiRequest(`/api/friends/user/${userId}/showcase`),
-          Auth.apiRequest(`/api/friends/user/${userId}/collection`)
+          Auth.apiRequest(`/api/friends/user/${userId}/collection`),
+          Auth.apiRequest(`/api/friends/user/${userId}/wishlist`)
         ]);
         this.friendProfileState.showcase = showcaseRes.ok ? await showcaseRes.json() : [];
         this.friendProfileState.collection = collectionRes.ok ? await collectionRes.json() : [];
+        this.friendProfileState.wishlist = wishlistRes.ok ? await wishlistRes.json() : [];
       }
 
       this.renderFriendFullProfile();
@@ -3390,13 +3398,15 @@ const Profile = {
    */
   async loadFriendCategoryData(userId, categoryId) {
     try {
-      const [showcaseRes, collectionRes] = await Promise.all([
+      const [showcaseRes, collectionRes, wishlistRes] = await Promise.all([
         Auth.apiRequest(`/api/friends/user/${userId}/showcase?category_id=${categoryId}`),
-        Auth.apiRequest(`/api/friends/user/${userId}/collection?category_id=${categoryId}`)
+        Auth.apiRequest(`/api/friends/user/${userId}/collection?category_id=${categoryId}`),
+        Auth.apiRequest(`/api/friends/user/${userId}/wishlist?category_id=${categoryId}`)
       ]);
 
       this.friendProfileState.showcase = showcaseRes.ok ? await showcaseRes.json() : [];
       this.friendProfileState.collection = collectionRes.ok ? await collectionRes.json() : [];
+      this.friendProfileState.wishlist = wishlistRes.ok ? await wishlistRes.json() : [];
     } catch (error) {
       console.error('Error loading friend category data:', error);
     }
@@ -3409,6 +3419,13 @@ const Profile = {
     if (!this.friendProfileState.userId) return;
 
     this.friendProfileState.currentCategoryId = categoryId;
+
+    // Apply category color for friend's selected category
+    const friendCategory = this.friendProfileState.categories.find(c => c.id === categoryId);
+    if (friendCategory && friendCategory.slug) {
+      this.applyCategoryColor(friendCategory.slug);
+    }
+
     await this.loadFriendCategoryData(this.friendProfileState.userId, categoryId);
     this.renderFriendFullProfile();
   },
@@ -3417,7 +3434,7 @@ const Profile = {
    * Render full page friend profile
    */
   renderFriendFullProfile() {
-    const { profile, categories, currentCategoryId, showcase, collection } = this.friendProfileState;
+    const { profile, categories, currentCategoryId, showcase, collection, wishlist } = this.friendProfileState;
     const friendPage = document.getElementById('friend-profile-page');
     const currentCategory = categories.find(c => c.id === currentCategoryId);
 
@@ -3497,6 +3514,26 @@ const Profile = {
             `).join('') : '<p class="empty-msg">No items in collection</p>'}
           </div>
         </div>
+
+        ${wishlist && wishlist.length > 0 ? `
+        <div class="friend-profile-section">
+          <h2 class="section-title">🔍 Currently Seeking
+            <span class="collection-count">(${wishlist.length})</span>
+          </h2>
+          <div class="friend-wishlist-grid">
+            ${wishlist.map(item => `
+              <div class="wishlist-item priority-${item.priority}">
+                <div class="wishlist-info">
+                  <span class="wishlist-title">${this.escapeHtml(item.title)}</span>
+                  ${item.artist ? `<span class="wishlist-artist">${this.escapeHtml(item.artist)}</span>` : ''}
+                  ${item.description ? `<p class="wishlist-description">${this.escapeHtml(item.description)}</p>` : ''}
+                  ${item.condition_wanted ? `<span class="wishlist-condition">Wanted: ${this.escapeHtml(item.condition_wanted)}</span>` : ''}
+                </div>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+        ` : ''}
       </div>
     `;
   },
@@ -3510,6 +3547,11 @@ const Profile = {
     const friendPage = document.getElementById('friend-profile-page');
 
     if (friendPage) friendPage.style.display = 'none';
+
+    // Restore user's category color scheme
+    if (this.currentCategorySlug) {
+      this.applyCategoryColor(this.currentCategorySlug);
+    }
 
     // Restore the correct view based on saved tab state
     const activeTab = localStorage.getItem('ncc_active_tab') || 'profile';

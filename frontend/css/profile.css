@@ -3807,7 +3807,8 @@ button:focus:not(:focus-visible),
   font-size: 2rem;
   font-weight: 700;
   margin: 0 0 8px 0;
-  color: var(--text-primary);
+  color: #ffffff; /* Force white for readability on dark backgrounds */
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
 }
 
 .friend-profile-pronouns {
@@ -3816,12 +3817,13 @@ button:focus:not(:focus-visible),
   background: rgba(255, 255, 255, 0.15);
   border-radius: 20px;
   font-size: 0.85rem;
-  color: var(--text-secondary);
+  color: rgba(255, 255, 255, 0.85); /* Force light color for dark backgrounds */
   margin-bottom: 12px;
 }
 
 .friend-profile-bio {
-  color: var(--text-secondary);
+  color: rgba(255, 255, 255, 0.85); /* Force light color for dark backgrounds */
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
   font-size: 0.95rem;
   line-height: 1.5;
   margin: 0;

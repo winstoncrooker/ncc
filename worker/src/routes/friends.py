@@ -711,14 +711,14 @@ async def get_user_collection(
 
         if category_id:
             results = await env.DB.prepare(
-                """SELECT id, artist, album, cover, year
+                """SELECT id, artist, album, cover, year, tags
                    FROM collections
                    WHERE user_id = ? AND category_id = ?
                    ORDER BY artist, album"""
             ).bind(target_user_id, category_id).all()
         else:
             results = await env.DB.prepare(
-                """SELECT id, artist, album, cover, year
+                """SELECT id, artist, album, cover, year, tags
                    FROM collections
                    WHERE user_id = ?
                    ORDER BY artist, album"""
@@ -733,7 +733,8 @@ async def get_user_collection(
                 "artist": row["artist"],
                 "album": row["album"],
                 "cover": to_python_value(row.get("cover")),
-                "year": to_python_value(row.get("year"))
+                "year": to_python_value(row.get("year")),
+                "tags": to_python_value(row.get("tags"))
             })
 
         return collection
@@ -803,7 +804,7 @@ async def get_user_showcase(
     try:
         if category_id:
             results = await env.DB.prepare(
-                """SELECT s.id, c.artist, c.album, c.cover, c.year
+                """SELECT s.id, c.artist, c.album, c.cover, c.year, c.tags, s.notes
                    FROM showcase_albums s
                    JOIN collections c ON s.collection_id = c.id
                    WHERE s.user_id = ? AND c.category_id = ?
@@ -811,7 +812,7 @@ async def get_user_showcase(
             ).bind(target_user_id, category_id).all()
         else:
             results = await env.DB.prepare(
-                """SELECT s.id, c.artist, c.album, c.cover, c.year
+                """SELECT s.id, c.artist, c.album, c.cover, c.year, c.tags, s.notes
                    FROM showcase_albums s
                    JOIN collections c ON s.collection_id = c.id
                    WHERE s.user_id = ?
@@ -827,9 +828,64 @@ async def get_user_showcase(
                 "artist": row["artist"],
                 "album": row["album"],
                 "cover": to_python_value(row.get("cover")),
-                "year": to_python_value(row.get("year"))
+                "year": to_python_value(row.get("year")),
+                "tags": to_python_value(row.get("tags")),
+                "notes": to_python_value(row.get("notes"))
             })
 
         return showcase
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error fetching showcase: {str(e)}")
+
+
+@router.get("/user/{target_user_id}/wishlist")
+async def get_user_wishlist(
+    request: Request,
+    target_user_id: int,
+    category_id: Optional[int] = None,
+    user_id: int = Depends(require_auth)
+) -> list[dict]:
+    """
+    Get a user's wishlist (currently seeking items), optionally filtered by category.
+    Only returns non-found items.
+    """
+    env = request.scope["env"]
+
+    try:
+        if category_id:
+            results = await env.DB.prepare(
+                """SELECT id, category_id, title, description, artist, year,
+                          condition_wanted, max_price, priority, created_at
+                   FROM wishlist
+                   WHERE user_id = ? AND category_id = ? AND is_found = 0
+                   ORDER BY priority DESC, created_at DESC"""
+            ).bind(target_user_id, category_id).all()
+        else:
+            results = await env.DB.prepare(
+                """SELECT id, category_id, title, description, artist, year,
+                          condition_wanted, max_price, priority, created_at
+                   FROM wishlist
+                   WHERE user_id = ? AND is_found = 0
+                   ORDER BY priority DESC, created_at DESC"""
+            ).bind(target_user_id).all()
+
+        wishlist = []
+        for row in results.results:
+            if hasattr(row, 'to_py'):
+                row = row.to_py()
+            wishlist.append({
+                "id": row["id"],
+                "category_id": row["category_id"],
+                "title": row["title"],
+                "description": to_python_value(row.get("description")),
+                "artist": to_python_value(row.get("artist")),
+                "year": to_python_value(row.get("year")),
+                "condition_wanted": to_python_value(row.get("condition_wanted")),
+                "max_price": to_python_value(row.get("max_price")),
+                "priority": row["priority"],
+                "created_at": to_python_value(row.get("created_at"))
+            })
+
+        return wishlist
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error fetching wishlist: {str(e)}")

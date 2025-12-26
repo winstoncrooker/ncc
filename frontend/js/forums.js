@@ -167,12 +167,9 @@ const Forums = {
 
     // Load forums data if switching to forums
     if (tab === 'forums') {
-      // Auto-filter to current profile category if set
-      if (typeof Profile !== 'undefined' && Profile.currentCategorySlug) {
-        this.currentCategory = Profile.currentCategorySlug;
-        this.currentGroupId = null;
-        this.applyCategoryColor(Profile.currentCategorySlug);
-      }
+      // Always default to All Posts when entering forums
+      this.currentCategory = null;
+      this.currentGroupId = null;
       this.loadFeed(true);
       this.loadMyGroups();
     }
