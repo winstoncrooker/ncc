@@ -62,6 +62,7 @@ class PublicProfile(BaseModel):
     collection_count: int = 0
     featured_category_id: Optional[int] = None  # Which category's showcase is shown
     featured_category_name: Optional[str] = None  # Name of featured category
+    featured_category_slug: Optional[str] = None  # Slug for frontend terms lookup
 
 
 class ShowcaseAlbum(BaseModel):
@@ -593,16 +594,18 @@ async def get_public_profile(
         # Get their showcase - filtered by featured category if set
         featured_category_id = to_python_value(user.get("featured_category_id"))
         featured_category_name = None
+        featured_category_slug = None
 
-        # Get category name if featured category is set
+        # Get category name and slug if featured category is set
         if featured_category_id:
             cat_result = await env.DB.prepare(
-                "SELECT name FROM categories WHERE id = ?"
+                "SELECT name, slug FROM categories WHERE id = ?"
             ).bind(featured_category_id).first()
             if cat_result and hasattr(cat_result, 'to_py'):
                 cat_result = cat_result.to_py()
             if cat_result:
                 featured_category_name = to_python_value(cat_result.get("name"))
+                featured_category_slug = to_python_value(cat_result.get("slug"))
 
         if featured_category_id:
             showcase_results = await env.DB.prepare(
@@ -634,10 +637,15 @@ async def get_public_profile(
                 year=to_python_value(row.get("year"))
             ))
 
-        # Get collection count
-        count_result = await env.DB.prepare(
-            "SELECT COUNT(*) as count FROM collections WHERE user_id = ?"
-        ).bind(target_user_id).first()
+        # Get collection count - filtered by featured category if set
+        if featured_category_id:
+            count_result = await env.DB.prepare(
+                "SELECT COUNT(*) as count FROM collections WHERE user_id = ? AND category_id = ?"
+            ).bind(target_user_id, featured_category_id).first()
+        else:
+            count_result = await env.DB.prepare(
+                "SELECT COUNT(*) as count FROM collections WHERE user_id = ?"
+            ).bind(target_user_id).first()
 
         if count_result and hasattr(count_result, 'to_py'):
             count_result = count_result.to_py()
@@ -658,7 +666,8 @@ async def get_public_profile(
             showcase=[s.model_dump() for s in showcase],
             collection_count=collection_count,
             featured_category_id=featured_category_id,
-            featured_category_name=featured_category_name
+            featured_category_name=featured_category_name,
+            featured_category_slug=featured_category_slug
         )
     except HTTPException:
         raise

@@ -3620,8 +3620,10 @@ const Profile = {
     // Bio
     document.getElementById('view-profile-bio').textContent = profile.bio || '';
 
-    // Collection count
-    const terms = this.getTerms();
+    // Collection count - use featured category terms if available, otherwise default
+    const terms = profile.featured_category_slug
+      ? (this.categoryTerms[profile.featured_category_slug] || this.categoryTerms['vinyl'])
+      : this.getTerms();
     document.getElementById('view-profile-collection-count').textContent = `${profile.collection_count || 0} ${terms.itemPlural}`;
 
     // Actions - show different buttons based on relationship
