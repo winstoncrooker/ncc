@@ -392,8 +392,12 @@ const MarketplaceModule = {
     const conditionLabel = this.formatCondition(listing.condition);
     const typeLabel = listing.type === 'trade' ? 'Trade Only' : (listing.type === 'both' ? 'Sale/Trade' : '');
 
-    const sellerAvatar = listing.seller_picture || Utils.getDefaultAvatar(listing.seller_name);
-    const rating = listing.seller_rating ? `${'★'.repeat(Math.round(listing.seller_rating))}` : '';
+    // Get seller info from nested object or flat fields (backwards compat)
+    const sellerName = listing.seller?.name || listing.seller_name || 'Seller';
+    const sellerPicture = listing.seller?.picture || listing.seller_picture;
+    const sellerRating = listing.seller?.rating_average || listing.seller_rating;
+    const sellerAvatar = sellerPicture || Utils.getDefaultAvatar(sellerName);
+    const rating = sellerRating ? `${'★'.repeat(Math.round(sellerRating))}` : '';
 
     const placeholder = Utils.getDefaultItemPlaceholder();
     const coverImage = listing.images && listing.images.length > 0
@@ -406,9 +410,6 @@ const MarketplaceModule = {
       ? `<span class="listing-badge badge-wishlist" title="Matches: ${this.escapeHtml(wishlistMatch.title)}">On Your Wishlist!</span>`
       : '';
     const wishlistClass = wishlistMatch ? 'wishlist-match' : '';
-
-    // Debug logging for image issues
-    console.log('[Marketplace] Listing:', listing.id, 'images:', listing.images?.length, 'collection_item:', listing.collection_item, 'cover:', listing.cover, 'coverImage:', coverImage);
 
     return `
       <div class="listing-card ${wishlistClass}" data-id="${listing.id}">
@@ -428,7 +429,7 @@ const MarketplaceModule = {
           </div>
           <div class="listing-card-seller">
             <img src="${sellerAvatar}" alt="" class="listing-seller-avatar" onerror="this.style.opacity='0.3'">
-            <span class="listing-seller-name">${this.escapeHtml(listing.seller_name || 'Seller')}</span>
+            <span class="listing-seller-name">${this.escapeHtml(sellerName)}</span>
             ${rating ? `<span class="listing-seller-rating">${rating}</span>` : ''}
           </div>
         </div>
@@ -1236,7 +1237,6 @@ const MarketplaceModule = {
    */
   async quickAcceptOffer(offerId) {
     event.stopPropagation();
-    if (!confirm('Accept this offer?')) return;
 
     try {
       const response = await Auth.apiRequest(`/api/marketplace/offers/${offerId}/accept`, {
@@ -1261,7 +1261,6 @@ const MarketplaceModule = {
    */
   async quickRejectOffer(offerId) {
     event.stopPropagation();
-    if (!confirm('Decline this offer?')) return;
 
     try {
       const response = await Auth.apiRequest(`/api/marketplace/offers/${offerId}/reject`, {
@@ -1422,7 +1421,6 @@ const MarketplaceModule = {
    */
   async deleteListing(listingId) {
     event.stopPropagation();
-    if (!confirm('Are you sure you want to delete this listing?')) return;
 
     try {
       const response = await Auth.apiRequest(`/api/marketplace/listings/${listingId}`, {
