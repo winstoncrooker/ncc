@@ -7,7 +7,7 @@ from datetime import datetime
 from fastapi import APIRouter, Request, HTTPException, Depends, Query
 from pydantic import BaseModel, Field
 import json
-from .auth import require_auth, require_csrf
+from .auth import require_auth
 from .blocks import get_blocked_user_ids
 from utils.scoring import calculate_hot_score
 from utils.conversions import to_python_value, convert_row, convert_rows
@@ -437,7 +437,7 @@ async def get_post(
 async def create_post(
     request: Request,
     body: CreatePostRequest,
-    user_id: int = Depends(require_csrf)
+    user_id: int = Depends(require_auth)
 ) -> PostResponse:
     """Create a new forum post."""
     env = request.scope["env"]
@@ -562,7 +562,7 @@ async def update_post(
     request: Request,
     post_id: int,
     body: UpdatePostRequest,
-    user_id: int = Depends(require_csrf)
+    user_id: int = Depends(require_auth)
 ) -> PostResponse:
     """Update an existing post (own posts only)."""
     env = request.scope["env"]
@@ -624,7 +624,7 @@ async def update_post(
 async def delete_post(
     request: Request,
     post_id: int,
-    user_id: int = Depends(require_csrf)
+    user_id: int = Depends(require_auth)
 ) -> dict:
     """Delete a post (own posts only)."""
     env = request.scope["env"]
@@ -667,7 +667,7 @@ async def delete_post(
 async def save_post(
     request: Request,
     post_id: int,
-    user_id: int = Depends(require_csrf)
+    user_id: int = Depends(require_auth)
 ) -> dict:
     """Save/bookmark a post."""
     env = request.scope["env"]
@@ -712,7 +712,7 @@ async def save_post(
 async def unsave_post(
     request: Request,
     post_id: int,
-    user_id: int = Depends(require_csrf)
+    user_id: int = Depends(require_auth)
 ) -> dict:
     """Remove a post from saved."""
     env = request.scope["env"]
