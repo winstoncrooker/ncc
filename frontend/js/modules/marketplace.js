@@ -407,10 +407,13 @@ const MarketplaceModule = {
       : '';
     const wishlistClass = wishlistMatch ? 'wishlist-match' : '';
 
+    // Debug logging for image issues
+    console.log('[Marketplace] Listing:', listing.id, 'images:', listing.images?.length, 'collection_item:', listing.collection_item, 'cover:', listing.cover, 'coverImage:', coverImage);
+
     return `
       <div class="listing-card ${wishlistClass}" data-id="${listing.id}">
         <div class="listing-card-image">
-          <img src="${this.escapeHtml(coverImage)}" alt="${this.escapeHtml(listing.title)}" onerror="this.src=Utils.getDefaultItemPlaceholder()">
+          <img src="${coverImage}" alt="${this.escapeHtml(listing.title)}" onerror="this.src='${placeholder}'">
           <div class="listing-card-badges">
             ${wishlistBadge}
             <span class="listing-badge badge-condition">${this.escapeHtml(conditionLabel)}</span>
@@ -424,7 +427,7 @@ const MarketplaceModule = {
             ${listing.city ? `<span class="listing-card-location">${this.escapeHtml(listing.city)}${listing.state ? ', ' + this.escapeHtml(listing.state) : ''}</span>` : ''}
           </div>
           <div class="listing-card-seller">
-            <img src="${this.escapeHtml(sellerAvatar)}" alt="" class="listing-seller-avatar" onerror="this.src='${Utils.getDefaultAvatar(listing.seller_name)}'">
+            <img src="${sellerAvatar}" alt="" class="listing-seller-avatar" onerror="this.style.opacity='0.3'">
             <span class="listing-seller-name">${this.escapeHtml(listing.seller_name || 'Seller')}</span>
             ${rating ? `<span class="listing-seller-rating">${rating}</span>` : ''}
           </div>
@@ -901,11 +904,11 @@ const MarketplaceModule = {
 
     gallery.innerHTML = `
       ${wishlistBanner}
-      <img src="${this.escapeHtml(photos[0])}" alt="${this.escapeHtml(listing.title)}" class="listing-detail-main-image" onerror="this.style.opacity='0.3'">
+      <img src="${photos[0]}" alt="${this.escapeHtml(listing.title)}" class="listing-detail-main-image" onerror="this.style.opacity='0.3'">
       ${photos.length > 1 ? `
         <div class="listing-detail-thumbnails">
           ${photos.map((photo, i) => `
-            <img src="${this.escapeHtml(photo)}" alt="" class="listing-detail-thumbnail ${i === 0 ? 'active' : ''}" onclick="MarketplaceModule.selectMainImage(this, '${this.escapeHtml(photo)}')" onerror="this.style.display='none'">
+            <img src="${photo}" alt="" class="listing-detail-thumbnail ${i === 0 ? 'active' : ''}" onclick="MarketplaceModule.selectMainImage(this, '${photo.replace(/'/g, "\\'")}')" onerror="this.style.display='none'">
           `).join('')}
         </div>
       ` : ''}

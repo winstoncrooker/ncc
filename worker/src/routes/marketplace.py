@@ -177,6 +177,11 @@ class OfferResponse(BaseModel):
     updated_at: str
 
 
+class OfferListResponse(BaseModel):
+    """Offer list response"""
+    offers: list[OfferResponse]
+
+
 class CreateOfferRequest(BaseModel):
     """Create offer request"""
     offer_type: str = Field("buy", pattern="^(buy|trade)$")
@@ -985,7 +990,7 @@ async def get_received_offers(
     request: Request,
     status: Optional[str] = Query(None, pattern="^(pending|accepted|rejected|countered|withdrawn)$"),
     user_id: int = Depends(require_auth)
-) -> list[OfferResponse]:
+) -> OfferListResponse:
     """Get offers received on user's listings."""
     env = request.scope["env"]
 
@@ -1053,7 +1058,7 @@ async def get_received_offers(
                 updated_at=str(row["updated_at"])
             ))
 
-        return offers
+        return OfferListResponse(offers=offers)
 
     except Exception as error:
         raise HTTPException(status_code=500, detail=f"Error fetching offers: {str(error)}")
@@ -1064,7 +1069,7 @@ async def get_sent_offers(
     request: Request,
     status: Optional[str] = Query(None, pattern="^(pending|accepted|rejected|countered|withdrawn)$"),
     user_id: int = Depends(require_auth)
-) -> list[OfferResponse]:
+) -> OfferListResponse:
     """Get offers sent by user."""
     env = request.scope["env"]
 
@@ -1132,7 +1137,7 @@ async def get_sent_offers(
                 updated_at=str(row["updated_at"])
             ))
 
-        return offers
+        return OfferListResponse(offers=offers)
 
     except Exception as error:
         raise HTTPException(status_code=500, detail=f"Error fetching offers: {str(error)}")
