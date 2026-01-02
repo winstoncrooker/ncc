@@ -16,6 +16,12 @@ const MarketplaceModule = {
   selectedCollectionItem: null,
   editingListingId: null,  // Track if we're editing vs creating
   userWishlist: [],  // Cached user wishlist for matching
+  // Messaging state
+  conversations: [],
+  currentConversation: null,
+  chatMessages: [],
+  chatPollingInterval: null,
+  unreadMessageCount: 0,
   filters: {
     search: '',
     category: '',
@@ -39,6 +45,10 @@ const MarketplaceModule = {
    */
   init() {
     this.setupEventListeners();
+    // Load unread count for badge (if we have auth)
+    if (typeof Auth !== 'undefined' && Auth.getToken()) {
+      this.loadUnreadCount();
+    }
   },
 
   /**
@@ -177,6 +187,16 @@ const MarketplaceModule = {
         if (event.key === 'Enter') this.applyFilters();
       }, true);
     });
+
+    // Marketplace messaging
+    addListener('chat-back-btn', 'click', () => this.backToConversations(), true);
+    addListener('chat-send-btn', 'click', () => this.sendChatMessage(), true);
+    addListener('chat-message-input', 'keypress', (event) => {
+      if (event.key === 'Enter' && !event.shiftKey) {
+        event.preventDefault();
+        this.sendChatMessage();
+      }
+    }, true);
   },
 
   /**
@@ -209,6 +229,9 @@ const MarketplaceModule = {
       case 'my-offers':
         this.loadMyOffers();
         break;
+      case 'messages':
+        this.loadConversations();
+        break;
     }
   },
 
@@ -217,6 +240,7 @@ const MarketplaceModule = {
    */
   onTabActivated() {
     this.loadListings();
+    this.loadUnreadCount();
   },
 
   /**
@@ -1471,7 +1495,7 @@ const MarketplaceModule = {
     document.getElementById('listing-state').value = listing.location_state || '';
 
     // Update photos preview
-    this.renderPhotosPreview();
+    this.refreshPhotosPreview();
 
     // Update modal title for edit mode
     const modalTitle = document.querySelector('#create-listing-modal .modal-header h2');
@@ -1511,29 +1535,301 @@ const MarketplaceModule = {
   },
 
   /**
-   * Message seller
+   * Message seller - starts a marketplace conversation about the current listing
    */
-  messageSeller() {
+  async messageSeller() {
     if (!this.currentListing) return;
 
-    // Get seller info from nested object or flat fields
-    const sellerId = this.currentListing.seller?.id || this.currentListing.user_id || this.currentListing.seller_id;
-    const sellerName = this.currentListing.seller?.name || this.currentListing.seller_name || 'Seller';
-    const sellerPicture = this.currentListing.seller?.picture || this.currentListing.seller_picture || '';
+    try {
+      // Create or get existing conversation for this listing
+      // Backend requires an initial message
+      const response = await Auth.apiRequest('/api/marketplace/messages/conversations', {
+        method: 'POST',
+        body: JSON.stringify({
+          listing_id: this.currentListing.id,
+          message: `Hi! I'm interested in "${this.currentListing.title}".`
+        })
+      });
 
-    // Use the messages module if available
-    if (typeof ProfileMessages !== 'undefined' && typeof ProfileMessages.openConversation === 'function') {
-      ProfileMessages.openConversation(sellerId, sellerName, sellerPicture);
-    } else if (window.Profile && typeof window.Profile.openConversation === 'function') {
-      window.Profile.openConversation(
-        this.currentListing.seller_id,
-        this.currentListing.seller_name || 'Seller',
-        this.currentListing.seller_picture || ''
-      );
-    } else {
-      Auth.showInfo('Messaging feature requires the messages module');
+      if (response.ok) {
+        const conversation = await response.json();
+        this.closeModal('listing-detail-modal');
+        // Switch to messages tab and open this conversation
+        this.switchSection('messages');
+        // Reload conversations first, then open the new one
+        await this.loadConversations();
+        this.openConversation(conversation.id);
+      } else {
+        const error = await response.json();
+        Auth.showError(error.detail || 'Failed to start conversation');
+      }
+    } catch (error) {
+      console.error('[Marketplace] Error starting conversation:', error);
+      Auth.showError('Failed to start conversation');
     }
-    this.closeModal('listing-detail-modal');
+  },
+
+  // ============================================================
+  // MARKETPLACE MESSAGING
+  // ============================================================
+
+  /**
+   * Load all marketplace conversations
+   */
+  async loadConversations() {
+    const list = document.getElementById('conversations-list');
+    if (!list) return;
+
+    list.innerHTML = '<div class="listings-loading">Loading conversations...</div>';
+
+    try {
+      const response = await Auth.apiRequest('/api/marketplace/messages/conversations');
+
+      if (response.ok) {
+        this.conversations = await response.json();
+        this.renderConversations();
+      } else {
+        this.conversations = [];
+        this.renderConversations();
+      }
+    } catch (error) {
+      console.error('[Marketplace] Error loading conversations:', error);
+      this.conversations = [];
+      this.renderConversations();
+    }
+  },
+
+  /**
+   * Render conversations list
+   */
+  renderConversations() {
+    const list = document.getElementById('conversations-list');
+    if (!list) return;
+
+    if (this.conversations.length === 0) {
+      list.innerHTML = `
+        <div class="conversations-empty">
+          <div class="empty-icon">💬</div>
+          <p>No messages yet</p>
+          <span>Start a conversation by messaging a seller</span>
+        </div>
+      `;
+      return;
+    }
+
+    list.innerHTML = this.conversations.map(conv => {
+      // Backend returns other_user_name, other_user_picture, unread_count
+      const otherName = conv.other_user_name || 'User';
+      const otherPicture = conv.other_user_picture;
+      const avatar = otherPicture || Utils.getDefaultAvatar(otherName);
+      const unreadCount = conv.unread_count || 0;
+      const timeAgo = Utils.formatTime(conv.last_message_at);
+      const lastMessage = conv.last_message || '';
+      const truncatedMessage = lastMessage.length > 50 ? lastMessage.substring(0, 50) + '...' : lastMessage;
+
+      return `
+        <div class="conversation-item ${unreadCount > 0 ? 'unread' : ''}" data-id="${conv.id}">
+          <img src="${avatar}" alt="" class="conversation-avatar" onerror="this.src='${Utils.getDefaultAvatar(otherName)}'">
+          <div class="conversation-info">
+            <div class="conversation-header">
+              <span class="conversation-name">${this.escapeHtml(otherName)}</span>
+              <span class="conversation-time">${timeAgo}</span>
+            </div>
+            <div class="conversation-listing">${this.escapeHtml(conv.listing_title)}</div>
+            <div class="conversation-preview">${this.escapeHtml(truncatedMessage)}</div>
+          </div>
+          ${unreadCount > 0 ? `<span class="conversation-badge">${unreadCount}</span>` : ''}
+        </div>
+      `;
+    }).join('');
+
+    // Add click handlers
+    list.querySelectorAll('.conversation-item').forEach(item => {
+      item.addEventListener('click', () => {
+        const conversationId = parseInt(item.dataset.id);
+        this.openConversation(conversationId);
+      });
+    });
+  },
+
+  /**
+   * Open a specific conversation
+   */
+  async openConversation(conversationId) {
+    const conversation = this.conversations.find(c => c.id === conversationId);
+    if (!conversation) return;
+
+    this.currentConversation = conversation;
+
+    // Show chat view, hide list
+    document.getElementById('conversations-list')?.classList.add('hidden');
+    const chatView = document.getElementById('marketplace-chat');
+    if (chatView) chatView.style.display = 'flex';
+
+    // Update chat header - backend returns other_user_name, other_user_picture
+    const otherName = conversation.other_user_name || 'User';
+    const otherPicture = conversation.other_user_picture;
+
+    document.getElementById('chat-other-avatar').src = otherPicture || Utils.getDefaultAvatar(otherName);
+    document.getElementById('chat-other-name').textContent = otherName;
+    document.getElementById('chat-listing-title').textContent = conversation.listing_title;
+
+    // Load messages
+    await this.loadMessages(conversationId);
+
+    // Start polling for new messages
+    this.startChatPolling(conversationId);
+  },
+
+  /**
+   * Load messages for a conversation
+   */
+  async loadMessages(conversationId) {
+    try {
+      const response = await Auth.apiRequest(`/api/marketplace/messages/conversations/${conversationId}`);
+
+      if (response.ok) {
+        // Backend returns array directly, not wrapped in { messages: [...] }
+        const data = await response.json();
+        this.chatMessages = Array.isArray(data) ? data : (data.messages || []);
+        this.renderMessages();
+      }
+    } catch (error) {
+      console.error('[Marketplace] Error loading messages:', error);
+    }
+  },
+
+  /**
+   * Render chat messages
+   */
+  renderMessages() {
+    const container = document.getElementById('chat-messages');
+    if (!container) return;
+
+    const currentUserId = window.Profile?.profile?.id;
+
+    if (this.chatMessages.length === 0) {
+      container.innerHTML = `
+        <div class="chat-empty">
+          <p>No messages yet. Start the conversation!</p>
+        </div>
+      `;
+      return;
+    }
+
+    container.innerHTML = this.chatMessages.map(message => {
+      const isMine = message.sender_id === currentUserId;
+      const timeAgo = Utils.formatTime(message.created_at);
+
+      return `
+        <div class="chat-message ${isMine ? 'sent' : 'received'}">
+          <div class="message-bubble">${this.escapeHtml(message.content)}</div>
+          <div class="message-time">${timeAgo}</div>
+        </div>
+      `;
+    }).join('');
+
+    // Scroll to bottom
+    container.scrollTop = container.scrollHeight;
+  },
+
+  /**
+   * Send a chat message
+   */
+  async sendChatMessage() {
+    if (!this.currentConversation) return;
+
+    const input = document.getElementById('chat-message-input');
+    const content = input?.value?.trim();
+
+    if (!content) return;
+
+    try {
+      const response = await Auth.apiRequest(`/api/marketplace/messages/conversations/${this.currentConversation.id}`, {
+        method: 'POST',
+        body: JSON.stringify({ content })
+      });
+
+      if (response.ok) {
+        input.value = '';
+        // Reload messages to show the new one
+        await this.loadMessages(this.currentConversation.id);
+      } else {
+        const error = await response.json();
+        Auth.showError(error.detail || 'Failed to send message');
+      }
+    } catch (error) {
+      console.error('[Marketplace] Error sending message:', error);
+      Auth.showError('Failed to send message');
+    }
+  },
+
+  /**
+   * Go back to conversations list
+   */
+  backToConversations() {
+    this.stopChatPolling();
+    this.currentConversation = null;
+
+    const chatView = document.getElementById('marketplace-chat');
+    if (chatView) chatView.style.display = 'none';
+    document.getElementById('conversations-list')?.classList.remove('hidden');
+
+    // Reload conversations to update unread counts
+    this.loadConversations();
+  },
+
+  /**
+   * Start polling for new messages
+   */
+  startChatPolling(conversationId) {
+    this.stopChatPolling();
+    this.chatPollingInterval = setInterval(() => {
+      if (this.currentConversation?.id === conversationId) {
+        this.loadMessages(conversationId);
+      }
+    }, 5000);
+  },
+
+  /**
+   * Stop polling for messages
+   */
+  stopChatPolling() {
+    if (this.chatPollingInterval) {
+      clearInterval(this.chatPollingInterval);
+      this.chatPollingInterval = null;
+    }
+  },
+
+  /**
+   * Load unread message count and update badge
+   */
+  async loadUnreadCount() {
+    try {
+      const response = await Auth.apiRequest('/api/marketplace/messages/unread-count');
+      if (response.ok) {
+        const data = await response.json();
+        this.unreadMessageCount = data.count || 0;
+        this.updateMessagesBadge();
+      }
+    } catch (error) {
+      console.error('[Marketplace] Error loading unread count:', error);
+    }
+  },
+
+  /**
+   * Update the messages tab badge
+   */
+  updateMessagesBadge() {
+    const badge = document.getElementById('marketplace-msg-badge');
+    if (badge) {
+      if (this.unreadMessageCount > 0) {
+        badge.textContent = this.unreadMessageCount > 99 ? '99+' : this.unreadMessageCount;
+        badge.style.display = 'inline-flex';
+      } else {
+        badge.style.display = 'none';
+      }
+    }
   },
 
   /**

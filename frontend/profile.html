@@ -352,6 +352,7 @@
             <button class="marketplace-tab active" data-section="browse">Browse</button>
             <button class="marketplace-tab" data-section="my-listings">My Listings</button>
             <button class="marketplace-tab" data-section="my-offers">My Offers</button>
+            <button class="marketplace-tab" data-section="messages">Messages <span class="marketplace-msg-badge" id="marketplace-msg-badge"></span></button>
           </div>
           <button class="create-listing-btn" id="create-listing-btn">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -450,6 +451,45 @@
               <div class="empty-icon">📨</div>
               <p>No offers yet</p>
               <span>Offers you receive or send will appear here</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Messages Section -->
+        <div class="marketplace-section" id="marketplace-messages">
+          <div class="marketplace-messages-container">
+            <!-- Conversations List -->
+            <div class="conversations-list" id="conversations-list">
+              <div class="conversations-empty" id="conversations-empty">
+                <div class="empty-icon">💬</div>
+                <p>No conversations yet</p>
+                <span>Message sellers about listings to start a conversation</span>
+              </div>
+            </div>
+            <!-- Chat View -->
+            <div class="marketplace-chat" id="marketplace-chat" style="display: none;">
+              <div class="chat-header">
+                <button class="chat-back-btn" id="chat-back-btn">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M19 12H5M12 19l-7-7 7-7"/>
+                  </svg>
+                </button>
+                <img src="" alt="" class="chat-avatar" id="chat-other-avatar">
+                <div class="chat-info">
+                  <span class="chat-name" id="chat-other-name"></span>
+                  <span class="chat-listing" id="chat-listing-title"></span>
+                </div>
+              </div>
+              <div class="chat-messages" id="chat-messages"></div>
+              <div class="chat-input">
+                <input type="text" id="chat-message-input" placeholder="Type a message..." maxlength="2000">
+                <button class="chat-send-btn" id="chat-send-btn">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="22" y1="2" x2="11" y2="13"/>
+                    <polygon points="22 2 15 22 11 13 2 9 22 2"/>
+                  </svg>
+                </button>
+              </div>
             </div>
           </div>
         </div>

@@ -1720,3 +1720,338 @@ async def get_user_ratings(
         raise
     except Exception as error:
         raise HTTPException(status_code=500, detail=f"Error fetching ratings: {str(error)}")
+
+
+# --- Marketplace Messages ---
+
+class MarketplaceMessageResponse(BaseModel):
+    """Message in a marketplace conversation"""
+    id: int
+    sender_id: int
+    sender_name: Optional[str] = None
+    sender_picture: Optional[str] = None
+    content: str
+    is_mine: bool
+    created_at: str
+
+
+class MarketplaceConversationResponse(BaseModel):
+    """Marketplace conversation about a listing"""
+    id: int
+    listing_id: int
+    listing_title: str
+    listing_cover: Optional[str] = None
+    other_user_id: int
+    other_user_name: Optional[str] = None
+    other_user_picture: Optional[str] = None
+    is_seller: bool
+    last_message: Optional[str] = None
+    last_message_at: Optional[str] = None
+    unread_count: int = 0
+    created_at: str
+
+
+class StartConversationRequest(BaseModel):
+    """Start a conversation about a listing"""
+    listing_id: int
+    message: str = Field(..., min_length=1, max_length=2000)
+
+
+class SendMessageRequest(BaseModel):
+    """Send a message in a conversation"""
+    content: str = Field(..., min_length=1, max_length=2000)
+
+
+@router.get("/messages/conversations")
+async def get_marketplace_conversations(
+    request: Request,
+    user_id: int = Depends(require_auth)
+) -> list[MarketplaceConversationResponse]:
+    """Get all marketplace conversations for the user."""
+    env = request.scope["env"]
+
+    try:
+        result = await env.DB.prepare(
+            """SELECT c.*,
+                      l.title as listing_title,
+                      (SELECT cover FROM collections WHERE id = l.collection_id) as listing_cover,
+                      buyer.name as buyer_name, buyer.picture as buyer_picture,
+                      seller.name as seller_name, seller.picture as seller_picture,
+                      (SELECT content FROM marketplace_messages WHERE conversation_id = c.id ORDER BY created_at DESC LIMIT 1) as last_message
+               FROM marketplace_conversations c
+               JOIN listings l ON c.listing_id = l.id
+               JOIN users buyer ON c.buyer_id = buyer.id
+               JOIN users seller ON c.seller_id = seller.id
+               WHERE c.buyer_id = ? OR c.seller_id = ?
+               ORDER BY c.last_message_at DESC"""
+        ).bind(user_id, user_id).all()
+        rows = convert_rows(result)
+
+        conversations = []
+        for row in rows:
+            is_seller = row["seller_id"] == user_id
+            other_user_id = row["buyer_id"] if is_seller else row["seller_id"]
+            other_user_name = row["buyer_name"] if is_seller else row["seller_name"]
+            other_user_picture = row["buyer_picture"] if is_seller else row["seller_picture"]
+            unread_count = row["seller_unread_count"] if is_seller else row["buyer_unread_count"]
+
+            conversations.append(MarketplaceConversationResponse(
+                id=row["id"],
+                listing_id=row["listing_id"],
+                listing_title=row["listing_title"],
+                listing_cover=to_python_value(row.get("listing_cover")),
+                other_user_id=other_user_id,
+                other_user_name=to_python_value(other_user_name),
+                other_user_picture=to_python_value(other_user_picture),
+                is_seller=is_seller,
+                last_message=to_python_value(row.get("last_message")),
+                last_message_at=str(row["last_message_at"]) if row.get("last_message_at") else None,
+                unread_count=to_python_value(unread_count, 0),
+                created_at=str(row["created_at"])
+            ))
+
+        return conversations
+
+    except Exception as error:
+        raise HTTPException(status_code=500, detail=f"Error fetching conversations: {str(error)}")
+
+
+@router.post("/messages/conversations")
+async def start_marketplace_conversation(
+    request: Request,
+    body: StartConversationRequest,
+    user_id: int = Depends(require_csrf)
+) -> MarketplaceConversationResponse:
+    """Start a new conversation about a listing."""
+    env = request.scope["env"]
+
+    try:
+        # Get listing info
+        listing = await env.DB.prepare(
+            """SELECT l.id, l.user_id as seller_id, l.title,
+                      (SELECT cover FROM collections WHERE id = l.collection_id) as listing_cover,
+                      u.name as seller_name, u.picture as seller_picture
+               FROM listings l
+               JOIN users u ON l.user_id = u.id
+               WHERE l.id = ?"""
+        ).bind(body.listing_id).first()
+        listing = convert_row(listing)
+
+        if not listing:
+            raise HTTPException(status_code=404, detail="Listing not found")
+
+        seller_id = listing["seller_id"]
+
+        if seller_id == user_id:
+            raise HTTPException(status_code=400, detail="Cannot message yourself")
+
+        # Check if conversation already exists
+        existing = await env.DB.prepare(
+            "SELECT id FROM marketplace_conversations WHERE listing_id = ? AND buyer_id = ?"
+        ).bind(body.listing_id, user_id).first()
+        existing = convert_row(existing)
+
+        if existing:
+            # Add message to existing conversation
+            conversation_id = existing["id"]
+            await env.DB.prepare(
+                "INSERT INTO marketplace_messages (conversation_id, sender_id, content) VALUES (?, ?, ?)"
+            ).bind(conversation_id, user_id, body.message).run()
+
+            # Update conversation
+            await env.DB.prepare(
+                "UPDATE marketplace_conversations SET last_message_at = CURRENT_TIMESTAMP, seller_unread_count = seller_unread_count + 1 WHERE id = ?"
+            ).bind(conversation_id).run()
+        else:
+            # Create new conversation
+            result = await env.DB.prepare(
+                "INSERT INTO marketplace_conversations (listing_id, buyer_id, seller_id, seller_unread_count) VALUES (?, ?, ?, 1) RETURNING id, created_at, last_message_at"
+            ).bind(body.listing_id, user_id, seller_id).first()
+            result = convert_row(result)
+            conversation_id = result["id"]
+
+            # Add first message
+            await env.DB.prepare(
+                "INSERT INTO marketplace_messages (conversation_id, sender_id, content) VALUES (?, ?, ?)"
+            ).bind(conversation_id, user_id, body.message).run()
+
+        # Get buyer info
+        buyer = await env.DB.prepare(
+            "SELECT name, picture FROM users WHERE id = ?"
+        ).bind(user_id).first()
+        buyer = convert_row(buyer)
+
+        return MarketplaceConversationResponse(
+            id=conversation_id,
+            listing_id=body.listing_id,
+            listing_title=listing["title"],
+            listing_cover=to_python_value(listing.get("listing_cover")),
+            other_user_id=seller_id,
+            other_user_name=to_python_value(listing.get("seller_name")),
+            other_user_picture=to_python_value(listing.get("seller_picture")),
+            is_seller=False,
+            last_message=body.message,
+            last_message_at=datetime.now().isoformat(),
+            unread_count=0,
+            created_at=datetime.now().isoformat()
+        )
+
+    except HTTPException:
+        raise
+    except Exception as error:
+        raise HTTPException(status_code=500, detail=f"Error starting conversation: {str(error)}")
+
+
+@router.get("/messages/conversations/{conversation_id}")
+async def get_marketplace_messages(
+    request: Request,
+    conversation_id: int,
+    user_id: int = Depends(require_auth)
+) -> list[MarketplaceMessageResponse]:
+    """Get messages in a conversation."""
+    env = request.scope["env"]
+
+    try:
+        # Verify user is part of this conversation
+        conv = await env.DB.prepare(
+            "SELECT buyer_id, seller_id FROM marketplace_conversations WHERE id = ?"
+        ).bind(conversation_id).first()
+        conv = convert_row(conv)
+
+        if not conv:
+            raise HTTPException(status_code=404, detail="Conversation not found")
+
+        if conv["buyer_id"] != user_id and conv["seller_id"] != user_id:
+            raise HTTPException(status_code=403, detail="Not authorized")
+
+        is_seller = conv["seller_id"] == user_id
+
+        # Mark messages as read
+        if is_seller:
+            await env.DB.prepare(
+                "UPDATE marketplace_conversations SET seller_unread_count = 0 WHERE id = ?"
+            ).bind(conversation_id).run()
+        else:
+            await env.DB.prepare(
+                "UPDATE marketplace_conversations SET buyer_unread_count = 0 WHERE id = ?"
+            ).bind(conversation_id).run()
+
+        await env.DB.prepare(
+            "UPDATE marketplace_messages SET is_read = 1 WHERE conversation_id = ? AND sender_id != ?"
+        ).bind(conversation_id, user_id).run()
+
+        # Get messages
+        result = await env.DB.prepare(
+            """SELECT m.*, u.name as sender_name, u.picture as sender_picture
+               FROM marketplace_messages m
+               JOIN users u ON m.sender_id = u.id
+               WHERE m.conversation_id = ?
+               ORDER BY m.created_at ASC"""
+        ).bind(conversation_id).all()
+        rows = convert_rows(result)
+
+        return [
+            MarketplaceMessageResponse(
+                id=row["id"],
+                sender_id=row["sender_id"],
+                sender_name=to_python_value(row.get("sender_name")),
+                sender_picture=to_python_value(row.get("sender_picture")),
+                content=row["content"],
+                is_mine=row["sender_id"] == user_id,
+                created_at=str(row["created_at"])
+            )
+            for row in rows
+        ]
+
+    except HTTPException:
+        raise
+    except Exception as error:
+        raise HTTPException(status_code=500, detail=f"Error fetching messages: {str(error)}")
+
+
+@router.post("/messages/conversations/{conversation_id}")
+async def send_marketplace_message(
+    request: Request,
+    conversation_id: int,
+    body: SendMessageRequest,
+    user_id: int = Depends(require_csrf)
+) -> MarketplaceMessageResponse:
+    """Send a message in a conversation."""
+    env = request.scope["env"]
+
+    try:
+        # Verify user is part of this conversation
+        conv = await env.DB.prepare(
+            "SELECT buyer_id, seller_id FROM marketplace_conversations WHERE id = ?"
+        ).bind(conversation_id).first()
+        conv = convert_row(conv)
+
+        if not conv:
+            raise HTTPException(status_code=404, detail="Conversation not found")
+
+        if conv["buyer_id"] != user_id and conv["seller_id"] != user_id:
+            raise HTTPException(status_code=403, detail="Not authorized")
+
+        is_sender_seller = conv["seller_id"] == user_id
+
+        # Insert message
+        result = await env.DB.prepare(
+            "INSERT INTO marketplace_messages (conversation_id, sender_id, content) VALUES (?, ?, ?) RETURNING id, created_at"
+        ).bind(conversation_id, user_id, body.content).first()
+        result = convert_row(result)
+
+        # Update conversation timestamp and unread count
+        if is_sender_seller:
+            await env.DB.prepare(
+                "UPDATE marketplace_conversations SET last_message_at = CURRENT_TIMESTAMP, buyer_unread_count = buyer_unread_count + 1 WHERE id = ?"
+            ).bind(conversation_id).run()
+        else:
+            await env.DB.prepare(
+                "UPDATE marketplace_conversations SET last_message_at = CURRENT_TIMESTAMP, seller_unread_count = seller_unread_count + 1 WHERE id = ?"
+            ).bind(conversation_id).run()
+
+        # Get sender info
+        sender = await env.DB.prepare(
+            "SELECT name, picture FROM users WHERE id = ?"
+        ).bind(user_id).first()
+        sender = convert_row(sender)
+
+        return MarketplaceMessageResponse(
+            id=result["id"],
+            sender_id=user_id,
+            sender_name=to_python_value(sender.get("name")),
+            sender_picture=to_python_value(sender.get("picture")),
+            content=body.content,
+            is_mine=True,
+            created_at=str(result["created_at"])
+        )
+
+    except HTTPException:
+        raise
+    except Exception as error:
+        raise HTTPException(status_code=500, detail=f"Error sending message: {str(error)}")
+
+
+@router.get("/messages/unread-count")
+async def get_marketplace_unread_count(
+    request: Request,
+    user_id: int = Depends(require_auth)
+) -> dict:
+    """Get total unread marketplace message count."""
+    env = request.scope["env"]
+
+    try:
+        # Sum unread counts where user is buyer or seller
+        result = await env.DB.prepare(
+            """SELECT
+                COALESCE(SUM(CASE WHEN buyer_id = ? THEN buyer_unread_count ELSE 0 END), 0) +
+                COALESCE(SUM(CASE WHEN seller_id = ? THEN seller_unread_count ELSE 0 END), 0) as total
+               FROM marketplace_conversations
+               WHERE buyer_id = ? OR seller_id = ?"""
+        ).bind(user_id, user_id, user_id, user_id).first()
+        result = convert_row(result)
+
+        return {"count": to_python_value(result.get("total"), 0) if result else 0}
+
+    except Exception as error:
+        raise HTTPException(status_code=500, detail=f"Error fetching unread count: {str(error)}")
