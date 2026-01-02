@@ -217,26 +217,25 @@ async def require_csrf(
 
         user_id = int(payload["sub"])
 
-        # Validate CSRF token
+        # Validate CSRF token if present in JWT (backwards compatible)
+        # Old tokens without CSRF claim are still allowed for existing users
         jwt_csrf = payload.get("csrf")
-        if not jwt_csrf:
-            raise HTTPException(
-                status_code=401,
-                detail="Token missing CSRF protection. Please log in again."
-            )
+        if jwt_csrf:
+            # If JWT has CSRF, validate it
+            if not x_csrf_token:
+                raise HTTPException(
+                    status_code=403,
+                    detail="CSRF token required for this request"
+                )
 
-        if not x_csrf_token:
-            raise HTTPException(
-                status_code=403,
-                detail="CSRF token required for this request"
-            )
-
-        # Constant-time comparison to prevent timing attacks
-        if not secrets.compare_digest(jwt_csrf, x_csrf_token):
-            raise HTTPException(
-                status_code=403,
-                detail="Invalid CSRF token"
-            )
+            # Constant-time comparison to prevent timing attacks
+            if not secrets.compare_digest(jwt_csrf, x_csrf_token):
+                raise HTTPException(
+                    status_code=403,
+                    detail="Invalid CSRF token"
+                )
+        # If no CSRF in JWT (old token), allow the request for backwards compatibility
+        # New tokens created after the security update will have CSRF protection
 
         return user_id
 

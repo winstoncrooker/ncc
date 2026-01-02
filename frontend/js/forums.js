@@ -1212,6 +1212,18 @@ const Forums = {
         } else {
           categorySelect.innerHTML = '<option value="">Select category...</option>' +
             categories.map(c => `<option value="${c.slug}" data-id="${c.id}">${c.icon} ${c.name}</option>`).join('');
+
+          // Auto-select current category if viewing a specific category (not "All Posts")
+          if (this.currentCategory) {
+            const matchingOption = Array.from(categorySelect.options).find(
+              opt => opt.value === this.currentCategory
+            );
+            if (matchingOption) {
+              categorySelect.value = this.currentCategory;
+              // Also load groups for this category
+              this.loadGroupsForCategory(this.currentCategory);
+            }
+          }
         }
       }
     } catch (error) {
