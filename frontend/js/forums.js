@@ -158,10 +158,10 @@ const Forums = {
     const aiToggleBtn = document.getElementById('ai-toggle-btn');
     const aiSidebar = document.getElementById('ai-sidebar');
     if (aiToggleBtn) {
-      aiToggleBtn.style.display = tab === 'forums' ? 'none' : 'flex';
+      aiToggleBtn.style.display = (tab === 'forums' || tab === 'marketplace') ? 'none' : 'flex';
     }
-    // Close AI sidebar if open when switching to forums
-    if (tab === 'forums' && aiSidebar && aiSidebar.classList.contains('open')) {
+    // Close AI sidebar if open when switching away from profile
+    if (tab !== 'profile' && aiSidebar && aiSidebar.classList.contains('open')) {
       aiSidebar.classList.remove('open');
     }
 
@@ -172,6 +172,14 @@ const Forums = {
       this.currentGroupId = null;
       this.loadFeed(true);
       this.loadMyGroups();
+      // Load trending data
+      this.loadTrendingPosts();
+      this.loadFeaturedCollectors();
+    }
+
+    // Load marketplace data if switching to marketplace
+    if (tab === 'marketplace' && typeof MarketplaceModule !== 'undefined') {
+      MarketplaceModule.onTabActivated();
     }
 
     // Reset accent color when switching back to Profile
@@ -185,7 +193,7 @@ const Forums = {
    */
   restoreSavedTab() {
     const savedTab = localStorage.getItem('ncc_active_tab');
-    if (savedTab && (savedTab === 'profile' || savedTab === 'forums')) {
+    if (savedTab && (savedTab === 'profile' || savedTab === 'forums' || savedTab === 'marketplace')) {
       this.switchMainTab(savedTab);
     }
   },
@@ -205,6 +213,32 @@ const Forums = {
   },
 
   /**
+   * Show skeleton loaders for forum feed
+   */
+  showFeedSkeletons(count = 3) {
+    const feedContent = document.getElementById('feed-content');
+    if (!feedContent) return;
+
+    let html = '';
+    for (let i = 0; i < count; i++) {
+      html += `
+        <div class="skeleton-post">
+          <div class="skeleton-post-header">
+            <div class="skeleton skeleton-post-avatar"></div>
+            <div class="skeleton-post-meta">
+              <div class="skeleton skeleton-post-author"></div>
+              <div class="skeleton skeleton-post-date"></div>
+            </div>
+          </div>
+          <div class="skeleton skeleton-post-title"></div>
+          <div class="skeleton skeleton-post-body"></div>
+        </div>
+      `;
+    }
+    feedContent.innerHTML = html;
+  },
+
+  /**
    * Load feed posts
    */
   async loadFeed(reset = false) {
@@ -215,6 +249,8 @@ const Forums = {
       this.posts = [];
       this.cursor = null;
       this.hasMore = false;
+      // Show skeletons on reset
+      this.showFeedSkeletons(3);
     }
 
     const feedContent = document.getElementById('feed-content');
@@ -382,6 +418,12 @@ const Forums = {
             <button class="post-action ${saveClass}" onclick="event.stopPropagation(); Forums.toggleSave(${post.id})">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="${post.is_saved ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2">
                 <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/>
+              </svg>
+            </button>
+            <button class="post-action report-btn" onclick="event.stopPropagation(); Forums.showReportModal('post', ${post.id})" title="Report this post">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/>
+                <line x1="4" y1="22" x2="4" y2="15"/>
               </svg>
             </button>
           </div>
@@ -637,7 +679,7 @@ const Forums = {
           ${post.images && post.images.length > 0 ? `
             <div class="post-images">
               ${post.images.map(url => `
-                <a href="${url}" target="_blank" class="post-image-link">
+                <a href="${url}" target="_blank" rel="noopener noreferrer" class="post-image-link">
                   <img src="${url}" alt="Post image" loading="lazy">
                 </a>
               `).join('')}
@@ -795,7 +837,7 @@ const Forums = {
       // Render comment images if any
       const commentImages = comment.images && comment.images.length > 0
         ? `<div class="comment-images">${comment.images.map(url => `
-            <a href="${url}" target="_blank" class="comment-image-link">
+            <a href="${url}" target="_blank" rel="noopener noreferrer" class="comment-image-link">
               <img src="${url}" alt="Comment image" loading="lazy">
             </a>
           `).join('')}</div>`
@@ -825,6 +867,7 @@ const Forums = {
             </button>
             ${depth < 2 ? `<button class="reply-btn" onclick="event.stopPropagation(); Forums.showReplyForm(${comment.id})">Reply</button>` : ''}
             ${isOwner ? `<button class="delete-btn" onclick="event.stopPropagation(); Forums.deleteComment(${comment.id})">Delete</button>` : ''}
+            <button class="report-btn" onclick="event.stopPropagation(); Forums.showReportModal('comment', ${comment.id})" title="Report this comment">Report</button>
           </div>
           <div class="reply-form" id="reply-form-${comment.id}" style="display:none">
             <textarea placeholder="Reply..." rows="2"></textarea>
@@ -1507,17 +1550,19 @@ const Forums = {
 
   /**
    * Apply category-specific color scheme (mirrors Profile.applyCategoryColor)
+   * Uses same colors as ProfileUI.categoryColors for consistency
    */
   applyCategoryColor(categorySlug) {
     const categoryColors = {
-      'vinyl': '#1db954',         // Spotify green
-      'trading-cards': '#ff6b35', // Orange
-      'cars': '#e63946',          // Red
-      'sneakers': '#7b2cbf',      // Purple
-      'watches': '#2a9d8f',       // Teal
-      'comics': '#f77f00',        // Amber
-      'video-games': '#4361ee',   // Blue
-      'coins': '#d4a373'          // Gold
+      'vinyl': '#1db954',           // green
+      'vinyl-records': '#1db954',   // alias for vinyl
+      'cars': '#e74c3c',            // red
+      'coins': '#f39c12',           // gold
+      'comics': '#9b59b6',          // purple
+      'sneakers': '#3498db',        // blue
+      'trading-cards': '#e67e22',   // orange
+      'video-games': '#2ecc71',     // green
+      'watches': '#1abc9c'          // teal
     };
 
     const color = categorySlug ? (categoryColors[categorySlug] || '#1db954') : '#1db954';
@@ -1997,6 +2042,248 @@ const Forums = {
     return text.substring(0, maxLength).trim() + '...';
   },
 
+  escapeHtml(text) {
+    if (!text) return '';
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+  },
+
+  // =============================================================================
+  // Report Functionality
+  // =============================================================================
+
+  /**
+   * Show report modal for a content item
+   */
+  showReportModal(contentType, contentId) {
+    const modal = document.getElementById('report-modal');
+    const form = document.getElementById('report-form');
+    const contentTypeInput = document.getElementById('report-content-type');
+    const contentIdInput = document.getElementById('report-content-id');
+    const reasonSelect = document.getElementById('report-reason');
+    const detailsTextarea = document.getElementById('report-details');
+    const detailsCount = document.getElementById('report-details-count');
+
+    // Reset form
+    form.reset();
+    contentTypeInput.value = contentType;
+    contentIdInput.value = contentId;
+    if (detailsCount) detailsCount.textContent = '0';
+
+    // Bind events
+    const closeBtn = document.getElementById('report-close');
+    const cancelBtn = document.getElementById('report-cancel');
+
+    closeBtn.onclick = () => this.hideReportModal();
+    cancelBtn.onclick = () => this.hideReportModal();
+
+    // Character count for details
+    detailsTextarea.oninput = () => {
+      if (detailsCount) {
+        detailsCount.textContent = detailsTextarea.value.length;
+      }
+    };
+
+    // Form submission
+    form.onsubmit = (e) => this.submitReport(e);
+
+    // Show modal
+    modal.classList.add('open');
+  },
+
+  /**
+   * Hide report modal
+   */
+  hideReportModal() {
+    const modal = document.getElementById('report-modal');
+    modal.classList.remove('open');
+  },
+
+  /**
+   * Submit a report
+   */
+  async submitReport(e) {
+    e.preventDefault();
+
+    const contentType = document.getElementById('report-content-type').value;
+    const contentId = parseInt(document.getElementById('report-content-id').value);
+    const reason = document.getElementById('report-reason').value;
+    const details = document.getElementById('report-details').value.trim();
+
+    if (!reason) {
+      Auth.showWarning('Please select a reason for your report');
+      return;
+    }
+
+    const submitBtn = e.target.querySelector('button[type="submit"]');
+    const originalText = submitBtn.textContent;
+    submitBtn.textContent = 'Submitting...';
+    submitBtn.disabled = true;
+
+    try {
+      const response = await fetch(`${API_BASE}/reports`, {
+        method: 'POST',
+        headers: {
+          ...Auth.getAuthHeaders(),
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          content_type: contentType,
+          content_id: contentId,
+          reason: reason,
+          details: details || null
+        })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.detail || 'Failed to submit report');
+      }
+
+      const data = await response.json();
+      this.hideReportModal();
+      Auth.showSuccess(data.message || 'Report submitted successfully');
+
+    } catch (error) {
+      console.error('Error submitting report:', error);
+      Auth.showError(error.message || 'Failed to submit report');
+    } finally {
+      submitBtn.textContent = originalText;
+      submitBtn.disabled = false;
+    }
+  },
+
+  // ============================================
+  // Trending Features
+  // ============================================
+
+  /**
+   * Load trending posts for sidebar
+   */
+  async loadTrendingPosts() {
+    const container = document.getElementById('trending-posts-list');
+    if (!container) return;
+
+    try {
+      const response = await fetch(`${API_BASE}/trending/posts?limit=5`, {
+        headers: Auth.getAuthHeaders()
+      });
+
+      if (!response.ok) throw new Error('Failed to load trending');
+
+      const data = await response.json();
+      this.renderTrendingPosts(data.posts || []);
+
+    } catch (error) {
+      console.error('Error loading trending posts:', error);
+      container.innerHTML = '<div class="trending-empty">No trending posts</div>';
+    }
+  },
+
+  /**
+   * Render trending posts in sidebar
+   */
+  renderTrendingPosts(posts) {
+    const container = document.getElementById('trending-posts-list');
+    if (!container) return;
+
+    if (!posts || posts.length === 0) {
+      container.innerHTML = '<div class="trending-empty">No trending posts yet</div>';
+      return;
+    }
+
+    container.innerHTML = posts.map(post => {
+      const score = post.upvote_count - post.downvote_count;
+      const scoreDisplay = score > 0 ? `+${score}` : score;
+
+      return `
+        <div class="trending-post-item" data-post-id="${post.id}" role="listitem">
+          <div class="trending-post-title">${this.escapeHtml(post.title)}</div>
+          <div class="trending-post-meta">
+            <span class="trending-post-score">${scoreDisplay} pts</span>
+            <span class="trending-post-category">${post.category_name || 'General'}</span>
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    // Add click handlers
+    container.querySelectorAll('.trending-post-item').forEach(item => {
+      item.addEventListener('click', () => {
+        const postId = parseInt(item.dataset.postId);
+        if (postId) this.showPostDetail(postId);
+      });
+    });
+  },
+
+  /**
+   * Load featured/active collectors
+   */
+  async loadFeaturedCollectors() {
+    const container = document.getElementById('featured-collectors-list');
+    if (!container) return;
+
+    try {
+      const response = await fetch(`${API_BASE}/trending/users?limit=5`, {
+        headers: Auth.getAuthHeaders()
+      });
+
+      if (!response.ok) throw new Error('Failed to load collectors');
+
+      const data = await response.json();
+      this.renderFeaturedCollectors(data.collectors || []);
+
+    } catch (error) {
+      console.error('Error loading featured collectors:', error);
+      container.innerHTML = '<div class="trending-empty">No active collectors</div>';
+    }
+  },
+
+  /**
+   * Render featured collectors in sidebar
+   */
+  renderFeaturedCollectors(collectors) {
+    const container = document.getElementById('featured-collectors-list');
+    if (!container) return;
+
+    if (!collectors || collectors.length === 0) {
+      container.innerHTML = '<div class="trending-empty">No active collectors yet</div>';
+      return;
+    }
+
+    container.innerHTML = collectors.map(collector => {
+      const initial = encodeURIComponent((collector.name || '?')[0].toUpperCase());
+      const defaultPic = `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect fill='%23333' width='100' height='100'/%3E%3Ctext x='50' y='55' text-anchor='middle' fill='%23666' font-size='40'%3E${initial}%3C/text%3E%3C/svg%3E`;
+      const picture = collector.picture || defaultPic;
+
+      return `
+        <div class="featured-collector-item" data-user-id="${collector.id}" role="listitem">
+          <img src="${picture}" alt="${this.escapeHtml(collector.name || 'Collector')}" class="featured-collector-avatar" onerror="this.src='${defaultPic}'">
+          <div class="featured-collector-info">
+            <div class="featured-collector-name">${this.escapeHtml(collector.name || 'Collector')}</div>
+            <div class="featured-collector-stats">
+              <span>${collector.post_count}</span> posts, <span>${collector.comment_count}</span> comments
+            </div>
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    // Add click handlers to view profile
+    container.querySelectorAll('.featured-collector-item').forEach(item => {
+      item.addEventListener('click', () => {
+        const userId = parseInt(item.dataset.userId);
+        if (userId && typeof Profile !== 'undefined' && Profile.viewFriendProfile) {
+          Profile.viewFriendProfile(userId);
+        }
+      });
+    });
+  },
+
+  /**
+   * Escape HTML for safe rendering
+   */
   escapeHtml(text) {
     if (!text) return '';
     const div = document.createElement('div');

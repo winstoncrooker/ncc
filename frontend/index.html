@@ -3,11 +3,29 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="Connect with fellow collectors, showcase your vinyl collection, and discover new records">
+  <meta name="description" content="Connect with fellow collectors, showcase your vinyl collection, and discover new records. Join a community of passionate collectors today.">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <title>Niche Collector Connector</title>
+  <title>Niche Collector Connector - Connect with Collectors Worldwide</title>
+
+  <!-- Canonical URL -->
+  <link rel="canonical" href="https://niche-collector.pages.dev/">
+
+  <!-- OpenGraph Tags -->
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Niche Collector Connector - Connect with Collectors Worldwide">
+  <meta property="og:description" content="Connect with fellow collectors, showcase your vinyl collection, and discover new records. Join a community of passionate collectors today.">
+  <meta property="og:url" content="https://niche-collector.pages.dev/">
+  <meta property="og:image" content="https://niche-collector.pages.dev/images/og-image.png">
+  <meta property="og:site_name" content="Niche Collector Connector">
+
+  <!-- Twitter Card Tags -->
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Niche Collector Connector - Connect with Collectors Worldwide">
+  <meta name="twitter:description" content="Connect with fellow collectors, showcase your vinyl collection, and discover new records. Join a community of passionate collectors today.">
+  <meta name="twitter:image" content="https://niche-collector.pages.dev/images/og-image.png">
+
   <link rel="manifest" href="/manifest.json">
   <meta name="theme-color" content="#1db954">
   <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500&family=Montserrat:wght@300;600&display=swap" rel="stylesheet">
@@ -67,10 +85,12 @@
       font-size: 0.9rem;
     }
 
-    .features h4 {
+    .features h2 {
       color: #1db954;
       margin-bottom: 15px;
       font-family: 'Orbitron', sans-serif;
+      font-size: 1rem;
+      font-weight: 500;
     }
 
     .features ul {
@@ -115,28 +135,28 @@
   </style>
 </head>
 <body>
-  <div class="vinyl-bg"></div>
+  <div class="vinyl-bg" aria-hidden="true"></div>
 
-  <div class="login-container">
-    <div class="login-card">
-      <div class="logo">🏆</div>
-      <h1 class="app-title">Niche Collector Connector</h1>
+  <main class="login-container" role="main">
+    <div class="login-card" role="region" aria-labelledby="app-title">
+      <div class="logo" aria-hidden="true">🏆</div>
+      <h1 class="app-title" id="app-title">Niche Collector Connector</h1>
       <p class="app-subtitle">Connect with collectors worldwide</p>
 
-      <div id="auth-container">
+      <div id="auth-container" role="region" aria-label="Authentication">
         <!-- Login button will be inserted here -->
       </div>
 
-      <div class="features">
-        <h4>What You Collect</h4>
-        <ul>
+      <section class="features" aria-labelledby="features-heading">
+        <h2 id="features-heading">What You Collect</h2>
+        <ul role="list">
           <li>Vinyl, cards, sneakers, watches & more</li>
           <li>Build and showcase your collection</li>
           <li>Join forums and connect with others</li>
         </ul>
-      </div>
+      </section>
     </div>
-  </div>
+  </main>
 
   <script src="js/config.js"></script>
   <script src="js/auth.js"></script>

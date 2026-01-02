@@ -5,7 +5,7 @@ User listing, analytics, and moderation for admin purposes
 
 from fastapi import APIRouter, Request, HTTPException, Depends, Query
 from pydantic import BaseModel
-from .auth import require_auth
+from .auth import require_auth, require_auth
 
 router = APIRouter()
 

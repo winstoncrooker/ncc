@@ -37,6 +37,34 @@ body {
   transition: background-color 0.3s, color 0.3s;
 }
 
+/* Global Accessibility Styles */
+*:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* Screen reader only utility class */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
 nav {
   background-color: var(--nav-bg);
   padding: 10px 20px;
@@ -60,7 +88,7 @@ nav {
 .hamburger span {
   width: 25px;
   height: 3px;
-  background: #1db954;
+  background: var(--accent);
   margin: 3px 0;
   transition: 0.3s;
   border-radius: 3px;
@@ -102,12 +130,12 @@ nav a::after {
   left: 0;
   width: 0;
   height: 2px;
-  background: #1db954;
+  background: var(--accent);
   transition: width 0.3s ease;
 }
 
 nav a:hover {
-  color: #1db954;
+  color: var(--accent);
 }
 
 nav a:hover::after {
@@ -133,7 +161,7 @@ nav a:hover::after {
     padding: 60px 20px 80px;
     gap: 20px;
     transition: right 0.3s ease;
-    border-left: 2px solid #1db954;
+    border-left: 2px solid var(--accent);
     overflow-y: auto;
     overflow-x: hidden;
     -webkit-overflow-scrolling: touch;
@@ -230,7 +258,7 @@ h1, h2, h3 {
 }
 
 .card-info h3 {
-  color: #1db954;
+  color: var(--accent);
   margin-bottom: 5px;
   font-size: 1rem;
   text-shadow: 2px 2px 4px rgba(0,0,0,0.8);
@@ -334,7 +362,7 @@ footer {
 .vinyl-info h3 {
   margin: 0 0 5px 0;
   font-size: 0.9rem;
-  color: #1db954;
+  color: var(--accent);
   font-family: 'Orbitron', sans-serif;
   text-shadow: 2px 2px 4px rgba(0,0,0,0.9);
 }
@@ -347,7 +375,7 @@ footer {
 }
 
 .vinyl-info .price {
-  color: #1db954;
+  color: var(--accent);
   font-weight: 600;
   margin-top: 3px;
 }

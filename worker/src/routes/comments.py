@@ -6,8 +6,10 @@ Nested comments with up to 3 levels of replies
 import json
 from fastapi import APIRouter, Request, HTTPException, Depends
 from pydantic import BaseModel, Field
-from .auth import require_auth
+from .auth import require_auth, require_auth
+from .blocks import get_blocked_user_ids
 from utils.conversions import to_python_value as safe_value
+from services.email import send_forum_reply_notification
 
 router = APIRouter()
 
@@ -80,18 +82,35 @@ async def get_comments(
         if not post:
             raise HTTPException(status_code=404, detail="Post not found")
 
-        # Get all comments for the post with votes
-        result = await env.DB.prepare(
-            """SELECT c.id, c.post_id, c.user_id, c.parent_comment_id, c.body, c.images,
+        # Get blocked user IDs to filter out
+        blocked_ids = await get_blocked_user_ids(env, user_id)
+
+        # Build query with optional blocked user filter
+        if blocked_ids:
+            placeholders = ",".join(["?" for _ in blocked_ids])
+            query = f"""SELECT c.id, c.post_id, c.user_id, c.parent_comment_id, c.body, c.images,
                       c.upvote_count, c.downvote_count, c.created_at,
                       u.name as author_name, u.picture as author_picture,
                       v.value as user_vote
                FROM forum_comments c
                JOIN users u ON c.user_id = u.id
                LEFT JOIN votes v ON v.comment_id = c.id AND v.user_id = ?
-               WHERE c.post_id = ?
+               WHERE c.post_id = ? AND c.user_id NOT IN ({placeholders})
                ORDER BY c.created_at ASC"""
-        ).bind(user_id, post_id).all()
+            result = await env.DB.prepare(query).bind(user_id, post_id, *blocked_ids).all()
+        else:
+            # Get all comments for the post with votes
+            result = await env.DB.prepare(
+                """SELECT c.id, c.post_id, c.user_id, c.parent_comment_id, c.body, c.images,
+                          c.upvote_count, c.downvote_count, c.created_at,
+                          u.name as author_name, u.picture as author_picture,
+                          v.value as user_vote
+                   FROM forum_comments c
+                   JOIN users u ON c.user_id = u.id
+                   LEFT JOIN votes v ON v.comment_id = c.id AND v.user_id = ?
+                   WHERE c.post_id = ?
+                   ORDER BY c.created_at ASC"""
+            ).bind(user_id, post_id).all()
 
         if hasattr(result, 'to_py'):
             result = result.to_py()
@@ -175,7 +194,7 @@ async def create_comment(
     try:
         # Verify post exists and not locked
         post = await env.DB.prepare(
-            "SELECT id, is_locked FROM forum_posts WHERE id = ?"
+            "SELECT id, is_locked, user_id, title FROM forum_posts WHERE id = ?"
         ).bind(post_id).first()
 
         if post and hasattr(post, 'to_py'):
@@ -263,6 +282,22 @@ async def create_comment(
 
         if author and hasattr(author, 'to_py'):
             author = author.to_py()
+
+        # Send email notification to post author (if not commenting on own post)
+        post_author_id = safe_value(post.get("user_id"))
+        if post_author_id and post_author_id != user_id:
+            try:
+                commenter_name = safe_value(author.get("name")) if author else "Someone"
+                post_title = safe_value(post.get("title")) or "a post"
+                await send_forum_reply_notification(
+                    env,
+                    post_author_id,
+                    commenter_name,
+                    post_title,
+                    body.body
+                )
+            except Exception:
+                pass  # Don't fail the request if email fails
 
         return CommentResponse(
             id=result["id"],

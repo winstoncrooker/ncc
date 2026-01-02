@@ -2,7 +2,7 @@
 Google OAuth2 Authentication routes
 """
 
-from fastapi import APIRouter, Request, HTTPException, Depends
+from fastapi import APIRouter, Request, HTTPException, Depends, Header
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.responses import RedirectResponse
 from pydantic import BaseModel
@@ -10,6 +10,7 @@ import jwt
 import httpx
 import urllib.parse
 import hashlib
+import secrets
 from datetime import datetime, timedelta, timezone
 
 router = APIRouter()
@@ -22,8 +23,9 @@ GOOGLE_USERINFO_URL = "https://www.googleapis.com/oauth2/v2/userinfo"
 
 
 class TokenResponse(BaseModel):
-    """JWT token response"""
+    """JWT token response with CSRF token for state-changing requests"""
     access_token: str
+    csrf_token: str  # Must be sent in X-CSRF-Token header for POST/PUT/DELETE
     token_type: str = "bearer"
     user_id: int
     email: str
@@ -43,15 +45,20 @@ class UserResponse(BaseModel):
     created_at: str | None = None
 
 
-def create_token(user_id: int, email: str, secret: str) -> str:
-    """Create JWT token"""
+def create_token(user_id: int, email: str, secret: str) -> tuple[str, str]:
+    """
+    Create JWT token with embedded CSRF token.
+    Returns tuple of (jwt_token, csrf_token).
+    """
+    csrf_token = secrets.token_urlsafe(32)
     payload = {
         "sub": str(user_id),  # Must be string for PyJWT
         "email": email,
+        "csrf": csrf_token,  # Embed CSRF token in JWT for validation
         "exp": datetime.utcnow() + timedelta(days=7),
         "iat": datetime.utcnow()
     }
-    return jwt.encode(payload, secret, algorithm="HS256")
+    return jwt.encode(payload, secret, algorithm="HS256"), csrf_token
 
 
 def hash_token(token: str) -> str:
@@ -60,7 +67,13 @@ def hash_token(token: str) -> str:
 
 
 async def is_token_blacklisted(env, token: str) -> bool:
-    """Check if a token is in the blacklist"""
+    """
+    Check if a token is in the blacklist.
+
+    SECURITY: This function is FAIL-CLOSED. If the database query fails for any reason,
+    we treat the token as blacklisted (deny access). This prevents revoked tokens from
+    being used if the database is temporarily unavailable.
+    """
     try:
         token_hash = hash_token(token)
         result = await env.DB.prepare(
@@ -77,10 +90,14 @@ async def is_token_blacklisted(env, token: str) -> bool:
         if not result:
             return False
         return True
-    except Exception:
-        # If blacklist check fails, allow the request (fail open for better UX)
-        # The token signature is still verified by JWT, so this is reasonably safe
-        return False
+    except Exception as error:
+        # FAIL-CLOSED: If we can't verify the token isn't blacklisted, deny access
+        # This is a security-critical decision - better to temporarily deny valid tokens
+        # than to allow potentially revoked tokens
+        raise HTTPException(
+            status_code=503,
+            detail="Unable to verify token status. Please try again."
+        )
 
 
 async def blacklist_token(env, token: str, user_id: int, expires_at: int) -> None:
@@ -156,6 +173,81 @@ async def require_auth(
         raise HTTPException(status_code=401, detail="Authentication required")
 
     return user_id
+
+
+async def require_csrf(
+    request: Request,
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+    x_csrf_token: str | None = Header(None, alias="X-CSRF-Token")
+) -> int:
+    """
+    Require both authentication AND CSRF token validation for state-changing requests.
+    Use this dependency for POST, PUT, DELETE endpoints.
+
+    SECURITY: The CSRF token is embedded in the JWT during login. The client must:
+    1. Store the CSRF token received during login
+    2. Send it in the X-CSRF-Token header for all state-changing requests
+    3. The token in the header must match the token embedded in the JWT
+
+    This provides defense-in-depth against CSRF attacks even if an attacker
+    manages to trick a user into making authenticated requests.
+    """
+    if not credentials:
+        raise HTTPException(status_code=401, detail="Authentication required")
+
+    env = request.scope["env"]
+    token = credentials.credentials
+
+    try:
+        # Get secret
+        secret = str(env.JWT_SECRET) if hasattr(env, 'JWT_SECRET') else None
+        if not secret:
+            raise HTTPException(status_code=500, detail="Server configuration error")
+
+        # Check if token is blacklisted
+        if await is_token_blacklisted(env, token):
+            raise HTTPException(status_code=401, detail="Token has been revoked")
+
+        # Decode the token
+        payload = jwt.decode(
+            token,
+            secret,
+            algorithms=["HS256"]
+        )
+
+        user_id = int(payload["sub"])
+
+        # Validate CSRF token
+        jwt_csrf = payload.get("csrf")
+        if not jwt_csrf:
+            raise HTTPException(
+                status_code=401,
+                detail="Token missing CSRF protection. Please log in again."
+            )
+
+        if not x_csrf_token:
+            raise HTTPException(
+                status_code=403,
+                detail="CSRF token required for this request"
+            )
+
+        # Constant-time comparison to prevent timing attacks
+        if not secrets.compare_digest(jwt_csrf, x_csrf_token):
+            raise HTTPException(
+                status_code=403,
+                detail="Invalid CSRF token"
+            )
+
+        return user_id
+
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(status_code=401, detail="Token expired")
+    except jwt.InvalidTokenError:
+        raise HTTPException(status_code=401, detail="Invalid token")
+    except HTTPException:
+        raise
+    except Exception as error:
+        raise HTTPException(status_code=500, detail="Authentication error")
 
 
 def get_redirect_uri(request: Request) -> str:
@@ -354,15 +446,16 @@ async def google_callback(request: Request, code: str = None, error: str = None,
                     else:
                         raise
 
-        # Create JWT token - must convert secret to string
+        # Create JWT token with embedded CSRF token
         jwt_secret = str(env.JWT_SECRET) if hasattr(env, 'JWT_SECRET') else None
         if not jwt_secret:
             raise HTTPException(status_code=500, detail="JWT_SECRET not configured")
-        token = create_token(user_id, email, jwt_secret)
+        token, csrf_token = create_token(user_id, email, jwt_secret)
 
-        # Redirect to frontend with token
-        # Frontend will extract token from URL and store it
-        redirect_url = f"{state}?token={token}&user_id={user_id}&email={urllib.parse.quote(email)}"
+        # Redirect to frontend with token and CSRF token
+        # Frontend will extract tokens from URL and store them
+        # CSRF token must be sent in X-CSRF-Token header for state-changing requests
+        redirect_url = f"{state}?token={token}&csrf_token={csrf_token}&user_id={user_id}&email={urllib.parse.quote(email)}"
         if name:
             redirect_url += f"&name={urllib.parse.quote(name)}"
         if picture:
@@ -440,10 +533,11 @@ async def refresh_token(
         jwt_secret = str(env.JWT_SECRET) if hasattr(env, 'JWT_SECRET') else None
         if not jwt_secret:
             raise HTTPException(status_code=500, detail="JWT_SECRET not configured")
-        token = create_token(user["id"], user["email"], jwt_secret)
+        token, csrf_token = create_token(user["id"], user["email"], jwt_secret)
 
         return TokenResponse(
             access_token=token,
+            csrf_token=csrf_token,
             user_id=user["id"],
             email=user["email"],
             name=user.get("name"),

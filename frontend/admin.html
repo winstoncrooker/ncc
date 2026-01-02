@@ -3,7 +3,13 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Admin - User List | NCC</title>
+  <meta name="description" content="Admin dashboard for Niche Collector Connector - manage users, posts, and content.">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Admin Dashboard | Niche Collector Connector</title>
+
+  <!-- Canonical URL -->
+  <link rel="canonical" href="https://niche-collector.pages.dev/admin.html">
+
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600&family=Orbitron:wght@700&display=swap" rel="stylesheet">
@@ -389,6 +395,168 @@
       flex-wrap: wrap;
     }
     .text-muted { color: rgba(255, 255, 255, 0.5); }
+
+    /* Reports badge */
+    .report-badge {
+      background: #e63946;
+      color: #fff;
+      border-radius: 10px;
+      padding: 2px 6px;
+      font-size: 0.7rem;
+      margin-left: 4px;
+    }
+    .report-badge:empty { display: none; }
+
+    /* Reports filters */
+    .reports-filters {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    .filter-select {
+      background: #252525;
+      border: 1px solid #444;
+      color: #fff;
+      padding: 8px 12px;
+      border-radius: 6px;
+      font-size: 0.9rem;
+    }
+
+    /* Report rows */
+    .report-preview {
+      max-width: 250px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      color: rgba(255,255,255,0.6);
+      font-size: 0.85rem;
+    }
+    .report-reason {
+      background: #333;
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 0.75rem;
+      text-transform: capitalize;
+    }
+    .report-status {
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 0.75rem;
+      text-transform: capitalize;
+    }
+    .report-status.pending { background: #f39c12; color: #000; }
+    .report-status.reviewed { background: #3498db; color: #fff; }
+    .report-status.actioned { background: #27ae60; color: #fff; }
+    .report-status.dismissed { background: #95a5a6; color: #fff; }
+
+    /* Modals */
+    .modal {
+      display: none;
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,0.7);
+      z-index: 1000;
+      align-items: center;
+      justify-content: center;
+    }
+    .modal.open { display: flex; }
+    .modal-content {
+      background: #1a1a1a;
+      border-radius: 12px;
+      max-width: 500px;
+      width: 90%;
+      max-height: 80vh;
+      overflow-y: auto;
+    }
+    .modal-content.modal-lg {
+      max-width: 700px;
+    }
+    .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 16px 20px;
+      border-bottom: 1px solid #333;
+    }
+    .modal-header h3 { margin: 0; font-size: 1.1rem; }
+    .modal-close {
+      background: none;
+      border: none;
+      color: #fff;
+      font-size: 1.5rem;
+      cursor: pointer;
+    }
+    .modal-body { padding: 20px; }
+    .form-group { margin-bottom: 16px; }
+    .form-group label {
+      display: block;
+      margin-bottom: 6px;
+      color: rgba(255,255,255,0.8);
+      font-size: 0.9rem;
+    }
+    .form-group select,
+    .form-group textarea {
+      width: 100%;
+      background: #252525;
+      border: 1px solid #444;
+      color: #fff;
+      padding: 10px;
+      border-radius: 6px;
+      font-size: 0.9rem;
+    }
+    .form-group textarea { resize: vertical; min-height: 80px; }
+    .modal-actions {
+      display: flex;
+      gap: 10px;
+      justify-content: flex-end;
+      margin-top: 20px;
+    }
+    .btn-cancel {
+      background: #333;
+      border: none;
+      color: #fff;
+      padding: 10px 20px;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+    .btn-danger {
+      background: #e63946;
+      border: none;
+      color: #fff;
+      padding: 10px 20px;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+    .btn-danger:hover { background: #c82333; }
+    .mod-target-info {
+      background: #252525;
+      padding: 12px;
+      border-radius: 6px;
+      margin-bottom: 16px;
+      font-size: 0.9rem;
+    }
+
+    /* User history */
+    .history-section { margin-bottom: 24px; }
+    .history-section h4 {
+      color: #1db954;
+      margin-bottom: 12px;
+      font-size: 0.9rem;
+    }
+    .history-item {
+      background: #252525;
+      padding: 12px;
+      border-radius: 6px;
+      margin-bottom: 8px;
+      font-size: 0.85rem;
+    }
+    .history-item .date { color: rgba(255,255,255,0.5); }
+    .history-item .action-type {
+      background: #333;
+      padding: 2px 6px;
+      border-radius: 4px;
+      margin-right: 8px;
+    }
   </style>
 </head>
 <body>
@@ -405,6 +573,7 @@
       <button class="tab-btn active" onclick="showTab('users', this)">Users</button>
       <button class="tab-btn" onclick="showTab('posts', this)">Posts</button>
       <button class="tab-btn" onclick="showTab('comments', this)">Comments</button>
+      <button class="tab-btn" onclick="showTab('reports', this)">Reports <span class="report-badge" id="pending-reports-badge"></span></button>
     </div>
 
     <!-- Users Tab -->
@@ -469,6 +638,76 @@
         <div class="loading">Loading comments...</div>
       </div>
     </div>
+
+    <!-- Reports Tab -->
+    <div id="reports-tab" class="tab-content">
+      <div class="reports-filters mb-16">
+        <select id="report-status-filter" class="filter-select" onchange="loadReports()">
+          <option value="">All statuses</option>
+          <option value="pending" selected>Pending</option>
+          <option value="reviewed">Reviewed</option>
+          <option value="actioned">Actioned</option>
+          <option value="dismissed">Dismissed</option>
+        </select>
+        <select id="report-type-filter" class="filter-select" onchange="loadReports()">
+          <option value="">All types</option>
+          <option value="post">Posts</option>
+          <option value="comment">Comments</option>
+          <option value="profile">Profiles</option>
+          <option value="message">Messages</option>
+        </select>
+      </div>
+      <div class="user-table" id="reports-table">
+        <div class="loading">Loading reports...</div>
+      </div>
+    </div>
+
+    <!-- Moderation Action Modal -->
+    <div class="modal" id="mod-action-modal">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3>Take Moderation Action</h3>
+          <button class="modal-close" onclick="closeModActionModal()">&times;</button>
+        </div>
+        <div class="modal-body">
+          <input type="hidden" id="mod-report-id">
+          <input type="hidden" id="mod-target-user-id">
+          <div class="mod-target-info" id="mod-target-info"></div>
+          <div class="form-group">
+            <label for="mod-action-type">Action</label>
+            <select id="mod-action-type" required>
+              <option value="">Select action...</option>
+              <option value="warn">Warn user</option>
+              <option value="hide">Hide content</option>
+              <option value="delete">Delete content</option>
+              <option value="suspend">Suspend user</option>
+              <option value="ban">Ban user</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="mod-action-reason">Reason</label>
+            <textarea id="mod-action-reason" rows="3" required placeholder="Explain the reason for this action..."></textarea>
+          </div>
+          <div class="modal-actions">
+            <button class="btn-cancel" onclick="closeModActionModal()">Cancel</button>
+            <button class="btn-danger" onclick="submitModAction()">Take Action</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- User History Modal -->
+    <div class="modal" id="user-history-modal">
+      <div class="modal-content modal-lg">
+        <div class="modal-header">
+          <h3>User Moderation History</h3>
+          <button class="modal-close" onclick="closeUserHistoryModal()">&times;</button>
+        </div>
+        <div class="modal-body" id="user-history-content">
+          <div class="loading">Loading history...</div>
+        </div>
+      </div>
+    </div>
   </div>
 
   <script src="/js/config.js"></script>
@@ -492,6 +731,8 @@
         loadPosts();
       } else if (tabName === 'comments' && commentsData.length === 0) {
         loadComments();
+      } else if (tabName === 'reports' && reportsData.length === 0) {
+        loadReports();
       }
     }
 
@@ -945,6 +1186,239 @@
       });
 
       content.innerHTML = html;
+    }
+
+    // =============================================================================
+    // Reports Functions
+    // =============================================================================
+
+    let reportsData = [];
+
+    async function loadReports() {
+      const tableEl = document.getElementById('reports-table');
+      const statusFilter = document.getElementById('report-status-filter').value;
+      const typeFilter = document.getElementById('report-type-filter').value;
+
+      tableEl.innerHTML = '<div class="loading">Loading reports...</div>';
+
+      try {
+        let url = '/api/reports/admin?limit=50';
+        if (statusFilter) url += `&status=${statusFilter}`;
+        if (typeFilter) url += `&content_type=${typeFilter}`;
+
+        const response = await Auth.apiRequest(url);
+
+        if (!response.ok) {
+          tableEl.innerHTML = '<div class="error">Failed to load reports</div>';
+          return;
+        }
+
+        const data = await response.json();
+        reportsData = data.reports;
+
+        // Update pending badge
+        const pendingCount = reportsData.filter(r => r.status === 'pending').length;
+        const badge = document.getElementById('pending-reports-badge');
+        badge.textContent = pendingCount > 0 ? pendingCount : '';
+
+        if (data.reports.length === 0) {
+          tableEl.innerHTML = '<div class="loading">No reports found</div>';
+          return;
+        }
+
+        tableEl.innerHTML = `
+          <table>
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Type</th>
+                <th>Content</th>
+                <th>Reported By</th>
+                <th>Content Author</th>
+                <th>Reason</th>
+                <th>Status</th>
+                <th>Date</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${data.reports.map(report => `
+                <tr id="report-row-${report.id}">
+                  <td class="user-id">${report.id}</td>
+                  <td><span class="report-reason">${report.content_type}</span></td>
+                  <td>
+                    <div class="report-preview">${escapeHtml(report.content_preview || 'Content unavailable')}</div>
+                  </td>
+                  <td>
+                    <div class="user-name">${escapeHtml(report.reporter_name || 'Unknown')}</div>
+                  </td>
+                  <td>
+                    <div class="user-name">${escapeHtml(report.content_author_name || 'Unknown')}</div>
+                    ${report.content_author_id ? `<button class="action-btn" onclick="showUserHistory(${report.content_author_id})">History</button>` : ''}
+                  </td>
+                  <td><span class="report-reason">${report.reason}</span></td>
+                  <td><span class="report-status ${report.status}">${report.status}</span></td>
+                  <td class="user-date">${formatDate(report.created_at)}</td>
+                  <td>
+                    ${report.status === 'pending' ? `
+                      <button class="action-btn" onclick="updateReportStatus(${report.id}, 'reviewed')">Mark Reviewed</button>
+                      <button class="action-btn" onclick="updateReportStatus(${report.id}, 'dismissed')">Dismiss</button>
+                      ${report.content_author_id ? `<button class="action-btn delete" onclick="showModActionModal(${report.id}, ${report.content_author_id}, '${escapeHtml(report.content_author_name || 'Unknown')}')">Take Action</button>` : ''}
+                    ` : `
+                      ${report.reviewed_by_name ? `<span class="text-muted">by ${escapeHtml(report.reviewed_by_name)}</span>` : ''}
+                    `}
+                  </td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        `;
+
+      } catch (error) {
+        console.error('Error loading reports:', error);
+        tableEl.innerHTML = '<div class="error">Failed to load reports</div>';
+      }
+    }
+
+    async function updateReportStatus(reportId, status) {
+      try {
+        const response = await Auth.apiRequest(`/api/reports/admin/${reportId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ status })
+        });
+
+        if (response.ok) {
+          loadReports();
+        } else {
+          alert('Failed to update report status');
+        }
+      } catch (error) {
+        console.error('Error updating report:', error);
+        alert('Failed to update report');
+      }
+    }
+
+    function showModActionModal(reportId, targetUserId, targetUserName) {
+      document.getElementById('mod-report-id').value = reportId;
+      document.getElementById('mod-target-user-id').value = targetUserId;
+      document.getElementById('mod-target-info').innerHTML = `
+        <strong>Target User:</strong> ${escapeHtml(targetUserName)} (ID: ${targetUserId})
+      `;
+      document.getElementById('mod-action-type').value = '';
+      document.getElementById('mod-action-reason').value = '';
+      document.getElementById('mod-action-modal').classList.add('open');
+    }
+
+    function closeModActionModal() {
+      document.getElementById('mod-action-modal').classList.remove('open');
+    }
+
+    async function submitModAction() {
+      const reportId = document.getElementById('mod-report-id').value;
+      const targetUserId = parseInt(document.getElementById('mod-target-user-id').value);
+      const actionType = document.getElementById('mod-action-type').value;
+      const reason = document.getElementById('mod-action-reason').value.trim();
+
+      if (!actionType) {
+        alert('Please select an action');
+        return;
+      }
+      if (!reason) {
+        alert('Please provide a reason');
+        return;
+      }
+
+      try {
+        const response = await Auth.apiRequest('/api/reports/admin/action', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            report_id: reportId ? parseInt(reportId) : null,
+            action_type: actionType,
+            target_user_id: targetUserId,
+            reason: reason
+          })
+        });
+
+        if (response.ok) {
+          closeModActionModal();
+          loadReports();
+          alert('Moderation action taken successfully');
+        } else {
+          const errorData = await response.json().catch(() => ({}));
+          alert(errorData.detail || 'Failed to take action');
+        }
+      } catch (error) {
+        console.error('Error taking moderation action:', error);
+        alert('Failed to take moderation action');
+      }
+    }
+
+    async function showUserHistory(userId) {
+      document.getElementById('user-history-modal').classList.add('open');
+      const content = document.getElementById('user-history-content');
+      content.innerHTML = '<div class="loading">Loading history...</div>';
+
+      try {
+        const response = await Auth.apiRequest(`/api/reports/admin/users/${userId}/history`);
+
+        if (!response.ok) {
+          content.innerHTML = '<div class="error">Failed to load history</div>';
+          return;
+        }
+
+        const data = await response.json();
+
+        let html = `
+          <div class="mod-target-info">
+            <strong>${escapeHtml(data.user_name || 'Unknown')}</strong>
+            ${data.user_email ? ` (${escapeHtml(data.user_email)})` : ''}
+            <br>
+            <span class="text-muted">Total reports against this user: ${data.report_count}</span>
+          </div>
+        `;
+
+        if (data.warnings.length > 0) {
+          html += `<div class="history-section">
+            <h4>Warnings (${data.warnings.length})</h4>
+            ${data.warnings.map(w => `
+              <div class="history-item">
+                <span class="action-type">${w.warning_type}</span>
+                ${escapeHtml(w.message)}
+                <div class="date">Issued by ${escapeHtml(w.issued_by_name || 'Admin')} on ${formatDate(w.created_at)}</div>
+              </div>
+            `).join('')}
+          </div>`;
+        }
+
+        if (data.actions.length > 0) {
+          html += `<div class="history-section">
+            <h4>Moderation Actions (${data.actions.length})</h4>
+            ${data.actions.map(a => `
+              <div class="history-item">
+                <span class="action-type">${a.action_type}</span>
+                ${escapeHtml(a.reason)}
+                <div class="date">By ${escapeHtml(a.moderator_name || 'Admin')} on ${formatDate(a.created_at)}</div>
+              </div>
+            `).join('')}
+          </div>`;
+        }
+
+        if (data.warnings.length === 0 && data.actions.length === 0) {
+          html += '<div class="text-muted">No moderation history for this user.</div>';
+        }
+
+        content.innerHTML = html;
+
+      } catch (error) {
+        console.error('Error loading user history:', error);
+        content.innerHTML = '<div class="error">Failed to load history</div>';
+      }
+    }
+
+    function closeUserHistoryModal() {
+      document.getElementById('user-history-modal').classList.remove('open');
     }
 
     // Load users and analytics on page load

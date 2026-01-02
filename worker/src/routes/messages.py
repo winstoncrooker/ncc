@@ -6,8 +6,10 @@ from fastapi import APIRouter, Request, HTTPException, Depends
 from pydantic import BaseModel
 from typing import Optional
 
-from routes.auth import require_auth
+from routes.auth import require_auth, require_auth
+from routes.blocks import is_blocked
 from utils.conversions import to_python_value
+from services.email import send_message_notification
 
 router = APIRouter()
 
@@ -210,6 +212,10 @@ async def send_message(
         if not recipient:
             raise HTTPException(status_code=404, detail="Recipient not found")
 
+        # Check if blocked (either direction)
+        if await is_blocked(env, user_id, body.recipient_id):
+            raise HTTPException(status_code=403, detail="Unable to send message to this user")
+
         # Check if you follow them (required to message)
         following = await env.DB.prepare(
             "SELECT id FROM friends WHERE user_id = ? AND friend_id = ?"
@@ -234,6 +240,13 @@ async def send_message(
 
         if result and hasattr(result, 'to_py'):
             result = result.to_py()
+
+        # Send email notification to recipient (non-blocking)
+        sender_name = to_python_value(sender.get("name")) if sender else "Someone"
+        try:
+            await send_message_notification(env, body.recipient_id, sender_name, body.content.strip())
+        except Exception:
+            pass  # Don't fail the request if email fails
 
         return Message(
             id=result["id"],

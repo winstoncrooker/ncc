@@ -10,7 +10,7 @@ from fastapi.responses import JSONResponse
 import asgi
 
 from routes import discogs, chat, auth, collection, profile, upload, friends, messages
-from routes import categories, interests, posts, comments, votes, category_profiles, admin, wishlist
+from routes import categories, interests, posts, comments, votes, category_profiles, admin, wishlist, search, blocks, moderation, notifications, marketplace, trending
 
 # Create FastAPI app with OpenAPI documentation
 app = FastAPI(
@@ -52,6 +52,12 @@ Authorization: Bearer <jwt_token>
         {"name": "chat", "description": "AI chat assistant"},
         {"name": "uploads", "description": "Image uploads"},
         {"name": "admin", "description": "Admin operations"},
+        {"name": "search", "description": "Global search across users, collections, and posts"},
+        {"name": "blocks", "description": "User blocking for privacy and safety"},
+        {"name": "moderation", "description": "Content moderation and reporting"},
+        {"name": "notifications", "description": "Email notification preferences"},
+        {"name": "marketplace", "description": "Buy, sell, and trade collectibles"},
+        {"name": "trending", "description": "Trending posts and featured collectors"},
     ]
 )
 
@@ -70,7 +76,7 @@ app.add_middleware(
     allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
-    allow_headers=["Authorization", "Content-Type", "Accept", "Origin", "X-Requested-With"],
+    allow_headers=["Authorization", "Content-Type", "Accept", "Origin", "X-Requested-With", "X-CSRF-Token"],
 )
 
 
@@ -87,7 +93,7 @@ def get_cors_headers(request: Request) -> dict:
     return {
         "Access-Control-Allow-Origin": get_cors_origin(request),
         "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS, PATCH",
-        "Access-Control-Allow-Headers": "Authorization, Content-Type, Accept, Origin, X-Requested-With",
+        "Access-Control-Allow-Headers": "Authorization, Content-Type, Accept, Origin, X-Requested-With, X-CSRF-Token",
         "Access-Control-Allow-Credentials": "true",
     }
 
@@ -128,6 +134,12 @@ app.include_router(votes.router, prefix="/api/votes", tags=["votes"])
 app.include_router(category_profiles.router, prefix="/api/profile", tags=["category_profiles"])
 app.include_router(admin.router, prefix="/api/admin", tags=["admin"])
 app.include_router(wishlist.router, prefix="/api/wishlist", tags=["wishlist"])
+app.include_router(search.router, prefix="/api/search", tags=["search"])
+app.include_router(blocks.router, prefix="/api/users", tags=["blocks"])
+app.include_router(moderation.router, prefix="/api/reports", tags=["moderation"])
+app.include_router(notifications.router, prefix="/api/notifications", tags=["notifications"])
+app.include_router(marketplace.router, prefix="/api/marketplace", tags=["marketplace"])
+app.include_router(trending.router, prefix="/api/trending", tags=["trending"])
 
 
 @app.get("/")

@@ -209,8 +209,6 @@ const FriendsModule = {
   async unfollowFromProfile() {
     if (!this.viewedProfile) return;
 
-    if (!confirm('Remove this friend?')) return;
-
     try {
       const response = await Auth.apiRequest(`/api/friends/${this.viewedProfile.id}`, {
         method: 'DELETE'
@@ -218,9 +216,44 @@ const FriendsModule = {
       if (response.ok) {
         this.closeModal('view-profile-modal');
         await this.loadFriends();
+        Auth.showSuccess('Friend removed');
+      } else {
+        const error = await response.json();
+        Auth.showError(error.detail || 'Failed to remove friend');
       }
     } catch (error) {
       console.error('Error unfollowing:', error);
+      Auth.showError('Failed to remove friend');
+    }
+  },
+
+  async blockFromProfile() {
+    if (!this.viewedProfile) return;
+
+    try {
+      const response = await Auth.apiRequest(`/api/users/${this.viewedProfile.id}/block`, {
+        method: 'POST'
+      });
+      if (response.ok) {
+        this.closeModal('view-profile-modal');
+        await this.loadFriends();
+        Auth.showSuccess('User blocked');
+      } else {
+        const error = await response.json();
+        Auth.showError(error.detail || 'Failed to block user');
+      }
+    } catch (error) {
+      console.error('Error blocking:', error);
+      Auth.showError('Failed to block user');
+    }
+  },
+
+  reportFromProfile() {
+    if (!this.viewedProfile) return;
+    this.closeModal('view-profile-modal');
+    // Use Forums.showReportModal if available
+    if (typeof Forums !== 'undefined' && Forums.showReportModal) {
+      Forums.showReportModal('profile', this.viewedProfile.id);
     }
   }
 };

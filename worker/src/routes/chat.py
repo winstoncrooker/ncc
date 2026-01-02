@@ -6,7 +6,7 @@ Uses ServiceNow-AI/Apriel-1.6-15b-Thinker model
 from fastapi import APIRouter, Request, HTTPException, Depends
 from pydantic import BaseModel
 from typing import Optional
-from routes.auth import require_auth
+from routes.auth import require_auth, require_auth
 import js
 from pyodide.ffi import to_js
 import re

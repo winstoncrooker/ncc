@@ -193,22 +193,15 @@ async def update_profile(
     """
     Update current user's profile.
     Requires authentication.
+    Uses atomic UPDATE with uniqueness check in WHERE clause to prevent race conditions.
     """
     env = request.scope["env"]
 
     try:
-        # Check name uniqueness if name is being updated
-        if body.name is not None and body.name.strip():
-            existing = await env.DB.prepare(
-                "SELECT id FROM users WHERE name = ? AND id != ?"
-            ).bind(body.name.strip(), user_id).first()
-
-            if existing:
-                raise HTTPException(status_code=400, detail="This name is already taken")
-
         # Build update query dynamically
         updates = []
         values = []
+        name_being_updated = body.name is not None and body.name.strip()
 
         if body.name is not None:
             updates.append("name = ?")
@@ -240,15 +233,48 @@ async def update_profile(
             values.append(body.featured_category_id if body.featured_category_id > 0 else None)
 
         if updates:
-            query = f"UPDATE users SET {', '.join(updates)} WHERE id = ?"
-            values.append(user_id)
-            await env.DB.prepare(query).bind(*values).run()
+            if name_being_updated:
+                # Use atomic UPDATE with uniqueness subquery check to prevent race conditions
+                # The NOT EXISTS check ensures no other user has this name at UPDATE time
+                query = f"""UPDATE users SET {', '.join(updates)}
+                           WHERE id = ?
+                           AND NOT EXISTS (
+                               SELECT 1 FROM users
+                               WHERE name = ? COLLATE NOCASE AND id != ?
+                           )
+                           RETURNING id"""
+                values.append(user_id)
+                values.append(body.name.strip())
+                values.append(user_id)
+
+                result = await env.DB.prepare(query).bind(*values).first()
+
+                if not result:
+                    # Either user doesn't exist or name is taken
+                    # Check which case it is
+                    user_exists = await env.DB.prepare(
+                        "SELECT id FROM users WHERE id = ?"
+                    ).bind(user_id).first()
+
+                    if not user_exists:
+                        raise HTTPException(status_code=404, detail="User not found")
+                    else:
+                        raise HTTPException(status_code=400, detail="This name is already taken")
+            else:
+                # No name update - simple update
+                query = f"UPDATE users SET {', '.join(updates)} WHERE id = ?"
+                values.append(user_id)
+                await env.DB.prepare(query).bind(*values).run()
 
         # Return updated profile
         return await get_profile(request, user_id)
     except HTTPException:
         raise
     except Exception as e:
+        # Handle unique constraint violation from the database index as a fallback
+        error_message = str(e).lower()
+        if "unique" in error_message and "name" in error_message:
+            raise HTTPException(status_code=400, detail="This name is already taken")
         raise HTTPException(status_code=500, detail=f"Error updating profile: {str(e)}")
 
 
@@ -312,7 +338,8 @@ async def add_to_showcase(
 ) -> ShowcaseAlbum:
     """
     Add album to showcase.
-    Limits showcase to 8 albums max.
+    Limits showcase to 8 albums max per category.
+    Uses INSERT ON CONFLICT to prevent race conditions with duplicate adds.
     """
     env = request.scope["env"]
 
@@ -349,37 +376,27 @@ async def add_to_showcase(
         if count and count["count"] >= 8:
             raise HTTPException(status_code=400, detail="Showcase limit reached (max 8 items per category)")
 
-        # Check if already in showcase
-        existing = await env.DB.prepare(
-            "SELECT id FROM showcase_albums WHERE user_id = ? AND collection_id = ?"
-        ).bind(user_id, body.collection_id).first()
-
-        if existing:
-            raise HTTPException(status_code=400, detail="Album already in showcase")
-
-        # Get next position
-        max_pos = await env.DB.prepare(
-            "SELECT COALESCE(MAX(position), -1) as max_pos FROM showcase_albums WHERE user_id = ?"
-        ).bind(user_id).first()
-
-        if max_pos and hasattr(max_pos, 'to_py'):
-            max_pos = max_pos.to_py()
-
-        next_pos = (max_pos["max_pos"] if max_pos else -1) + 1
-
-        # Insert into showcase
+        # Use INSERT ON CONFLICT to atomically insert or detect existing entry
+        # The UNIQUE(user_id, collection_id) constraint handles race conditions
+        # We use a subquery to calculate position atomically
         result = await env.DB.prepare(
             """INSERT INTO showcase_albums (user_id, collection_id, position)
-               VALUES (?, ?, ?) RETURNING id"""
-        ).bind(user_id, body.collection_id, next_pos).first()
+               VALUES (?, ?, (SELECT COALESCE(MAX(position), -1) + 1 FROM showcase_albums WHERE user_id = ?))
+               ON CONFLICT(user_id, collection_id) DO NOTHING
+               RETURNING id, position"""
+        ).bind(user_id, body.collection_id, user_id).first()
 
         if result and hasattr(result, 'to_py'):
             result = result.to_py()
 
+        if not result:
+            # ON CONFLICT DO NOTHING means it already exists
+            raise HTTPException(status_code=400, detail="Album already in showcase")
+
         return ShowcaseAlbum(
             id=result["id"],
             collection_id=body.collection_id,
-            position=next_pos,
+            position=result["position"],
             artist=album["artist"],
             album=album["album"],
             cover=to_python_value(album.get("cover")),
@@ -432,7 +449,7 @@ async def reorder_showcase(
     """
     Reorder showcase albums.
     Pass list of showcase album IDs in desired order.
-    Uses single SQL statement to prevent race conditions.
+    Uses single atomic SQL UPDATE with CASE WHEN to prevent race conditions.
     """
     env = request.scope["env"]
 
@@ -448,17 +465,28 @@ async def reorder_showcase(
             except (ValueError, TypeError):
                 raise HTTPException(status_code=400, detail="Invalid showcase ID")
 
-        # Update each position individually with parameterized queries
-        # This is safer than building dynamic SQL with f-strings
+        # Build a single atomic UPDATE using CASE WHEN for all positions
+        # This ensures all position updates happen in a single statement
+        case_clauses = []
         for position, showcase_id in enumerate(validated_ids):
-            await env.DB.prepare(
-                """UPDATE showcase_albums
-                   SET position = ?
-                   WHERE id = ? AND user_id = ?"""
-            ).bind(position, showcase_id, user_id).run()
+            case_clauses.append(f"WHEN id = {int(showcase_id)} THEN {position}")
+
+        case_statement = " ".join(case_clauses)
+
+        # Create the list of IDs for the IN clause (already validated as integers)
+        id_list = ", ".join(str(sid) for sid in validated_ids)
+
+        # Single atomic UPDATE that sets all positions at once
+        await env.DB.prepare(
+            f"""UPDATE showcase_albums
+               SET position = CASE {case_statement} END
+               WHERE user_id = ? AND id IN ({id_list})"""
+        ).bind(user_id).run()
 
         # Return updated showcase
         return await get_showcase(request, user_id)
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error reordering showcase: {str(e)}")
 
@@ -581,3 +609,231 @@ async def update_privacy_settings(
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error updating privacy settings: {str(e)}")
+
+
+# ============================================================================
+# Public Profile Endpoints (No authentication required)
+# ============================================================================
+
+class PublicProfileResponse(BaseModel):
+    """Public profile response - limited info based on privacy settings"""
+    id: int
+    name: Optional[str] = None
+    picture: Optional[str] = None
+    bio: Optional[str] = None
+    pronouns: Optional[str] = None
+    background_image: Optional[str] = None
+    location: Optional[str] = None
+    external_links: Optional[ExternalLinks] = None
+    member_since: Optional[str] = None
+    showcase: list[dict] = []
+    collection_count: int = 0
+    featured_category_id: Optional[int] = None
+    featured_category_name: Optional[str] = None
+    featured_category_slug: Optional[str] = None
+
+
+class PublicShowcaseItem(BaseModel):
+    """Showcase item for public profile"""
+    id: int
+    artist: str
+    album: str
+    cover: Optional[str] = None
+    year: Optional[int] = None
+    notes: Optional[str] = None
+
+
+@router.get("/public/{user_id}")
+async def get_public_profile(
+    request: Request,
+    user_id: int
+) -> PublicProfileResponse:
+    """
+    Get public profile of a user.
+    No authentication required.
+    Only returns data if user's profile_visibility is set to 'public'.
+    """
+    env = request.scope["env"]
+
+    try:
+        # Get user with privacy settings
+        user = await env.DB.prepare(
+            """SELECT id, name, picture, bio, pronouns, background_image,
+                      location, external_links, created_at, privacy_settings,
+                      featured_category_id
+               FROM users WHERE id = ?"""
+        ).bind(user_id).first()
+
+        if user and hasattr(user, 'to_py'):
+            user = user.to_py()
+
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+
+        # Check privacy settings
+        privacy = parse_privacy_settings(to_python_value(user.get("privacy_settings")))
+
+        if privacy.profile_visibility != "public":
+            raise HTTPException(
+                status_code=403,
+                detail="This profile is not public"
+            )
+
+        # Get featured category info
+        featured_category_id = to_python_value(user.get("featured_category_id"))
+        featured_category_name = None
+        featured_category_slug = None
+
+        if featured_category_id:
+            category = await env.DB.prepare(
+                "SELECT name, slug FROM categories WHERE id = ?"
+            ).bind(featured_category_id).first()
+            if category and hasattr(category, 'to_py'):
+                category = category.to_py()
+            if category:
+                featured_category_name = to_python_value(category.get("name"))
+                featured_category_slug = to_python_value(category.get("slug"))
+
+        # Get showcase if privacy allows
+        showcase = []
+        if privacy.show_showcase:
+            if featured_category_id:
+                showcase_results = await env.DB.prepare(
+                    """SELECT s.id, c.artist, c.album, c.cover, c.year, s.notes
+                       FROM showcase_albums s
+                       JOIN collections c ON s.collection_id = c.id
+                       WHERE s.user_id = ? AND c.category_id = ?
+                       ORDER BY s.position ASC
+                       LIMIT 8"""
+                ).bind(user_id, featured_category_id).all()
+            else:
+                showcase_results = await env.DB.prepare(
+                    """SELECT s.id, c.artist, c.album, c.cover, c.year, s.notes
+                       FROM showcase_albums s
+                       JOIN collections c ON s.collection_id = c.id
+                       WHERE s.user_id = ?
+                       ORDER BY s.position ASC
+                       LIMIT 8"""
+                ).bind(user_id).all()
+
+            for row in showcase_results.results:
+                if hasattr(row, 'to_py'):
+                    row = row.to_py()
+                showcase.append({
+                    "id": row["id"],
+                    "artist": row["artist"],
+                    "album": row["album"],
+                    "cover": to_python_value(row.get("cover")),
+                    "year": to_python_value(row.get("year")),
+                    "notes": to_python_value(row.get("notes"))
+                })
+
+        # Get collection count if privacy allows
+        collection_count = 0
+        if privacy.show_collection:
+            if featured_category_id:
+                count_result = await env.DB.prepare(
+                    "SELECT COUNT(*) as count FROM collections WHERE user_id = ? AND category_id = ?"
+                ).bind(user_id, featured_category_id).first()
+            else:
+                count_result = await env.DB.prepare(
+                    "SELECT COUNT(*) as count FROM collections WHERE user_id = ?"
+                ).bind(user_id).first()
+
+            if count_result and hasattr(count_result, 'to_py'):
+                count_result = count_result.to_py()
+            collection_count = count_result["count"] if count_result else 0
+
+        external_links = parse_external_links(to_python_value(user.get("external_links")))
+
+        return PublicProfileResponse(
+            id=user["id"],
+            name=to_python_value(user.get("name")),
+            picture=to_python_value(user.get("picture")),
+            bio=to_python_value(user.get("bio")),
+            pronouns=to_python_value(user.get("pronouns")),
+            background_image=to_python_value(user.get("background_image")),
+            location=to_python_value(user.get("location")),
+            external_links=external_links,
+            member_since=str(user["created_at"]) if to_python_value(user.get("created_at")) else None,
+            showcase=showcase,
+            collection_count=collection_count,
+            featured_category_id=featured_category_id,
+            featured_category_name=featured_category_name,
+            featured_category_slug=featured_category_slug
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error fetching public profile: {str(e)}")
+
+
+@router.get("/public/{user_id}/showcase")
+async def get_public_showcase(
+    request: Request,
+    user_id: int,
+    category_id: Optional[int] = None
+) -> list[dict]:
+    """
+    Get public showcase of a user.
+    No authentication required.
+    Only returns data if user's profile is public and show_showcase is true.
+    """
+    env = request.scope["env"]
+
+    try:
+        # Check privacy settings
+        user = await env.DB.prepare(
+            "SELECT privacy_settings FROM users WHERE id = ?"
+        ).bind(user_id).first()
+
+        if user and hasattr(user, 'to_py'):
+            user = user.to_py()
+
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+
+        privacy = parse_privacy_settings(to_python_value(user.get("privacy_settings")))
+
+        if privacy.profile_visibility != "public":
+            raise HTTPException(status_code=403, detail="This profile is not public")
+
+        if not privacy.show_showcase:
+            raise HTTPException(status_code=403, detail="Showcase is not public")
+
+        # Get showcase
+        if category_id:
+            results = await env.DB.prepare(
+                """SELECT s.id, c.artist, c.album, c.cover, c.year, s.notes
+                   FROM showcase_albums s
+                   JOIN collections c ON s.collection_id = c.id
+                   WHERE s.user_id = ? AND c.category_id = ?
+                   ORDER BY s.position ASC"""
+            ).bind(user_id, category_id).all()
+        else:
+            results = await env.DB.prepare(
+                """SELECT s.id, c.artist, c.album, c.cover, c.year, s.notes
+                   FROM showcase_albums s
+                   JOIN collections c ON s.collection_id = c.id
+                   WHERE s.user_id = ?
+                   ORDER BY s.position ASC"""
+            ).bind(user_id).all()
+
+        showcase = []
+        for row in results.results:
+            if hasattr(row, 'to_py'):
+                row = row.to_py()
+            showcase.append({
+                "id": row["id"],
+                "artist": row["artist"],
+                "album": row["album"],
+                "cover": to_python_value(row.get("cover")),
+                "year": to_python_value(row.get("year")),
+                "notes": to_python_value(row.get("notes"))
+            })
+
+        return showcase
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error fetching public showcase: {str(e)}")

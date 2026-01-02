@@ -8,7 +8,9 @@ from pydantic import BaseModel, Field
 from typing import Optional
 
 from routes.auth import require_auth
+from routes.blocks import is_blocked
 from utils.conversions import to_python_value
+from services.email import send_friend_request_notification, send_friend_accepted_notification
 
 router = APIRouter()
 
@@ -63,6 +65,8 @@ class PublicProfile(BaseModel):
     featured_category_id: Optional[int] = None  # Which category's showcase is shown
     featured_category_name: Optional[str] = None  # Name of featured category
     featured_category_slug: Optional[str] = None  # Slug for frontend terms lookup
+    is_blocked: bool = False  # True if I blocked them
+    is_blocking_me: bool = False  # True if they blocked me (profile hidden)
 
 
 class ShowcaseAlbum(BaseModel):
@@ -152,6 +156,10 @@ async def send_friend_request(
         if existing_friend:
             raise HTTPException(status_code=400, detail="You are already friends with this user")
 
+        # Check if blocked (either direction)
+        if await is_blocked(env, user_id, target_id):
+            raise HTTPException(status_code=403, detail="Unable to send friend request to this user")
+
         # Check if request already exists (in either direction)
         existing_request = await env.DB.prepare(
             """SELECT id, sender_id, status FROM friend_requests
@@ -212,6 +220,13 @@ async def send_friend_request(
 
         if result and hasattr(result, 'to_py'):
             result = result.to_py()
+
+        # Send email notification to recipient (non-blocking, ignore errors)
+        sender_name = to_python_value(sender.get("name")) if sender else "Someone"
+        try:
+            await send_friend_request_notification(env, target_id, sender_name)
+        except Exception:
+            pass  # Don't fail the request if email fails
 
         return FriendRequest(
             id=result["id"],
@@ -380,6 +395,19 @@ async def accept_friend_request(
         await env.DB.prepare(
             "INSERT OR IGNORE INTO friends (user_id, friend_id) VALUES (?, ?)"
         ).bind(sender_id, user_id).run()
+
+        # Send email notification to the original sender (non-blocking)
+        try:
+            # Get accepter's name
+            accepter = await env.DB.prepare(
+                "SELECT name FROM users WHERE id = ?"
+            ).bind(user_id).first()
+            if accepter and hasattr(accepter, 'to_py'):
+                accepter = accepter.to_py()
+            accepter_name = to_python_value(accepter.get("name")) if accepter else "Someone"
+            await send_friend_accepted_notification(env, sender_id, accepter_name)
+        except Exception:
+            pass  # Don't fail the request if email fails
 
         return {"status": "accepted", "friend_id": sender_id}
     except HTTPException:
@@ -565,6 +593,28 @@ async def get_public_profile(
         if not user:
             raise HTTPException(status_code=404, detail="User not found")
 
+        # Check block status
+        i_blocked = await env.DB.prepare(
+            "SELECT id FROM blocked_users WHERE blocker_id = ? AND blocked_id = ?"
+        ).bind(user_id, target_user_id).first()
+        if i_blocked and hasattr(i_blocked, 'to_py'):
+            i_blocked = i_blocked.to_py()
+
+        they_blocked = await env.DB.prepare(
+            "SELECT id FROM blocked_users WHERE blocker_id = ? AND blocked_id = ?"
+        ).bind(target_user_id, user_id).first()
+        if they_blocked and hasattr(they_blocked, 'to_py'):
+            they_blocked = they_blocked.to_py()
+
+        # If they blocked me, return minimal profile with block indicator
+        if they_blocked:
+            return PublicProfile(
+                id=user["id"],
+                name=to_python_value(user.get("name")),
+                picture=to_python_value(user.get("picture")),
+                is_blocking_me=True
+            )
+
         # Check if friends (mutual)
         is_friend = await env.DB.prepare(
             "SELECT id FROM friends WHERE user_id = ? AND friend_id = ?"
@@ -667,7 +717,9 @@ async def get_public_profile(
             collection_count=collection_count,
             featured_category_id=featured_category_id,
             featured_category_name=featured_category_name,
-            featured_category_slug=featured_category_slug
+            featured_category_slug=featured_category_slug,
+            is_blocked=bool(i_blocked),
+            is_blocking_me=False
         )
     except HTTPException:
         raise

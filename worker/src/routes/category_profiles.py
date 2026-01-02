@@ -6,7 +6,7 @@ Per-category user profiles with custom fields and items
 from fastapi import APIRouter, Request, HTTPException, Depends, Query
 from pydantic import BaseModel
 import json
-from .auth import require_auth, get_current_user
+from .auth import require_auth, require_auth, get_current_user
 from utils.conversions import to_python_value as safe_value
 
 router = APIRouter()

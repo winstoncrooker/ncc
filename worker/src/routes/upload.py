@@ -9,7 +9,7 @@ import uuid
 from datetime import datetime
 import js
 
-from routes.auth import require_auth
+from routes.auth import require_auth, require_auth
 
 router = APIRouter()
 

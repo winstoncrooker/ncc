@@ -10,6 +10,7 @@ const Auth = {
   // Storage keys
   TOKEN_KEY: 'ncc_token',
   USER_KEY: 'ncc_user',
+  CSRF_KEY: 'ncc_csrf',
 
   init() {
     // Check for OAuth callback params in URL
@@ -32,11 +33,15 @@ const Auth = {
         name: params.get('name') || null,
         picture: params.get('picture') || null
       };
+      const csrfToken = params.get('csrf_token');
 
       // Test localStorage availability (can fail in private browsing)
       try {
         this.setToken(token);
         this.setUser(user);
+        if (csrfToken) {
+          this.setCsrfToken(csrfToken);
+        }
       } catch (e) {
         console.error('[Auth] localStorage error:', e.message);
         Auth.showError('Unable to save login. Please disable private browsing or enable cookies.');
@@ -61,6 +66,7 @@ const Auth = {
   cleanUrl() {
     const url = new URL(window.location.href);
     url.searchParams.delete('token');
+    url.searchParams.delete('csrf_token');
     url.searchParams.delete('user_id');
     url.searchParams.delete('email');
     url.searchParams.delete('name');
@@ -86,6 +92,7 @@ const Auth = {
   logout() {
     localStorage.removeItem(this.TOKEN_KEY);
     localStorage.removeItem(this.USER_KEY);
+    localStorage.removeItem(this.CSRF_KEY);
     window.dispatchEvent(new CustomEvent('auth:logout'));
   },
 
@@ -115,6 +122,20 @@ const Auth = {
    */
   setToken(token) {
     localStorage.setItem(this.TOKEN_KEY, token);
+  },
+
+  /**
+   * Get stored CSRF token
+   */
+  getCsrfToken() {
+    return localStorage.getItem(this.CSRF_KEY);
+  },
+
+  /**
+   * Set CSRF token
+   */
+  setCsrfToken(token) {
+    localStorage.setItem(this.CSRF_KEY, token);
   },
 
   /**
@@ -155,6 +176,7 @@ const Auth = {
     const apiBase = typeof CONFIG !== 'undefined' ? CONFIG.API_BASE : '';
     const url = `${apiBase}${endpoint}`;
     const token = this.getToken();
+    const csrfToken = this.getCsrfToken();
 
     const headers = {
       'Content-Type': 'application/json',
@@ -163,6 +185,11 @@ const Auth = {
 
     if (token) {
       headers['Authorization'] = `Bearer ${token}`;
+    }
+
+    // Include CSRF token for state-changing requests (POST, PUT, DELETE, PATCH)
+    if (csrfToken) {
+      headers['X-CSRF-Token'] = csrfToken;
     }
 
     console.log('[Auth] API request:', options.method || 'GET', endpoint);
@@ -189,6 +216,21 @@ const Auth = {
       }
     }
 
+    // Handle 403 CSRF errors - prompt user to re-login
+    if (response.status === 403) {
+      try {
+        const errorData = await response.clone().json();
+        if (errorData.detail && errorData.detail.includes('CSRF')) {
+          console.log('[Auth] CSRF token missing or invalid, need re-login');
+          this.showError('Session expired. Please log in again.');
+          this.logout();
+          window.dispatchEvent(new CustomEvent('auth:expired'));
+        }
+      } catch (e) {
+        // Ignore JSON parse errors
+      }
+    }
+
     return response;
   },
 
@@ -204,6 +246,9 @@ const Auth = {
       if (response.ok) {
         const data = await response.json();
         this.setToken(data.access_token);
+        if (data.csrf_token) {
+          this.setCsrfToken(data.csrf_token);
+        }
         this.setUser({
           id: data.user_id,
           email: data.email,
@@ -232,6 +277,9 @@ const Auth = {
     const toast = document.createElement('div');
     toast.id = 'app-toast';
     toast.className = `app-toast app-toast-${type}`;
+    toast.setAttribute('role', 'alert');
+    toast.setAttribute('aria-live', 'assertive');
+    toast.setAttribute('aria-atomic', 'true');
 
     const icons = {
       error: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>',
@@ -252,6 +300,7 @@ const Auth = {
     const closeBtn = document.createElement('button');
     closeBtn.className = 'toast-close';
     closeBtn.innerHTML = '&times;';
+    closeBtn.setAttribute('aria-label', 'Close notification');
     closeBtn.onclick = () => toast.remove();
 
     toast.appendChild(iconSpan);

@@ -77,14 +77,14 @@ async def vote_on_post(env, user_id: int, post_id: int, value: int) -> VoteRespo
     if not post:
         raise HTTPException(status_code=404, detail="Post not found")
 
-    # Check existing vote
+    # Get existing vote to determine the action
     existing = await env.DB.prepare(
         "SELECT id, value FROM votes WHERE user_id = ? AND post_id = ?"
     ).bind(user_id, post_id).first()
 
     existing = convert_row(existing)
 
-    # Calculate deltas for atomic update
+    # Determine action and deltas atomically
     upvote_delta = 0
     downvote_delta = 0
     new_vote = None
@@ -93,56 +93,77 @@ async def vote_on_post(env, user_id: int, post_id: int, value: int) -> VoteRespo
         old_value = existing["value"]
 
         if old_value == value:
-            # Same vote = remove vote
-            await env.DB.prepare(
-                "DELETE FROM votes WHERE id = ?"
-            ).bind(existing["id"]).run()
+            # Same vote = remove vote using atomic DELETE with WHERE clause
+            result = await env.DB.prepare(
+                "DELETE FROM votes WHERE user_id = ? AND post_id = ? AND value = ? RETURNING id"
+            ).bind(user_id, post_id, value).first()
 
-            if value == 1:
-                upvote_delta = -1
+            if result:
+                # Vote was actually deleted - apply deltas
+                if value == 1:
+                    upvote_delta = -1
+                else:
+                    downvote_delta = -1
+                new_vote = None
             else:
-                downvote_delta = -1
-
-            new_vote = None
-
+                # Vote was already changed/deleted by concurrent request - refetch state
+                current = await env.DB.prepare(
+                    "SELECT value FROM votes WHERE user_id = ? AND post_id = ?"
+                ).bind(user_id, post_id).first()
+                current = convert_row(current)
+                new_vote = current["value"] if current else None
         else:
-            # Different vote = change vote
-            await env.DB.prepare(
-                "UPDATE votes SET value = ? WHERE id = ?"
-            ).bind(value, existing["id"]).run()
+            # Different vote = change vote atomically with old value check
+            result = await env.DB.prepare(
+                "UPDATE votes SET value = ? WHERE user_id = ? AND post_id = ? AND value = ? RETURNING id"
+            ).bind(value, user_id, post_id, old_value).first()
 
-            if old_value == 1:
-                upvote_delta = -1
+            if result:
+                # Vote was actually updated - apply deltas
+                if old_value == 1:
+                    upvote_delta = -1
+                else:
+                    downvote_delta = -1
+
+                if value == 1:
+                    upvote_delta += 1
+                else:
+                    downvote_delta += 1
+
+                new_vote = value
             else:
-                downvote_delta = -1
-
-            if value == 1:
-                upvote_delta += 1
-            else:
-                downvote_delta += 1
-
-            new_vote = value
-
+                # Vote was already changed by concurrent request - refetch state
+                current = await env.DB.prepare(
+                    "SELECT value FROM votes WHERE user_id = ? AND post_id = ?"
+                ).bind(user_id, post_id).first()
+                current = convert_row(current)
+                new_vote = current["value"] if current else None
     else:
-        # New vote
+        # New vote - use INSERT ON CONFLICT to handle concurrent inserts
+        result = await env.DB.prepare(
+            """INSERT INTO votes (user_id, post_id, value)
+               VALUES (?, ?, ?)
+               ON CONFLICT(user_id, post_id) DO UPDATE SET value = excluded.value
+               RETURNING id, value"""
+        ).bind(user_id, post_id, value).first()
+
+        result = convert_row(result)
+        if result:
+            new_vote = result["value"]
+            if value == 1:
+                upvote_delta = 1
+            else:
+                downvote_delta = 1
+
+    # Only update counts if we actually changed something
+    if upvote_delta != 0 or downvote_delta != 0:
+        # Atomic update of post counts using SQL arithmetic with floor constraint
         await env.DB.prepare(
-            "INSERT INTO votes (user_id, post_id, value) VALUES (?, ?, ?)"
-        ).bind(user_id, post_id, value).run()
-
-        if value == 1:
-            upvote_delta = 1
-        else:
-            downvote_delta = 1
-
-        new_vote = value
-
-    # Atomic update of post counts using SQL arithmetic
-    await env.DB.prepare(
-        """UPDATE forum_posts
-           SET upvote_count = upvote_count + ?,
-               downvote_count = downvote_count + ?
-           WHERE id = ?"""
-    ).bind(upvote_delta, downvote_delta, post_id).run()
+            """UPDATE forum_posts
+               SET upvote_count = MAX(0, upvote_count + ?),
+                   downvote_count = MAX(0, downvote_count + ?)
+               WHERE id = ?"""
+        ).bind(upvote_delta, downvote_delta, post_id).run()
 
     # Fetch updated counts to calculate hot score
     updated_post = await env.DB.prepare(
@@ -182,14 +203,14 @@ async def vote_on_comment(env, user_id: int, comment_id: int, value: int) -> Vot
     if not comment:
         raise HTTPException(status_code=404, detail="Comment not found")
 
-    # Check existing vote
+    # Get existing vote to determine the action
     existing = await env.DB.prepare(
         "SELECT id, value FROM votes WHERE user_id = ? AND comment_id = ?"
     ).bind(user_id, comment_id).first()
 
     existing = convert_row(existing)
 
-    # Calculate deltas for atomic update
+    # Determine action and deltas atomically
     upvote_delta = 0
     downvote_delta = 0
     new_vote = None
@@ -198,56 +219,77 @@ async def vote_on_comment(env, user_id: int, comment_id: int, value: int) -> Vot
         old_value = existing["value"]
 
         if old_value == value:
-            # Same vote = remove vote
-            await env.DB.prepare(
-                "DELETE FROM votes WHERE id = ?"
-            ).bind(existing["id"]).run()
+            # Same vote = remove vote using atomic DELETE with WHERE clause
+            result = await env.DB.prepare(
+                "DELETE FROM votes WHERE user_id = ? AND comment_id = ? AND value = ? RETURNING id"
+            ).bind(user_id, comment_id, value).first()
 
-            if value == 1:
-                upvote_delta = -1
+            if result:
+                # Vote was actually deleted - apply deltas
+                if value == 1:
+                    upvote_delta = -1
+                else:
+                    downvote_delta = -1
+                new_vote = None
             else:
-                downvote_delta = -1
-
-            new_vote = None
-
+                # Vote was already changed/deleted by concurrent request - refetch state
+                current = await env.DB.prepare(
+                    "SELECT value FROM votes WHERE user_id = ? AND comment_id = ?"
+                ).bind(user_id, comment_id).first()
+                current = convert_row(current)
+                new_vote = current["value"] if current else None
         else:
-            # Different vote = change vote
-            await env.DB.prepare(
-                "UPDATE votes SET value = ? WHERE id = ?"
-            ).bind(value, existing["id"]).run()
+            # Different vote = change vote atomically with old value check
+            result = await env.DB.prepare(
+                "UPDATE votes SET value = ? WHERE user_id = ? AND comment_id = ? AND value = ? RETURNING id"
+            ).bind(value, user_id, comment_id, old_value).first()
 
-            if old_value == 1:
-                upvote_delta = -1
+            if result:
+                # Vote was actually updated - apply deltas
+                if old_value == 1:
+                    upvote_delta = -1
+                else:
+                    downvote_delta = -1
+
+                if value == 1:
+                    upvote_delta += 1
+                else:
+                    downvote_delta += 1
+
+                new_vote = value
             else:
-                downvote_delta = -1
-
-            if value == 1:
-                upvote_delta += 1
-            else:
-                downvote_delta += 1
-
-            new_vote = value
-
+                # Vote was already changed by concurrent request - refetch state
+                current = await env.DB.prepare(
+                    "SELECT value FROM votes WHERE user_id = ? AND comment_id = ?"
+                ).bind(user_id, comment_id).first()
+                current = convert_row(current)
+                new_vote = current["value"] if current else None
     else:
-        # New vote
+        # New vote - use INSERT ON CONFLICT to handle concurrent inserts
+        result = await env.DB.prepare(
+            """INSERT INTO votes (user_id, comment_id, value)
+               VALUES (?, ?, ?)
+               ON CONFLICT(user_id, comment_id) DO UPDATE SET value = excluded.value
+               RETURNING id, value"""
+        ).bind(user_id, comment_id, value).first()
+
+        result = convert_row(result)
+        if result:
+            new_vote = result["value"]
+            if value == 1:
+                upvote_delta = 1
+            else:
+                downvote_delta = 1
+
+    # Only update counts if we actually changed something
+    if upvote_delta != 0 or downvote_delta != 0:
+        # Atomic update of comment counts using SQL arithmetic with floor constraint
         await env.DB.prepare(
-            "INSERT INTO votes (user_id, comment_id, value) VALUES (?, ?, ?)"
-        ).bind(user_id, comment_id, value).run()
-
-        if value == 1:
-            upvote_delta = 1
-        else:
-            downvote_delta = 1
-
-        new_vote = value
-
-    # Atomic update of comment counts using SQL arithmetic
-    await env.DB.prepare(
-        """UPDATE forum_comments
-           SET upvote_count = upvote_count + ?,
-               downvote_count = downvote_count + ?
-           WHERE id = ?"""
-    ).bind(upvote_delta, downvote_delta, comment_id).run()
+            """UPDATE forum_comments
+               SET upvote_count = MAX(0, upvote_count + ?),
+                   downvote_count = MAX(0, downvote_count + ?)
+               WHERE id = ?"""
+        ).bind(upvote_delta, downvote_delta, comment_id).run()
 
     # Fetch updated counts
     updated_comment = await env.DB.prepare(
@@ -275,14 +317,14 @@ async def remove_post_vote(
     env = request.scope["env"]
 
     try:
-        # Get existing vote
-        existing = await env.DB.prepare(
-            "SELECT id, value FROM votes WHERE user_id = ? AND post_id = ?"
+        # Atomically delete and get the value that was deleted
+        deleted = await env.DB.prepare(
+            "DELETE FROM votes WHERE user_id = ? AND post_id = ? RETURNING value"
         ).bind(user_id, post_id).first()
 
-        existing = convert_row(existing)
+        deleted = convert_row(deleted)
 
-        if not existing:
+        if not deleted:
             # No vote to remove, return current counts
             post = await env.DB.prepare(
                 "SELECT upvote_count, downvote_count, hot_score FROM forum_posts WHERE id = ?"
@@ -301,20 +343,16 @@ async def remove_post_vote(
                 hot_score=post["hot_score"]
             )
 
-        # Delete vote
-        old_value = existing["value"]
-        await env.DB.prepare(
-            "DELETE FROM votes WHERE id = ?"
-        ).bind(existing["id"]).run()
-
-        # Atomic update of post counts using SQL arithmetic
+        # Vote was deleted - apply deltas based on the value that was deleted
+        old_value = deleted["value"]
         upvote_delta = -1 if old_value == 1 else 0
         downvote_delta = -1 if old_value == -1 else 0
 
+        # Atomic update of post counts using SQL arithmetic with floor constraint
         await env.DB.prepare(
             """UPDATE forum_posts
-               SET upvote_count = upvote_count + ?,
-                   downvote_count = downvote_count + ?
+               SET upvote_count = MAX(0, upvote_count + ?),
+                   downvote_count = MAX(0, downvote_count + ?)
                WHERE id = ?"""
         ).bind(upvote_delta, downvote_delta, post_id).run()
 
@@ -358,14 +396,14 @@ async def remove_comment_vote(
     env = request.scope["env"]
 
     try:
-        # Get existing vote
-        existing = await env.DB.prepare(
-            "SELECT id, value FROM votes WHERE user_id = ? AND comment_id = ?"
+        # Atomically delete and get the value that was deleted
+        deleted = await env.DB.prepare(
+            "DELETE FROM votes WHERE user_id = ? AND comment_id = ? RETURNING value"
         ).bind(user_id, comment_id).first()
 
-        existing = convert_row(existing)
+        deleted = convert_row(deleted)
 
-        if not existing:
+        if not deleted:
             # No vote to remove
             comment = await env.DB.prepare(
                 "SELECT upvote_count, downvote_count FROM forum_comments WHERE id = ?"
@@ -383,20 +421,16 @@ async def remove_comment_vote(
                 downvote_count=comment["downvote_count"]
             )
 
-        # Delete vote
-        old_value = existing["value"]
-        await env.DB.prepare(
-            "DELETE FROM votes WHERE id = ?"
-        ).bind(existing["id"]).run()
-
-        # Atomic update of comment counts using SQL arithmetic
+        # Vote was deleted - apply deltas based on the value that was deleted
+        old_value = deleted["value"]
         upvote_delta = -1 if old_value == 1 else 0
         downvote_delta = -1 if old_value == -1 else 0
 
+        # Atomic update of comment counts using SQL arithmetic with floor constraint
         await env.DB.prepare(
             """UPDATE forum_comments
-               SET upvote_count = upvote_count + ?,
-                   downvote_count = downvote_count + ?
+               SET upvote_count = MAX(0, upvote_count + ?),
+                   downvote_count = MAX(0, downvote_count + ?)
                WHERE id = ?"""
         ).bind(upvote_delta, downvote_delta, comment_id).run()
 

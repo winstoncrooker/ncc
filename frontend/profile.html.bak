@@ -33,7 +33,6 @@
   <link rel="stylesheet" href="css/auth.css">
   <link rel="stylesheet" href="css/profile.css">
   <link rel="stylesheet" href="css/forums.css">
-  <link rel="stylesheet" href="css/marketplace.css">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.1/cropper.min.css">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.0.6/purify.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.1/cropper.min.js"></script>
@@ -192,13 +191,6 @@
       </div>
     </section>
 
-    <!-- Category Switcher -->
-    <section class="category-switcher-section" id="category-switcher-section" aria-label="Switch collection category">
-      <div class="category-tabs" id="category-tabs" role="tablist" aria-label="Collection categories">
-        <!-- Dynamically populated with category tabs -->
-      </div>
-    </section>
-
     <!-- Collection Summary Card (Multi-Collection Identity) -->
     <section class="collection-summary-section" id="collection-summary-section" style="display: none;" aria-label="Collection categories">
       <div class="collection-summary-card" id="collection-summary-card" role="list" aria-label="Your collection categories">
@@ -343,119 +335,6 @@
       </div><!-- end profile-main -->
     </div><!-- end profile-view -->
 
-    <!-- Marketplace View -->
-    <div class="tab-view" id="marketplace-view" role="tabpanel" aria-labelledby="marketplace-tab">
-      <div class="marketplace-container">
-        <!-- Marketplace Header -->
-        <div class="marketplace-header">
-          <div class="marketplace-tabs">
-            <button class="marketplace-tab active" data-section="browse">Browse</button>
-            <button class="marketplace-tab" data-section="my-listings">My Listings</button>
-            <button class="marketplace-tab" data-section="my-offers">My Offers</button>
-          </div>
-          <button class="create-listing-btn" id="create-listing-btn">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <line x1="12" y1="5" x2="12" y2="19"></line>
-              <line x1="5" y1="12" x2="19" y2="12"></line>
-            </svg>
-            Create Listing
-          </button>
-        </div>
-
-        <!-- Browse Section -->
-        <div class="marketplace-section active" id="marketplace-browse">
-          <div class="marketplace-filters">
-            <div class="filter-row">
-              <div class="marketplace-search">
-                <input type="text" id="marketplace-search-input" placeholder="Search listings..." autocomplete="off" aria-label="Search marketplace">
-              </div>
-              <select id="filter-category" class="filter-select" aria-label="Filter by category">
-                <option value="">All Categories</option>
-                <option value="vinyl">Vinyl Records</option>
-                <option value="trading-cards">Trading Cards</option>
-                <option value="comics">Comics</option>
-                <option value="video-games">Video Games</option>
-                <option value="sneakers">Sneakers</option>
-                <option value="watches">Watches</option>
-                <option value="coins">Coins</option>
-                <option value="cars">Cars</option>
-              </select>
-              <select id="filter-condition" class="filter-select" aria-label="Filter by condition">
-                <option value="">Any Condition</option>
-                <option value="mint">Mint</option>
-                <option value="near_mint">Near Mint</option>
-                <option value="excellent">Excellent</option>
-                <option value="very_good">Very Good</option>
-                <option value="good">Good</option>
-                <option value="fair">Fair</option>
-                <option value="poor">Poor</option>
-              </select>
-              <select id="filter-type" class="filter-select" aria-label="Filter by type">
-                <option value="">All Types</option>
-                <option value="sale">For Sale</option>
-                <option value="trade">Trade Only</option>
-                <option value="both">Sale or Trade</option>
-              </select>
-            </div>
-            <div class="filter-row">
-              <div class="price-range">
-                <input type="number" id="filter-price-min" placeholder="Min $" min="0" aria-label="Minimum price">
-                <span>-</span>
-                <input type="number" id="filter-price-max" placeholder="Max $" min="0" aria-label="Maximum price">
-              </div>
-              <input type="text" id="filter-location" class="location-input" placeholder="Location..." aria-label="Filter by location">
-              <select id="filter-sort-listings" class="filter-select" aria-label="Sort listings">
-                <option value="newest">Newest First</option>
-                <option value="oldest">Oldest First</option>
-                <option value="price-low">Price: Low to High</option>
-                <option value="price-high">Price: High to Low</option>
-              </select>
-              <button class="btn-apply-filters" id="apply-marketplace-filters">Apply Filters</button>
-            </div>
-          </div>
-          <div class="listings-grid" id="listings-grid">
-            <div class="listings-empty" id="listings-empty">
-              <div class="empty-icon">🏪</div>
-              <p>No listings found</p>
-              <span>Be the first to create a listing!</span>
-            </div>
-          </div>
-          <div class="listings-pagination" id="listings-pagination"></div>
-        </div>
-
-        <!-- My Listings Section -->
-        <div class="marketplace-section" id="marketplace-my-listings">
-          <div class="my-listings-tabs">
-            <button class="my-listings-tab active" data-status="active">Active</button>
-            <button class="my-listings-tab" data-status="sold">Sold</button>
-            <button class="my-listings-tab" data-status="expired">Expired</button>
-          </div>
-          <div class="listings-grid" id="my-listings-grid">
-            <div class="listings-empty" id="my-listings-empty">
-              <div class="empty-icon">📦</div>
-              <p>No listings yet</p>
-              <span>Create your first listing to start selling!</span>
-            </div>
-          </div>
-        </div>
-
-        <!-- My Offers Section -->
-        <div class="marketplace-section" id="marketplace-my-offers">
-          <div class="my-offers-tabs">
-            <button class="my-offers-tab active" data-type="received">Received</button>
-            <button class="my-offers-tab" data-type="sent">Sent</button>
-          </div>
-          <div class="offers-list" id="offers-list">
-            <div class="offers-empty" id="offers-empty">
-              <div class="empty-icon">📨</div>
-              <p>No offers yet</p>
-              <span>Offers you receive or send will appear here</span>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div><!-- end marketplace-view -->
-
     <!-- Forums View -->
     <div class="tab-view" id="forums-view" role="tabpanel" aria-labelledby="forums-tab">
       <div class="forums-container">
@@ -493,36 +372,6 @@
               </div>
               <button class="discover-btn" id="discover-groups-btn" aria-label="Discover new groups">+ Discover Groups</button>
             </div>
-
-            <!-- Trending Section -->
-            <div class="sidebar-section trending-section">
-              <h3 id="trending-heading">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align: middle; margin-right: 4px;">
-                  <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/>
-                  <polyline points="17 6 23 6 23 12"/>
-                </svg>
-                Trending
-              </h3>
-              <div class="trending-posts-list" id="trending-posts-list" role="list" aria-labelledby="trending-heading">
-                <div class="trending-loading">Loading...</div>
-              </div>
-            </div>
-
-            <!-- Featured Collectors Section -->
-            <div class="sidebar-section featured-collectors-section">
-              <h3 id="featured-collectors-heading">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align: middle; margin-right: 4px;">
-                  <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
-                  <circle cx="9" cy="7" r="4"/>
-                  <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
-                  <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
-                </svg>
-                Active Collectors
-              </h3>
-              <div class="featured-collectors-list" id="featured-collectors-list" role="list" aria-labelledby="featured-collectors-heading">
-                <div class="trending-loading">Loading...</div>
-              </div>
-            </div>
           </aside>
 
           <!-- Feed Content -->
@@ -537,17 +386,6 @@
       </div>
     </div><!-- end forums-view -->
   </main>
-
-  <!-- Footer -->
-  <footer class="site-footer" role="contentinfo">
-    <div class="footer-content">
-      <span class="footer-copyright">&copy; 2025 Niche Collector Connector</span>
-      <nav class="footer-links" aria-label="Footer navigation">
-        <a href="terms.html">Terms of Service</a>
-        <a href="privacy.html">Privacy Policy</a>
-      </nav>
-    </div>
-  </footer>
 
   <!-- AI Assistant Toggle -->
   <button class="ai-toggle-btn" id="ai-toggle-btn" title="AI Assistant" aria-label="Open AI assistant">
@@ -665,15 +503,15 @@
   </div>
 
   <!-- View Profile Modal -->
-  <div class="modal" id="view-profile-modal" role="dialog" aria-modal="true" aria-labelledby="view-profile-modal-title" aria-hidden="true">
+  <div class="modal" id="view-profile-modal">
     <div class="modal-content modal-lg">
       <div class="modal-header">
-        <h3 id="view-profile-modal-title">Profile</h3>
-        <button class="modal-close" id="view-profile-close" aria-label="Close profile dialog">&times;</button>
+        <h3>Profile</h3>
+        <button class="modal-close" id="view-profile-close">&times;</button>
       </div>
       <div class="view-profile-content" id="view-profile-content">
         <div class="view-profile-header">
-          <div class="view-profile-bg" id="view-profile-bg" aria-hidden="true"></div>
+          <div class="view-profile-bg" id="view-profile-bg"></div>
           <img class="view-profile-picture" id="view-profile-picture" src="" alt="User profile picture">
         </div>
         <div class="view-profile-info">
@@ -686,36 +524,29 @@
             <span id="view-profile-collection-count">0 records</span>
           </div>
           <div class="view-profile-actions" id="view-profile-actions">
-            <button class="btn-message" id="view-profile-message" aria-label="Send message to this user">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+            <button class="btn-message" id="view-profile-message">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
               </svg>
               Message
             </button>
-            <button class="btn-unfollow" id="view-profile-unfollow" aria-label="Unfollow this user">Unfollow</button>
-            <button class="btn-report" id="view-profile-report" aria-label="Report this user" title="Report this profile">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-                <path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/>
-                <line x1="4" y1="22" x2="4" y2="15"/>
-              </svg>
-              Report
-            </button>
+            <button class="btn-unfollow" id="view-profile-unfollow">Unfollow</button>
           </div>
         </div>
         <div class="view-profile-showcase">
           <h3 id="view-showcase-title">Showcase</h3>
-          <div class="view-showcase-grid" id="view-showcase-grid" role="list" aria-label="User's showcase"></div>
+          <div class="view-showcase-grid" id="view-showcase-grid"></div>
         </div>
       </div>
     </div>
   </div>
 
   <!-- Edit Profile Modal -->
-  <div class="modal" id="edit-profile-modal" role="dialog" aria-modal="true" aria-labelledby="edit-profile-modal-title" aria-hidden="true">
+  <div class="modal" id="edit-profile-modal">
     <div class="modal-content">
       <div class="modal-header">
-        <h3 id="edit-profile-modal-title">Edit Profile</h3>
-        <button class="modal-close" id="edit-profile-close" aria-label="Close edit profile dialog">&times;</button>
+        <h3>Edit Profile</h3>
+        <button class="modal-close" id="edit-profile-close">&times;</button>
       </div>
       <form id="edit-profile-form">
         <div class="form-group">
@@ -728,7 +559,7 @@
         </div>
         <div class="form-group">
           <label for="edit-bio">Bio</label>
-          <textarea id="edit-bio" rows="4" maxlength="500" placeholder="Tell us about yourself and your vinyl journey..." aria-describedby="bio-char-count-label"></textarea>
+          <textarea id="edit-bio" rows="4" maxlength="500" placeholder="Tell us about yourself and your vinyl journey..."></textarea>
           <span class="char-count"><span id="bio-char-count">0</span>/500</span>
         </div>
         <div class="form-group">
@@ -801,54 +632,6 @@
           </div>
         </div>
 
-        <!-- Email Notification Settings Section -->
-        <div class="notifications-section">
-          <h4 style="color: #1db954; margin: 16px 0 12px; font-size: 0.9rem;">Email Notifications</h4>
-          <div class="toggle-group">
-            <label class="toggle-label">
-              <span>Friend Requests</span>
-              <input type="checkbox" id="notify-friend-requests" checked class="toggle-checkbox">
-              <span class="toggle-switch"></span>
-            </label>
-          </div>
-          <div class="toggle-group">
-            <label class="toggle-label">
-              <span>Messages</span>
-              <input type="checkbox" id="notify-messages" checked class="toggle-checkbox">
-              <span class="toggle-switch"></span>
-            </label>
-          </div>
-          <div class="toggle-group">
-            <label class="toggle-label">
-              <span>Forum Replies</span>
-              <input type="checkbox" id="notify-forum-replies" checked class="toggle-checkbox">
-              <span class="toggle-switch"></span>
-            </label>
-          </div>
-          <div class="toggle-group">
-            <label class="toggle-label">
-              <span>Marketplace Offers</span>
-              <input type="checkbox" id="notify-offers" checked class="toggle-checkbox">
-              <span class="toggle-switch"></span>
-            </label>
-          </div>
-          <div class="toggle-group">
-            <label class="toggle-label">
-              <span>Sales & Transactions</span>
-              <input type="checkbox" id="notify-sales" checked class="toggle-checkbox">
-              <span class="toggle-switch"></span>
-            </label>
-          </div>
-        </div>
-
-        <!-- Blocked Users Section -->
-        <div class="blocked-users-section">
-          <h4 style="color: #1db954; margin: 16px 0 12px; font-size: 0.9rem;">Blocked Users</h4>
-          <div id="blocked-users-list" class="blocked-users-list">
-            <p class="blocked-users-empty">Loading blocked users...</p>
-          </div>
-        </div>
-
         <div class="form-actions">
           <button type="button" class="btn-cancel" id="edit-profile-cancel">Cancel</button>
           <button type="submit" class="btn-save">Save Changes</button>
@@ -858,11 +641,11 @@
   </div>
 
   <!-- Add Wishlist Item Modal -->
-  <div class="modal" id="add-wishlist-modal" role="dialog" aria-modal="true" aria-labelledby="add-wishlist-modal-title" aria-hidden="true">
+  <div class="modal" id="add-wishlist-modal">
     <div class="modal-content">
       <div class="modal-header">
-        <h3 id="add-wishlist-modal-title">Add Wanted Item</h3>
-        <button class="modal-close" id="add-wishlist-close" aria-label="Close add wishlist dialog">&times;</button>
+        <h3>Add Wanted Item</h3>
+        <button class="modal-close" id="add-wishlist-close">&times;</button>
       </div>
       <form id="add-wishlist-form">
         <div class="form-group">
@@ -1174,298 +957,6 @@
 
   <!-- Category Template Switcher (in profile view header) -->
 
-
-  <!-- Create Listing Modal -->
-  <div class="modal" id="create-listing-modal">
-    <div class="modal-content modal-lg">
-      <div class="modal-header">
-        <h3>Create Listing</h3>
-        <button class="modal-close" id="create-listing-close">&times;</button>
-      </div>
-      <div class="modal-tabs">
-        <button class="tab-btn active" data-tab="listing-collection">From Collection</button>
-        <button class="tab-btn" data-tab="listing-manual">Manual Entry</button>
-      </div>
-      <div class="tab-content active" id="tab-listing-collection">
-        <p class="modal-subtitle">Select an item from your collection to list</p>
-        <div class="listing-collection-grid" id="listing-collection-grid">
-          <div class="listings-empty">
-            <div class="empty-icon">📦</div>
-            <p>No items in your collection</p>
-            <span>Add items to your collection first</span>
-          </div>
-        </div>
-      </div>
-      <div class="tab-content" id="tab-listing-manual">
-        <form id="create-listing-form">
-          <div class="form-group">
-            <label for="listing-title">Title *</label>
-            <input type="text" id="listing-title" required maxlength="200" placeholder="What are you selling?">
-          </div>
-          <div class="form-group">
-            <label for="listing-description">Description *</label>
-            <textarea id="listing-description" required rows="4" maxlength="2000" placeholder="Describe the item, condition details, any flaws..."></textarea>
-          </div>
-          <div class="form-group">
-            <label for="listing-category">Category *</label>
-            <select id="listing-category" required>
-              <option value="">Select category...</option>
-              <option value="vinyl">Vinyl Records</option>
-              <option value="trading-cards">Trading Cards</option>
-              <option value="comics">Comics</option>
-              <option value="video-games">Video Games</option>
-              <option value="sneakers">Sneakers</option>
-              <option value="watches">Watches</option>
-              <option value="coins">Coins</option>
-              <option value="cars">Cars</option>
-            </select>
-          </div>
-          <div class="form-row">
-            <div class="form-group">
-              <label for="listing-condition">Condition *</label>
-              <select id="listing-condition" required>
-                <option value="">Select condition...</option>
-                <option value="mint">Mint</option>
-                <option value="near_mint">Near Mint</option>
-                <option value="excellent">Excellent</option>
-                <option value="very_good">Very Good</option>
-                <option value="good">Good</option>
-                <option value="fair">Fair</option>
-                <option value="poor">Poor</option>
-              </select>
-            </div>
-            <div class="form-group">
-              <label for="listing-type">Listing Type *</label>
-              <select id="listing-type" required>
-                <option value="sale">For Sale</option>
-                <option value="trade">Trade Only</option>
-                <option value="both">Sale or Trade</option>
-              </select>
-            </div>
-          </div>
-          <div class="form-row">
-            <div class="form-group">
-              <label for="listing-price">Price ($)</label>
-              <input type="number" id="listing-price" min="0" step="0.01" placeholder="0.00">
-              <small class="form-hint">Leave empty for trade-only listings</small>
-            </div>
-            <div class="form-group">
-              <label for="listing-shipping">Shipping</label>
-              <select id="listing-shipping">
-                <option value="local">Local Pickup Only</option>
-                <option value="shipping">Shipping Available</option>
-                <option value="both">Pickup or Shipping</option>
-              </select>
-            </div>
-          </div>
-          <div class="form-row">
-            <div class="form-group">
-              <label for="listing-city">City</label>
-              <input type="text" id="listing-city" maxlength="100" placeholder="City">
-            </div>
-            <div class="form-group">
-              <label for="listing-state">State/Region</label>
-              <input type="text" id="listing-state" maxlength="100" placeholder="State or region">
-            </div>
-          </div>
-          <div class="form-group">
-            <label>Photos</label>
-            <div class="listing-photos-upload" id="listing-photos-upload">
-              <input type="file" id="listing-photos-input" accept="image/*" multiple style="display: none;">
-              <button type="button" class="btn-upload" onclick="document.getElementById('listing-photos-input').click()">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
-                  <circle cx="8.5" cy="8.5" r="1.5"></circle>
-                  <polyline points="21 15 16 10 5 21"></polyline>
-                </svg>
-                Add Photos (up to 6)
-              </button>
-              <div class="listing-photos-preview" id="listing-photos-preview"></div>
-            </div>
-          </div>
-          <div class="form-actions">
-            <button type="button" class="btn-cancel" id="create-listing-cancel">Cancel</button>
-            <button type="submit" class="btn-save">Create Listing</button>
-          </div>
-        </form>
-      </div>
-    </div>
-  </div>
-
-  <!-- Listing Detail Modal -->
-  <div class="modal" id="listing-detail-modal">
-    <div class="modal-content modal-lg">
-      <div class="modal-header">
-        <h3 id="listing-detail-title">Listing Details</h3>
-        <button class="modal-close" id="listing-detail-close">&times;</button>
-      </div>
-      <div class="listing-detail-content" id="listing-detail-content">
-        <div class="listing-detail-gallery" id="listing-detail-gallery"></div>
-        <div class="listing-detail-info">
-          <h2 id="listing-detail-name"></h2>
-          <div class="listing-detail-meta">
-            <span class="listing-price" id="listing-detail-price"></span>
-            <span class="listing-condition" id="listing-detail-condition"></span>
-            <span class="listing-type-badge" id="listing-detail-type"></span>
-          </div>
-          <p class="listing-description" id="listing-detail-description"></p>
-          <div class="listing-detail-location" id="listing-detail-location"></div>
-          <div class="listing-seller" id="listing-detail-seller">
-            <img src="" alt="Seller" class="seller-avatar" id="seller-avatar">
-            <div class="seller-info">
-              <span class="seller-name" id="seller-name"></span>
-              <span class="seller-rating" id="seller-rating"></span>
-            </div>
-          </div>
-          <div class="listing-detail-actions" id="listing-detail-actions">
-            <button class="btn-make-offer" id="btn-make-offer">Make Offer</button>
-            <button class="btn-message-seller" id="btn-message-seller">Message Seller</button>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Make Offer Modal -->
-  <div class="modal" id="make-offer-modal">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h3>Make an Offer</h3>
-        <button class="modal-close" id="make-offer-close">&times;</button>
-      </div>
-      <div class="offer-listing-preview" id="offer-listing-preview"></div>
-      <form id="make-offer-form">
-        <div class="offer-type-selector">
-          <label class="offer-type-option">
-            <input type="radio" name="offer-type" value="cash" checked>
-            <span>Cash Offer</span>
-          </label>
-          <label class="offer-type-option">
-            <input type="radio" name="offer-type" value="trade">
-            <span>Trade</span>
-          </label>
-          <label class="offer-type-option">
-            <input type="radio" name="offer-type" value="both">
-            <span>Cash + Trade</span>
-          </label>
-        </div>
-        <div class="form-group offer-cash-section">
-          <label for="offer-amount">Your Offer ($)</label>
-          <input type="number" id="offer-amount" min="0" step="0.01" placeholder="0.00">
-        </div>
-        <div class="form-group offer-trade-section" style="display: none;">
-          <label>Items to Trade</label>
-          <div class="offer-trade-items" id="offer-trade-items">
-            <button type="button" class="btn-add-trade-item" id="btn-add-trade-item">+ Add from Collection</button>
-          </div>
-        </div>
-        <div class="form-group">
-          <label for="offer-message">Message to Seller (optional)</label>
-          <textarea id="offer-message" rows="3" maxlength="500" placeholder="Introduce yourself or add any details..."></textarea>
-        </div>
-        <div class="form-actions">
-          <button type="button" class="btn-cancel" id="make-offer-cancel">Cancel</button>
-          <button type="submit" class="btn-save">Send Offer</button>
-        </div>
-      </form>
-    </div>
-  </div>
-
-  <!-- Offer Detail Modal (for managing received offers) -->
-  <div class="modal" id="offer-detail-modal">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h3>Offer Details</h3>
-        <button class="modal-close" id="offer-detail-close">&times;</button>
-      </div>
-      <div class="offer-detail-content" id="offer-detail-content">
-        <div class="offer-from-section" id="offer-from-section"></div>
-        <div class="offer-for-section" id="offer-for-section"></div>
-        <div class="offer-amount-section" id="offer-amount-section"></div>
-        <div class="offer-trade-section" id="offer-trade-section"></div>
-        <div class="offer-message-section" id="offer-message-section"></div>
-        <div class="offer-actions" id="offer-actions">
-          <button class="btn-accept-offer" id="btn-accept-offer">Accept</button>
-          <button class="btn-counter-offer" id="btn-counter-offer">Counter</button>
-          <button class="btn-reject-offer" id="btn-reject-offer">Decline</button>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Counter Offer Modal -->
-  <div class="modal" id="counter-offer-modal">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h3>Counter Offer</h3>
-        <button class="modal-close" id="counter-offer-close">&times;</button>
-      </div>
-      <form id="counter-offer-form">
-        <p class="modal-subtitle" id="counter-original-amount"></p>
-        <div class="form-group">
-          <label for="counter-amount">Your Counter Offer ($)</label>
-          <input type="number" id="counter-amount" min="0" step="0.01" placeholder="0.00">
-        </div>
-        <div class="form-group">
-          <label for="counter-message">Message (optional)</label>
-          <textarea id="counter-message" rows="3" maxlength="500" placeholder="Explain your counter offer..."></textarea>
-        </div>
-        <div class="form-actions">
-          <button type="button" class="btn-cancel" id="counter-offer-cancel">Cancel</button>
-          <button type="submit" class="btn-save">Send Counter</button>
-        </div>
-      </form>
-    </div>
-  </div>
-
-  <!-- Complete Transaction Modal -->
-  <div class="modal" id="complete-transaction-modal">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h3>Complete Transaction</h3>
-        <button class="modal-close" id="complete-transaction-close">&times;</button>
-      </div>
-      <div class="transaction-summary" id="transaction-summary"></div>
-      <form id="complete-transaction-form">
-        <div class="form-group">
-          <label for="transaction-rating">Rate this Transaction</label>
-          <div class="star-rating" id="transaction-rating">
-            <button type="button" class="star" data-rating="1">★</button>
-            <button type="button" class="star" data-rating="2">★</button>
-            <button type="button" class="star" data-rating="3">★</button>
-            <button type="button" class="star" data-rating="4">★</button>
-            <button type="button" class="star" data-rating="5">★</button>
-          </div>
-          <input type="hidden" id="rating-value" value="0">
-        </div>
-        <div class="form-group">
-          <label for="transaction-feedback">Feedback (optional)</label>
-          <textarea id="transaction-feedback" rows="3" maxlength="500" placeholder="Share your experience..."></textarea>
-        </div>
-        <div class="form-actions">
-          <button type="button" class="btn-cancel" id="complete-transaction-cancel">Skip for Now</button>
-          <button type="submit" class="btn-save">Submit & Complete</button>
-        </div>
-      </form>
-    </div>
-  </div>
-
-  <!-- Select Trade Items Modal -->
-  <div class="modal" id="select-trade-items-modal">
-    <div class="modal-content modal-lg">
-      <div class="modal-header">
-        <h3>Select Items to Trade</h3>
-        <button class="modal-close" id="select-trade-items-close">&times;</button>
-      </div>
-      <p class="modal-subtitle">Choose items from your collection to offer in trade</p>
-      <div class="trade-items-grid" id="trade-items-grid"></div>
-      <div class="form-actions">
-        <button type="button" class="btn-cancel" id="select-trade-items-cancel">Cancel</button>
-        <button type="button" class="btn-save" id="select-trade-items-confirm">Add Selected</button>
-      </div>
-    </div>
-  </div>
-
   <!-- Hidden file input for photo upload -->
   <input type="file" id="photo-upload-input" accept="image/*" style="display:none">
   <input type="file" id="bg-upload-input" accept="image/*" style="display:none">
@@ -1476,19 +967,11 @@
   <script src="js/templates/index.js"></script>
   <script src="js/interests.js"></script>
   <script src="js/forums.js"></script>
-  <!-- Profile modules (loaded in dependency order before profile.js) -->
-  <script src="js/profile-core.js"></script>
-  <script src="js/profile-ui.js"></script>
-  <script src="js/profile-collection.js"></script>
-  <script src="js/profile-showcase.js"></script>
-  <script src="js/profile-friends.js"></script>
-  <script src="js/profile-messages.js"></script>
-  <script src="js/profile-chat.js"></script>
-  <script src="js/profile-modals.js"></script>
-  <!-- Legacy module components (still used for search/marketplace) -->
+  <!-- Modular components (loaded before profile.js) -->
+  <script src="js/modules/chat.js"></script>
+  <script src="js/modules/messages.js"></script>
+  <script src="js/modules/friends.js"></script>
   <script src="js/modules/search.js"></script>
-  <script src="js/modules/marketplace.js"></script>
-  <!-- Main profile entry point (combines all modules) -->
   <script src="js/profile.js"></script>
 
   <script>

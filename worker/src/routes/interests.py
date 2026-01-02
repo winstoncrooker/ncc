@@ -5,7 +5,7 @@ Manages user membership in categories and interest groups
 
 from fastapi import APIRouter, Request, HTTPException, Depends
 from pydantic import BaseModel
-from .auth import require_auth
+from .auth import require_auth, require_auth
 from utils.conversions import to_python_value as safe_value
 
 router = APIRouter()

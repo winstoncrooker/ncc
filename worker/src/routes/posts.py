@@ -7,7 +7,8 @@ from datetime import datetime
 from fastapi import APIRouter, Request, HTTPException, Depends, Query
 from pydantic import BaseModel, Field
 import json
-from .auth import require_auth
+from .auth import require_auth, require_auth
+from .blocks import get_blocked_user_ids
 from utils.scoring import calculate_hot_score
 from utils.conversions import to_python_value, convert_row, convert_rows
 
@@ -159,6 +160,13 @@ async def get_feed(
             elif sort == "top":
                 conditions.append("(p.upvote_count - p.downvote_count) < ?")
                 params.append(int(cursor))
+
+        # Filter out posts from blocked users (bi-directional)
+        blocked_ids = await get_blocked_user_ids(env, user_id)
+        if blocked_ids:
+            placeholders = ",".join(["?" for _ in blocked_ids])
+            conditions.append(f"p.user_id NOT IN ({placeholders})")
+            params.extend(list(blocked_ids))
 
         # Build ORDER BY
         order_by = {

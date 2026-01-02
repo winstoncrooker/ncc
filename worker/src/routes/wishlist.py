@@ -6,7 +6,7 @@ from fastapi import APIRouter, Request, HTTPException, Depends
 from pydantic import BaseModel, Field
 from typing import Optional
 
-from routes.auth import require_auth
+from routes.auth import require_auth, require_auth
 from utils.conversions import to_python_value
 
 router = APIRouter()

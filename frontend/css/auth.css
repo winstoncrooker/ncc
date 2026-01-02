@@ -34,6 +34,12 @@
   outline-offset: 2px;
 }
 
+.google-login-btn:focus-visible {
+  outline: 3px solid #1db954;
+  outline-offset: 2px;
+  box-shadow: 0 0 0 6px rgba(29, 185, 84, 0.25);
+}
+
 .google-login-btn svg {
   flex-shrink: 0;
 }
@@ -264,6 +270,12 @@
 
 .app-toast .toast-close:hover {
   color: #fff;
+}
+
+.app-toast .toast-close:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 2px;
+  border-radius: 4px;
 }
 
 /* Toast Types */

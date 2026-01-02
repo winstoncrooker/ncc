@@ -6,7 +6,7 @@ from fastapi import APIRouter, Request, HTTPException, Depends
 from pydantic import BaseModel, Field
 from typing import Optional
 
-from routes.auth import require_auth, get_current_user
+from routes.auth import require_auth, require_auth, get_current_user
 from utils.conversions import to_python_value
 
 router = APIRouter()
@@ -141,6 +141,7 @@ async def add_album(
     """
     Add album to user's collection.
     Requires authentication.
+    Uses atomic INSERT with NOT EXISTS subquery to prevent race conditions.
     """
     env = request.scope["env"]
 
@@ -148,21 +149,6 @@ async def add_album(
         raise HTTPException(status_code=400, detail="Artist and album required")
 
     try:
-        # Check for duplicate (within same category if provided)
-        if body.category_id:
-            existing = await env.DB.prepare(
-                """SELECT id FROM collections
-                   WHERE user_id = ? AND LOWER(artist) = LOWER(?) AND LOWER(album) = LOWER(?) AND category_id = ?"""
-            ).bind(user_id, body.artist, body.album, body.category_id).first()
-        else:
-            existing = await env.DB.prepare(
-                """SELECT id FROM collections
-                   WHERE user_id = ? AND LOWER(artist) = LOWER(?) AND LOWER(album) = LOWER(?)"""
-            ).bind(user_id, body.artist, body.album).first()
-
-        if existing:
-            raise HTTPException(status_code=400, detail="Album already in collection")
-
         # Build dynamic query for optional fields
         # D1 has issues with None/null values, so we only include fields that have values
         fields = ["user_id", "artist", "album"]
@@ -202,12 +188,37 @@ async def add_album(
         print(f"[Collection] Adding album: {body.artist} - {body.album} (category: {body.category_id})")
         print(f"[Collection] Fields: {field_names}, Values: {values}")
 
-        result = await env.DB.prepare(
-            f"INSERT INTO collections ({field_names}) VALUES ({placeholders}) RETURNING id"
-        ).bind(*values).first()
+        # Use atomic INSERT with NOT EXISTS to prevent race conditions
+        # The WHERE NOT EXISTS ensures no duplicate is inserted even with concurrent requests
+        if body.category_id is not None:
+            # Check duplicate within category
+            result = await env.DB.prepare(
+                f"""INSERT INTO collections ({field_names})
+                   SELECT {placeholders}
+                   WHERE NOT EXISTS (
+                       SELECT 1 FROM collections
+                       WHERE user_id = ? AND LOWER(artist) = LOWER(?) AND LOWER(album) = LOWER(?) AND category_id = ?
+                   )
+                   RETURNING id"""
+            ).bind(*values, user_id, body.artist, body.album, body.category_id).first()
+        else:
+            # Check duplicate without category constraint
+            result = await env.DB.prepare(
+                f"""INSERT INTO collections ({field_names})
+                   SELECT {placeholders}
+                   WHERE NOT EXISTS (
+                       SELECT 1 FROM collections
+                       WHERE user_id = ? AND LOWER(artist) = LOWER(?) AND LOWER(album) = LOWER(?)
+                   )
+                   RETURNING id"""
+            ).bind(*values, user_id, body.artist, body.album).first()
 
         if result and hasattr(result, 'to_py'):
             result = result.to_py()
+
+        if not result:
+            # NOT EXISTS check failed - album already exists
+            raise HTTPException(status_code=400, detail="Album already in collection")
 
         return Album(
             id=result["id"],
@@ -368,65 +379,97 @@ async def sync_collection(
     Sync offline changes with server.
     Handles adds, updates, and deletes in a single request.
     Returns the complete updated collection.
+    Uses atomic operations to prevent race conditions and data loss.
     """
     env = request.scope["env"]
     from datetime import datetime
 
     try:
-        # Process deletions first
-        for album_id in body.deleted_ids:
-            await env.DB.prepare(
-                "DELETE FROM collections WHERE id = ? AND user_id = ?"
-            ).bind(album_id, user_id).run()
+        # Process deletions first - batch delete for atomicity
+        if body.deleted_ids:
+            # Validate all IDs are integers
+            validated_delete_ids = []
+            for album_id in body.deleted_ids:
+                try:
+                    validated_delete_ids.append(int(album_id))
+                except (ValueError, TypeError):
+                    continue  # Skip invalid IDs
 
-        # Process albums (upsert)
+            if validated_delete_ids:
+                # Batch delete in a single query
+                id_list = ", ".join(str(aid) for aid in validated_delete_ids)
+                await env.DB.prepare(
+                    f"DELETE FROM collections WHERE user_id = ? AND id IN ({id_list})"
+                ).bind(user_id).run()
+
+        # Process albums using atomic upsert pattern
         for album in body.albums:
             if album.id:
-                # Update existing - include all fields to prevent data loss
-                await env.DB.prepare(
+                # Update existing by ID - use RETURNING to verify update happened
+                result = await env.DB.prepare(
                     """UPDATE collections
                        SET artist = ?, album = ?, genre = ?, cover = ?, price = ?,
                            discogs_id = ?, year = ?, category_id = ?, tags = ?,
                            condition = ?, notes = ?, updated_at = CURRENT_TIMESTAMP
-                       WHERE id = ? AND user_id = ?"""
+                       WHERE id = ? AND user_id = ?
+                       RETURNING id"""
                 ).bind(
                     album.artist, album.album, album.genre, album.cover, album.price,
                     album.discogs_id, album.year, album.category_id, album.tags,
                     album.condition, album.notes, album.id, user_id
-                ).run()
-            else:
-                # Check for existing by artist/album (case-insensitive)
-                existing = await env.DB.prepare(
-                    """SELECT id FROM collections
-                       WHERE user_id = ? AND LOWER(artist) = LOWER(?) AND LOWER(album) = LOWER(?)"""
-                ).bind(user_id, album.artist, album.album).first()
+                ).first()
 
-                if existing:
-                    if hasattr(existing, 'to_py'):
-                        existing = existing.to_py()
-                    # Update existing - include all fields to prevent data loss
-                    await env.DB.prepare(
-                        """UPDATE collections
-                           SET genre = ?, cover = ?, price = ?, discogs_id = ?, year = ?,
-                               category_id = ?, tags = ?, condition = ?, notes = ?,
-                               updated_at = CURRENT_TIMESTAMP
-                           WHERE id = ?"""
-                    ).bind(
-                        album.genre, album.cover, album.price, album.discogs_id,
-                        album.year, album.category_id, album.tags, album.condition,
-                        album.notes, existing["id"]
-                    ).run()
-                else:
-                    # Insert new - include all fields
+                # If update didn't match any row, the ID might be stale - try insert as fallback
+                if not result:
                     await env.DB.prepare(
                         """INSERT INTO collections
                            (user_id, artist, album, genre, cover, price, discogs_id, year,
                             category_id, tags, condition, notes)
-                           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"""
+                           SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+                           WHERE NOT EXISTS (
+                               SELECT 1 FROM collections
+                               WHERE user_id = ? AND LOWER(artist) = LOWER(?) AND LOWER(album) = LOWER(?)
+                           )"""
                     ).bind(
                         user_id, album.artist, album.album, album.genre,
                         album.cover, album.price, album.discogs_id, album.year,
-                        album.category_id, album.tags, album.condition, album.notes
+                        album.category_id, album.tags, album.condition, album.notes,
+                        user_id, album.artist, album.album
+                    ).run()
+            else:
+                # No ID - atomic upsert: try update first, then insert if no match
+                # Use UPDATE with RETURNING to check if row was updated
+                update_result = await env.DB.prepare(
+                    """UPDATE collections
+                       SET genre = COALESCE(?, genre), cover = COALESCE(?, cover),
+                           price = COALESCE(?, price), discogs_id = COALESCE(?, discogs_id),
+                           year = COALESCE(?, year), category_id = COALESCE(?, category_id),
+                           tags = COALESCE(?, tags), condition = COALESCE(?, condition),
+                           notes = COALESCE(?, notes), updated_at = CURRENT_TIMESTAMP
+                       WHERE user_id = ? AND LOWER(artist) = LOWER(?) AND LOWER(album) = LOWER(?)
+                       RETURNING id"""
+                ).bind(
+                    album.genre, album.cover, album.price, album.discogs_id,
+                    album.year, album.category_id, album.tags, album.condition,
+                    album.notes, user_id, album.artist, album.album
+                ).first()
+
+                if not update_result:
+                    # No existing row - atomic insert with NOT EXISTS check
+                    await env.DB.prepare(
+                        """INSERT INTO collections
+                           (user_id, artist, album, genre, cover, price, discogs_id, year,
+                            category_id, tags, condition, notes)
+                           SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+                           WHERE NOT EXISTS (
+                               SELECT 1 FROM collections
+                               WHERE user_id = ? AND LOWER(artist) = LOWER(?) AND LOWER(album) = LOWER(?)
+                           )"""
+                    ).bind(
+                        user_id, album.artist, album.album, album.genre,
+                        album.cover, album.price, album.discogs_id, album.year,
+                        album.category_id, album.tags, album.condition, album.notes,
+                        user_id, album.artist, album.album
                     ).run()
 
         # Get updated collection
