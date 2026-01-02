@@ -22,6 +22,7 @@ const MarketplaceModule = {
   chatMessages: [],
   chatPollingInterval: null,
   unreadMessageCount: 0,
+  currentChatOffer: null, // Current offer status in chat
   filters: {
     search: '',
     category: '',
@@ -1674,8 +1675,9 @@ const MarketplaceModule = {
     document.getElementById('chat-other-name').textContent = otherName;
     document.getElementById('chat-listing-title').textContent = conversation.listing_title;
 
-    // Load messages
+    // Load messages and offer status
     await this.loadMessages(conversationId);
+    await this.loadChatOfferStatus(conversationId);
 
     // Start polling for new messages
     this.startChatPolling(conversationId);
@@ -1720,10 +1722,65 @@ const MarketplaceModule = {
     container.innerHTML = this.chatMessages.map(message => {
       const isMine = message.sender_id === currentUserId;
       const timeAgo = Utils.formatTime(message.created_at);
+      const content = message.content || '';
 
+      // Check for special offer messages
+      const offerMatch = content.match(/^\[OFFER:(\d+):([\d.]+):(\w+)\](.*)$/);
+      const acceptedMatch = content.match(/^\[OFFER_ACCEPTED:(\d+):([\d.]+)\]$/);
+      const rejectedMatch = content.match(/^\[OFFER_REJECTED:(\d+):([\d.]+)\]$/);
+
+      if (offerMatch) {
+        const [, offerId, amount, offerType, extraMessage] = offerMatch;
+        const typeLabel = offerType === 'offer' ? 'Offer' : 'Counter-offer';
+        return `
+          <div class="chat-message ${isMine ? 'sent' : 'received'} offer-message">
+            <div class="offer-bubble">
+              <div class="offer-header">${typeLabel}</div>
+              <div class="offer-amount">$${parseFloat(amount).toFixed(2)}</div>
+              ${extraMessage ? `<div class="offer-note">${this.escapeHtml(extraMessage.trim())}</div>` : ''}
+            </div>
+            <div class="message-time">${timeAgo}</div>
+          </div>
+        `;
+      }
+
+      if (acceptedMatch) {
+        const [, offerId, amount] = acceptedMatch;
+        return `
+          <div class="chat-message system-message">
+            <div class="system-bubble accepted">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+                <polyline points="22 4 12 14.01 9 11.01"/>
+              </svg>
+              <span>Offer accepted at $${parseFloat(amount).toFixed(2)}</span>
+            </div>
+            <div class="message-time">${timeAgo}</div>
+          </div>
+        `;
+      }
+
+      if (rejectedMatch) {
+        const [, offerId, amount] = rejectedMatch;
+        return `
+          <div class="chat-message system-message">
+            <div class="system-bubble rejected">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="10"/>
+                <line x1="15" y1="9" x2="9" y2="15"/>
+                <line x1="9" y1="9" x2="15" y2="15"/>
+              </svg>
+              <span>Offer declined ($${parseFloat(amount).toFixed(2)})</span>
+            </div>
+            <div class="message-time">${timeAgo}</div>
+          </div>
+        `;
+      }
+
+      // Regular message
       return `
         <div class="chat-message ${isMine ? 'sent' : 'received'}">
-          <div class="message-bubble">${this.escapeHtml(message.content)}</div>
+          <div class="message-bubble">${this.escapeHtml(content)}</div>
           <div class="message-time">${timeAgo}</div>
         </div>
       `;
@@ -1798,6 +1855,204 @@ const MarketplaceModule = {
     if (this.chatPollingInterval) {
       clearInterval(this.chatPollingInterval);
       this.chatPollingInterval = null;
+    }
+  },
+
+  /**
+   * Load current offer status for conversation
+   */
+  async loadChatOfferStatus(conversationId) {
+    try {
+      const response = await Auth.apiRequest(`/api/marketplace/messages/conversations/${conversationId}/offer`);
+      if (response.ok) {
+        this.currentChatOffer = await response.json();
+        this.renderOfferBar();
+      }
+    } catch (error) {
+      console.error('[Marketplace] Error loading offer status:', error);
+    }
+  },
+
+  /**
+   * Render the offer action bar at the bottom of chat
+   */
+  renderOfferBar() {
+    const container = document.getElementById('chat-offer-bar');
+    if (!container) return;
+
+    const offer = this.currentChatOffer;
+    if (!offer) {
+      container.innerHTML = '';
+      container.style.display = 'none';
+      return;
+    }
+
+    container.style.display = 'block';
+
+    // If no offer yet, show make offer button
+    if (!offer.has_offer) {
+      const listingPrice = offer.listing_price ? `$${parseFloat(offer.listing_price).toFixed(2)}` : '';
+      container.innerHTML = `
+        <div class="offer-bar-content">
+          <div class="offer-info">
+            ${listingPrice ? `<span class="listing-price">Listed at ${listingPrice}</span>` : ''}
+          </div>
+          <button class="offer-btn make-offer" onclick="MarketplaceModule.showOfferInput()">
+            Make Offer
+          </button>
+        </div>
+      `;
+      return;
+    }
+
+    // Has offer - show status and actions
+    const currentAmount = offer.counter_amount || offer.offer_amount;
+    const statusLabels = {
+      'pending': offer.is_buyer ? 'Your offer' : 'Buyer offered',
+      'countered': offer.is_buyer ? 'Seller countered' : 'Your counter',
+      'rejected': 'Offer declined',
+      'accepted': 'Accepted',
+      'withdrawn': 'Withdrawn'
+    };
+
+    let actions = '';
+    if (offer.can_accept && offer.status !== 'accepted') {
+      actions += `<button class="offer-btn accept" onclick="MarketplaceModule.acceptChatOffer()">Accept $${parseFloat(currentAmount).toFixed(2)}</button>`;
+    }
+    if (offer.can_counter) {
+      actions += `<button class="offer-btn counter" onclick="MarketplaceModule.showOfferInput()">Counter</button>`;
+    }
+    if (!offer.is_buyer && offer.status === 'pending') {
+      actions += `<button class="offer-btn reject" onclick="MarketplaceModule.rejectChatOffer()">Decline</button>`;
+    }
+
+    container.innerHTML = `
+      <div class="offer-bar-content">
+        <div class="offer-status">
+          <span class="status-label">${statusLabels[offer.status] || offer.status}</span>
+          <span class="status-amount">$${parseFloat(currentAmount).toFixed(2)}</span>
+        </div>
+        <div class="offer-actions">${actions}</div>
+      </div>
+    `;
+  },
+
+  /**
+   * Show offer input field
+   */
+  showOfferInput() {
+    const container = document.getElementById('chat-offer-bar');
+    if (!container) return;
+
+    const currentAmount = this.currentChatOffer?.counter_amount || this.currentChatOffer?.offer_amount || this.currentChatOffer?.listing_price || '';
+    const isCounter = this.currentChatOffer?.has_offer;
+
+    container.innerHTML = `
+      <div class="offer-input-form">
+        <div class="offer-input-row">
+          <span class="currency-symbol">$</span>
+          <input type="number" id="chat-offer-amount" placeholder="0.00" step="0.01" min="0" value="${currentAmount}">
+          <input type="text" id="chat-offer-message" placeholder="Add a note (optional)" maxlength="500">
+        </div>
+        <div class="offer-input-actions">
+          <button class="offer-btn cancel" onclick="MarketplaceModule.renderOfferBar()">Cancel</button>
+          <button class="offer-btn submit" onclick="MarketplaceModule.submitChatOffer()">
+            ${isCounter ? 'Send Counter' : 'Send Offer'}
+          </button>
+        </div>
+      </div>
+    `;
+
+    document.getElementById('chat-offer-amount')?.focus();
+  },
+
+  /**
+   * Submit an offer from chat
+   */
+  async submitChatOffer() {
+    if (!this.currentConversation) return;
+
+    const amountInput = document.getElementById('chat-offer-amount');
+    const messageInput = document.getElementById('chat-offer-message');
+    const amount = parseFloat(amountInput?.value);
+    const message = messageInput?.value?.trim() || null;
+
+    if (!amount || amount <= 0) {
+      Auth.showError('Please enter a valid amount');
+      return;
+    }
+
+    try {
+      const response = await Auth.apiRequest(
+        `/api/marketplace/messages/conversations/${this.currentConversation.id}/offer`,
+        {
+          method: 'POST',
+          body: JSON.stringify({ amount, message })
+        }
+      );
+
+      if (response.ok) {
+        // Reload messages and offer status
+        await this.loadMessages(this.currentConversation.id);
+        await this.loadChatOfferStatus(this.currentConversation.id);
+      } else {
+        const error = await response.json();
+        Auth.showError(error.detail || 'Failed to submit offer');
+      }
+    } catch (error) {
+      console.error('[Marketplace] Error submitting offer:', error);
+      Auth.showError('Failed to submit offer');
+    }
+  },
+
+  /**
+   * Accept offer from chat
+   */
+  async acceptChatOffer() {
+    if (!this.currentConversation || !this.currentChatOffer?.offer_id) return;
+
+    try {
+      const response = await Auth.apiRequest(
+        `/api/marketplace/messages/conversations/${this.currentConversation.id}/offer/${this.currentChatOffer.offer_id}/accept`,
+        { method: 'POST' }
+      );
+
+      if (response.ok) {
+        Auth.showSuccess('Offer accepted!');
+        await this.loadMessages(this.currentConversation.id);
+        await this.loadChatOfferStatus(this.currentConversation.id);
+      } else {
+        const error = await response.json();
+        Auth.showError(error.detail || 'Failed to accept offer');
+      }
+    } catch (error) {
+      console.error('[Marketplace] Error accepting offer:', error);
+      Auth.showError('Failed to accept offer');
+    }
+  },
+
+  /**
+   * Reject offer from chat
+   */
+  async rejectChatOffer() {
+    if (!this.currentConversation || !this.currentChatOffer?.offer_id) return;
+
+    try {
+      const response = await Auth.apiRequest(
+        `/api/marketplace/messages/conversations/${this.currentConversation.id}/offer/${this.currentChatOffer.offer_id}/reject`,
+        { method: 'POST' }
+      );
+
+      if (response.ok) {
+        await this.loadMessages(this.currentConversation.id);
+        await this.loadChatOfferStatus(this.currentConversation.id);
+      } else {
+        const error = await response.json();
+        Auth.showError(error.detail || 'Failed to decline offer');
+      }
+    } catch (error) {
+      console.error('[Marketplace] Error declining offer:', error);
+      Auth.showError('Failed to decline offer');
     }
   },
 

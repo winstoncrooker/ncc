@@ -1180,24 +1180,32 @@ async def update_offer(
         current_status = offer["status"]
         new_status = body.status
 
-        if current_status not in ["pending", "countered"]:
+        # Allow counter-offers to go back and forth
+        # Valid statuses for making changes: pending, countered, rejected (for buyer to counter back)
+        if current_status not in ["pending", "countered", "rejected"]:
             raise HTTPException(status_code=400, detail=f"Cannot update offer in status: {current_status}")
 
-        # Validate permissions
+        # Validate permissions - both parties can now counter-offer
         if is_buyer:
             if new_status == "withdrawn":
                 pass  # Buyer can withdraw
             elif new_status == "accepted" and current_status == "countered":
-                pass  # Buyer can accept counter
+                pass  # Buyer can accept seller's counter
+            elif new_status == "countered" and current_status in ["rejected", "countered"]:
+                # Buyer can counter after rejection or counter seller's counter
+                if body.counter_amount is None:
+                    raise HTTPException(status_code=400, detail="Counter amount is required")
             else:
-                raise HTTPException(status_code=403, detail="Buyer can only withdraw or accept counter offers")
+                raise HTTPException(status_code=403, detail="Buyer can withdraw, accept counter, or make counter-offer")
 
         if is_seller:
-            if new_status in ["accepted", "rejected", "countered"]:
-                if new_status == "countered" and body.counter_amount is None:
-                    raise HTTPException(status_code=400, detail="Counter amount is required for counter offers")
+            if new_status in ["accepted", "rejected"]:
+                pass  # Seller can accept or reject
+            elif new_status == "countered":
+                if body.counter_amount is None:
+                    raise HTTPException(status_code=400, detail="Counter amount is required")
             else:
-                raise HTTPException(status_code=403, detail="Seller can only accept, reject, or counter offers")
+                raise HTTPException(status_code=403, detail="Seller can accept, reject, or counter offers")
 
         # Check listing is still active
         if offer["listing_status"] != "active":
@@ -2055,3 +2063,350 @@ async def get_marketplace_unread_count(
 
     except Exception as error:
         raise HTTPException(status_code=500, detail=f"Error fetching unread count: {str(error)}")
+
+
+class ChatOfferRequest(BaseModel):
+    """Create or counter an offer from within a conversation"""
+    amount: float = Field(..., ge=0)
+    message: Optional[str] = Field(None, max_length=500)
+
+
+class ChatOfferResponse(BaseModel):
+    """Response for chat offer creation"""
+    offer_id: int
+    status: str
+    amount: float
+    message_id: int
+    created_at: str
+
+
+@router.post("/messages/conversations/{conversation_id}/offer")
+async def create_chat_offer(
+    request: Request,
+    conversation_id: int,
+    body: ChatOfferRequest,
+    user_id: int = Depends(require_csrf)
+) -> ChatOfferResponse:
+    """
+    Create or counter an offer from within the chat.
+    - Buyer can make initial offer or counter after rejection/counter
+    - Seller can counter a pending/countered offer
+    The offer is also posted as a special message in the chat.
+    """
+    env = request.scope["env"]
+
+    try:
+        # Get conversation and listing info
+        conv = await env.DB.prepare(
+            """SELECT c.*, l.id as listing_id, l.user_id as listing_seller_id,
+                      l.title as listing_title, l.status as listing_status, l.price as listing_price
+               FROM marketplace_conversations c
+               JOIN listings l ON c.listing_id = l.id
+               WHERE c.id = ?"""
+        ).bind(conversation_id).first()
+        conv = convert_row(conv)
+
+        if not conv:
+            raise HTTPException(status_code=404, detail="Conversation not found")
+
+        if conv["buyer_id"] != user_id and conv["seller_id"] != user_id:
+            raise HTTPException(status_code=403, detail="Not authorized")
+
+        if conv["listing_status"] != "active":
+            raise HTTPException(status_code=400, detail="Listing is no longer active")
+
+        is_buyer = conv["buyer_id"] == user_id
+        is_seller = conv["seller_id"] == user_id
+        listing_id = conv["listing_id"]
+
+        # Check for existing offer on this listing from this buyer
+        existing_offer = await env.DB.prepare(
+            "SELECT id, status, offer_amount, counter_amount FROM listing_offers WHERE listing_id = ? AND buyer_id = ? ORDER BY created_at DESC LIMIT 1"
+        ).bind(listing_id, conv["buyer_id"]).first()
+        existing_offer = convert_row(existing_offer) if existing_offer else None
+
+        offer_id = None
+        new_status = None
+
+        if is_buyer:
+            if existing_offer and existing_offer["status"] in ["pending", "countered", "rejected"]:
+                # Buyer countering - update existing offer
+                await env.DB.prepare(
+                    "UPDATE listing_offers SET offer_amount = ?, status = 'pending', counter_amount = NULL, counter_message = NULL, message = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?"
+                ).bind(body.amount, body.message, existing_offer["id"]).run()
+                offer_id = existing_offer["id"]
+                new_status = "pending"
+            else:
+                # New offer from buyer
+                result = await env.DB.prepare(
+                    "INSERT INTO listing_offers (listing_id, buyer_id, offer_type, offer_amount, message, status) VALUES (?, ?, 'buy', ?, ?, 'pending') RETURNING id"
+                ).bind(listing_id, user_id, body.amount, body.message).first()
+                result = convert_row(result)
+                offer_id = result["id"]
+                new_status = "pending"
+
+        elif is_seller:
+            if not existing_offer:
+                raise HTTPException(status_code=400, detail="No offer to counter")
+
+            if existing_offer["status"] not in ["pending", "countered"]:
+                raise HTTPException(status_code=400, detail="Cannot counter this offer")
+
+            # Seller countering
+            await env.DB.prepare(
+                "UPDATE listing_offers SET counter_amount = ?, counter_message = ?, status = 'countered', updated_at = CURRENT_TIMESTAMP WHERE id = ?"
+            ).bind(body.amount, body.message, existing_offer["id"]).run()
+            offer_id = existing_offer["id"]
+            new_status = "countered"
+
+        # Create a special offer message in the chat
+        offer_type = "offer" if is_buyer and (not existing_offer or existing_offer["status"] == "rejected") else "counter"
+        offer_message_content = f"[OFFER:{offer_id}:{body.amount}:{offer_type}]"
+        if body.message:
+            offer_message_content += f" {body.message}"
+
+        msg_result = await env.DB.prepare(
+            "INSERT INTO marketplace_messages (conversation_id, sender_id, content) VALUES (?, ?, ?) RETURNING id, created_at"
+        ).bind(conversation_id, user_id, offer_message_content).first()
+        msg_result = convert_row(msg_result)
+
+        # Update conversation timestamp and unread count
+        if is_buyer:
+            await env.DB.prepare(
+                "UPDATE marketplace_conversations SET last_message_at = CURRENT_TIMESTAMP, seller_unread_count = seller_unread_count + 1 WHERE id = ?"
+            ).bind(conversation_id).run()
+        else:
+            await env.DB.prepare(
+                "UPDATE marketplace_conversations SET last_message_at = CURRENT_TIMESTAMP, buyer_unread_count = buyer_unread_count + 1 WHERE id = ?"
+            ).bind(conversation_id).run()
+
+        return ChatOfferResponse(
+            offer_id=offer_id,
+            status=new_status,
+            amount=body.amount,
+            message_id=msg_result["id"],
+            created_at=str(msg_result["created_at"])
+        )
+
+    except HTTPException:
+        raise
+    except Exception as error:
+        raise HTTPException(status_code=500, detail=f"Error creating offer: {str(error)}")
+
+
+@router.post("/messages/conversations/{conversation_id}/offer/{offer_id}/accept")
+async def accept_chat_offer(
+    request: Request,
+    conversation_id: int,
+    offer_id: int,
+    user_id: int = Depends(require_csrf)
+) -> dict:
+    """Accept an offer from within the chat."""
+    env = request.scope["env"]
+
+    try:
+        # Verify conversation and offer
+        conv = await env.DB.prepare(
+            "SELECT buyer_id, seller_id, listing_id FROM marketplace_conversations WHERE id = ?"
+        ).bind(conversation_id).first()
+        conv = convert_row(conv)
+
+        if not conv:
+            raise HTTPException(status_code=404, detail="Conversation not found")
+
+        offer = await env.DB.prepare(
+            """SELECT o.*, l.user_id as seller_id, l.status as listing_status
+               FROM listing_offers o
+               JOIN listings l ON o.listing_id = l.id
+               WHERE o.id = ? AND o.listing_id = ?"""
+        ).bind(offer_id, conv["listing_id"]).first()
+        offer = convert_row(offer)
+
+        if not offer:
+            raise HTTPException(status_code=404, detail="Offer not found")
+
+        is_seller = offer["seller_id"] == user_id
+        is_buyer = offer["buyer_id"] == user_id
+
+        # Seller accepts pending offer, Buyer accepts counter
+        if is_seller and offer["status"] != "pending":
+            raise HTTPException(status_code=400, detail="Can only accept pending offers")
+        if is_buyer and offer["status"] != "countered":
+            raise HTTPException(status_code=400, detail="Can only accept counter offers")
+
+        if not is_seller and not is_buyer:
+            raise HTTPException(status_code=403, detail="Not authorized")
+
+        if offer["listing_status"] != "active":
+            raise HTTPException(status_code=400, detail="Listing is no longer active")
+
+        # Accept the offer
+        await env.DB.prepare(
+            "UPDATE listing_offers SET status = 'accepted', updated_at = CURRENT_TIMESTAMP WHERE id = ?"
+        ).bind(offer_id).run()
+
+        # Get final price
+        final_price = offer.get("counter_amount") or offer.get("offer_amount")
+
+        # Create transaction
+        await env.DB.prepare(
+            "INSERT INTO transactions (listing_id, offer_id, seller_id, buyer_id, final_price, payment_status) VALUES (?, ?, ?, ?, ?, 'pending')"
+        ).bind(conv["listing_id"], offer_id, offer["seller_id"], offer["buyer_id"], final_price).run()
+
+        # Mark listing as sold
+        await env.DB.prepare(
+            "UPDATE listings SET status = 'sold', updated_at = CURRENT_TIMESTAMP WHERE id = ?"
+        ).bind(conv["listing_id"]).run()
+
+        # Reject other pending offers
+        await env.DB.prepare(
+            "UPDATE listing_offers SET status = 'rejected', updated_at = CURRENT_TIMESTAMP WHERE listing_id = ? AND id != ? AND status IN ('pending', 'countered')"
+        ).bind(conv["listing_id"], offer_id).run()
+
+        # Post acceptance message
+        accept_message = f"[OFFER_ACCEPTED:{offer_id}:{final_price}]"
+        await env.DB.prepare(
+            "INSERT INTO marketplace_messages (conversation_id, sender_id, content) VALUES (?, ?, ?)"
+        ).bind(conversation_id, user_id, accept_message).run()
+
+        # Update conversation
+        if is_seller:
+            await env.DB.prepare(
+                "UPDATE marketplace_conversations SET last_message_at = CURRENT_TIMESTAMP, buyer_unread_count = buyer_unread_count + 1 WHERE id = ?"
+            ).bind(conversation_id).run()
+        else:
+            await env.DB.prepare(
+                "UPDATE marketplace_conversations SET last_message_at = CURRENT_TIMESTAMP, seller_unread_count = seller_unread_count + 1 WHERE id = ?"
+            ).bind(conversation_id).run()
+
+        return {"success": True, "message": "Offer accepted", "final_price": final_price}
+
+    except HTTPException:
+        raise
+    except Exception as error:
+        raise HTTPException(status_code=500, detail=f"Error accepting offer: {str(error)}")
+
+
+@router.post("/messages/conversations/{conversation_id}/offer/{offer_id}/reject")
+async def reject_chat_offer(
+    request: Request,
+    conversation_id: int,
+    offer_id: int,
+    user_id: int = Depends(require_csrf)
+) -> dict:
+    """Reject an offer from within the chat. Only seller can reject."""
+    env = request.scope["env"]
+
+    try:
+        # Verify conversation and offer
+        conv = await env.DB.prepare(
+            "SELECT buyer_id, seller_id, listing_id FROM marketplace_conversations WHERE id = ?"
+        ).bind(conversation_id).first()
+        conv = convert_row(conv)
+
+        if not conv:
+            raise HTTPException(status_code=404, detail="Conversation not found")
+
+        if conv["seller_id"] != user_id:
+            raise HTTPException(status_code=403, detail="Only seller can reject offers")
+
+        offer = await env.DB.prepare(
+            "SELECT id, status, offer_amount FROM listing_offers WHERE id = ? AND listing_id = ?"
+        ).bind(offer_id, conv["listing_id"]).first()
+        offer = convert_row(offer)
+
+        if not offer:
+            raise HTTPException(status_code=404, detail="Offer not found")
+
+        if offer["status"] not in ["pending", "countered"]:
+            raise HTTPException(status_code=400, detail="Cannot reject this offer")
+
+        # Reject the offer
+        await env.DB.prepare(
+            "UPDATE listing_offers SET status = 'rejected', updated_at = CURRENT_TIMESTAMP WHERE id = ?"
+        ).bind(offer_id).run()
+
+        # Post rejection message
+        reject_message = f"[OFFER_REJECTED:{offer_id}:{offer['offer_amount']}]"
+        await env.DB.prepare(
+            "INSERT INTO marketplace_messages (conversation_id, sender_id, content) VALUES (?, ?, ?)"
+        ).bind(conversation_id, user_id, reject_message).run()
+
+        # Update conversation
+        await env.DB.prepare(
+            "UPDATE marketplace_conversations SET last_message_at = CURRENT_TIMESTAMP, buyer_unread_count = buyer_unread_count + 1 WHERE id = ?"
+        ).bind(conversation_id).run()
+
+        return {"success": True, "message": "Offer declined"}
+
+    except HTTPException:
+        raise
+    except Exception as error:
+        raise HTTPException(status_code=500, detail=f"Error rejecting offer: {str(error)}")
+
+
+@router.get("/messages/conversations/{conversation_id}/offer")
+async def get_conversation_offer(
+    request: Request,
+    conversation_id: int,
+    user_id: int = Depends(require_auth)
+) -> dict:
+    """Get the current offer status for a conversation."""
+    env = request.scope["env"]
+
+    try:
+        # Verify user is part of conversation
+        conv = await env.DB.prepare(
+            "SELECT buyer_id, seller_id, listing_id FROM marketplace_conversations WHERE id = ?"
+        ).bind(conversation_id).first()
+        conv = convert_row(conv)
+
+        if not conv:
+            raise HTTPException(status_code=404, detail="Conversation not found")
+
+        if conv["buyer_id"] != user_id and conv["seller_id"] != user_id:
+            raise HTTPException(status_code=403, detail="Not authorized")
+
+        # Get latest offer
+        offer = await env.DB.prepare(
+            """SELECT o.*, l.price as listing_price
+               FROM listing_offers o
+               JOIN listings l ON o.listing_id = l.id
+               WHERE o.listing_id = ? AND o.buyer_id = ?
+               ORDER BY o.updated_at DESC LIMIT 1"""
+        ).bind(conv["listing_id"], conv["buyer_id"]).first()
+        offer = convert_row(offer) if offer else None
+
+        if not offer:
+            # Get listing price for reference
+            listing = await env.DB.prepare(
+                "SELECT price FROM listings WHERE id = ?"
+            ).bind(conv["listing_id"]).first()
+            listing = convert_row(listing)
+            return {
+                "has_offer": False,
+                "listing_price": to_python_value(listing.get("price")) if listing else None
+            }
+
+        return {
+            "has_offer": True,
+            "offer_id": offer["id"],
+            "status": offer["status"],
+            "offer_amount": to_python_value(offer.get("offer_amount")),
+            "counter_amount": to_python_value(offer.get("counter_amount")),
+            "listing_price": to_python_value(offer.get("listing_price")),
+            "is_buyer": conv["buyer_id"] == user_id,
+            "can_counter": (
+                (conv["buyer_id"] == user_id and offer["status"] in ["rejected", "countered"]) or
+                (conv["seller_id"] == user_id and offer["status"] in ["pending", "countered"])
+            ),
+            "can_accept": (
+                (conv["seller_id"] == user_id and offer["status"] == "pending") or
+                (conv["buyer_id"] == user_id and offer["status"] == "countered")
+            )
+        }
+
+    except HTTPException:
+        raise
+    except Exception as error:
+        raise HTTPException(status_code=500, detail=f"Error fetching offer: {str(error)}")

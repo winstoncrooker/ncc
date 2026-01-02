@@ -1904,3 +1904,263 @@
 [data-theme="light"] .chat-message.received .message-bubble {
   background: rgba(0, 0, 0, 0.06);
 }
+
+/* ============================================
+   CHAT OFFER SYSTEM
+   ============================================ */
+
+/* Offer Bar */
+.chat-offer-bar {
+  display: none;
+  padding: 12px 16px;
+  background: var(--bg-card);
+  border-top: 1px solid var(--border-color);
+}
+
+.offer-bar-content {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.offer-info .listing-price {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+.offer-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.status-label {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+.status-amount {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--accent);
+}
+
+.offer-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.offer-btn {
+  padding: 8px 16px;
+  border-radius: 20px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: none;
+}
+
+.offer-btn.make-offer,
+.offer-btn.counter {
+  background: var(--accent);
+  color: #000;
+}
+
+.offer-btn.make-offer:hover,
+.offer-btn.counter:hover {
+  transform: scale(1.02);
+  box-shadow: 0 4px 12px rgba(29, 185, 84, 0.3);
+}
+
+.offer-btn.accept {
+  background: #4caf50;
+  color: #fff;
+}
+
+.offer-btn.accept:hover {
+  background: #43a047;
+}
+
+.offer-btn.reject {
+  background: transparent;
+  color: #ef5350;
+  border: 1px solid #ef5350;
+}
+
+.offer-btn.reject:hover {
+  background: rgba(239, 83, 80, 0.1);
+}
+
+.offer-btn.cancel {
+  background: transparent;
+  color: var(--text-secondary);
+  border: 1px solid var(--border-color);
+}
+
+.offer-btn.cancel:hover {
+  background: var(--bg-hover);
+}
+
+.offer-btn.submit {
+  background: var(--accent);
+  color: #000;
+}
+
+/* Offer Input Form */
+.offer-input-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.offer-input-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.offer-input-row .currency-symbol {
+  font-size: 1.2rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.offer-input-row input[type="number"] {
+  width: 120px;
+  padding: 10px 14px;
+  background: var(--bg-hover);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  color: var(--text-primary);
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.offer-input-row input[type="text"] {
+  flex: 1;
+  padding: 10px 14px;
+  background: var(--bg-hover);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  color: var(--text-primary);
+  font-size: 0.9rem;
+}
+
+.offer-input-row input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.offer-input-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+/* Offer Messages in Chat */
+.chat-message.offer-message .offer-bubble {
+  padding: 16px;
+  border-radius: 16px;
+  text-align: center;
+  min-width: 150px;
+}
+
+.chat-message.sent.offer-message .offer-bubble {
+  background: linear-gradient(135deg, var(--accent), #17a34a);
+  color: #000;
+}
+
+.chat-message.received.offer-message .offer-bubble {
+  background: linear-gradient(135deg, #2d3748, #1a202c);
+  border: 2px solid var(--accent);
+}
+
+.offer-bubble .offer-header {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  opacity: 0.8;
+  margin-bottom: 4px;
+}
+
+.offer-bubble .offer-amount {
+  font-size: 1.5rem;
+  font-weight: 700;
+}
+
+.chat-message.received.offer-message .offer-bubble .offer-amount {
+  color: var(--accent);
+}
+
+.offer-bubble .offer-note {
+  font-size: 0.85rem;
+  margin-top: 8px;
+  opacity: 0.9;
+}
+
+/* System Messages (accepted/rejected) */
+.chat-message.system-message {
+  align-self: center;
+  max-width: none;
+}
+
+.system-bubble {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border-radius: 20px;
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
+.system-bubble.accepted {
+  background: rgba(76, 175, 80, 0.15);
+  color: #4caf50;
+}
+
+.system-bubble.rejected {
+  background: rgba(239, 83, 80, 0.15);
+  color: #ef5350;
+}
+
+.system-bubble svg {
+  flex-shrink: 0;
+}
+
+/* Mobile Responsive for Offer Bar */
+@media (max-width: 768px) {
+  .offer-bar-content {
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .offer-actions {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .offer-input-row {
+    flex-wrap: wrap;
+  }
+
+  .offer-input-row input[type="number"] {
+    width: 100px;
+  }
+
+  .offer-input-row input[type="text"] {
+    flex: 1 1 100%;
+    margin-top: 8px;
+  }
+}
+
+/* Light Theme Overrides for Offers */
+[data-theme="light"] .chat-message.received.offer-message .offer-bubble {
+  background: linear-gradient(135deg, #f7fafc, #edf2f7);
+  border-color: var(--accent);
+}
+
+[data-theme="light"] .offer-input-row input {
+  background: rgba(0, 0, 0, 0.04);
+}
