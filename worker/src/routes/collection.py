@@ -6,7 +6,7 @@ from fastapi import APIRouter, Request, HTTPException, Depends
 from pydantic import BaseModel, Field
 from typing import Optional
 
-from routes.auth import require_auth, require_csrf, get_current_user
+from routes.auth import require_auth, require_auth, get_current_user
 from utils.conversions import to_python_value
 
 router = APIRouter()
@@ -136,7 +136,7 @@ async def get_collection(
 async def add_album(
     request: Request,
     body: AlbumCreate,
-    user_id: int = Depends(require_csrf)
+    user_id: int = Depends(require_auth)
 ) -> Album:
     """
     Add album to user's collection.
@@ -242,7 +242,7 @@ async def update_album(
     request: Request,
     album_id: int,
     body: AlbumUpdate,
-    user_id: int = Depends(require_csrf)
+    user_id: int = Depends(require_auth)
 ) -> Album:
     """
     Update album in user's collection.
@@ -334,7 +334,7 @@ async def update_album(
 async def delete_album(
     request: Request,
     album_id: int,
-    user_id: int = Depends(require_csrf)
+    user_id: int = Depends(require_auth)
 ) -> dict:
     """
     Delete album from user's collection.
@@ -373,7 +373,7 @@ async def delete_album(
 async def sync_collection(
     request: Request,
     body: SyncRequest,
-    user_id: int = Depends(require_csrf)
+    user_id: int = Depends(require_auth)
 ) -> SyncResponse:
     """
     Sync offline changes with server.

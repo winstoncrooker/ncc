@@ -7,7 +7,7 @@ from fastapi import APIRouter, Request, HTTPException, Depends
 from pydantic import BaseModel, Field
 from typing import Optional
 
-from routes.auth import require_auth, require_csrf
+from routes.auth import require_auth, require_auth
 from routes.blocks import is_blocked
 from utils.conversions import to_python_value
 from services.email import send_friend_request_notification, send_friend_accepted_notification
@@ -120,7 +120,7 @@ async def get_friends(
 async def send_friend_request(
     request: Request,
     body: SendFriendRequest,
-    user_id: int = Depends(require_csrf)
+    user_id: int = Depends(require_auth)
 ) -> FriendRequest:
     """
     Send a friend request by exact name (case-sensitive).
@@ -354,7 +354,7 @@ async def get_request_count(
 async def accept_friend_request(
     request: Request,
     request_id: int,
-    user_id: int = Depends(require_csrf)
+    user_id: int = Depends(require_auth)
 ) -> dict:
     """
     Accept a friend request.
@@ -420,7 +420,7 @@ async def accept_friend_request(
 async def reject_friend_request(
     request: Request,
     request_id: int,
-    user_id: int = Depends(require_csrf)
+    user_id: int = Depends(require_auth)
 ) -> dict:
     """
     Reject a friend request.
@@ -461,7 +461,7 @@ async def reject_friend_request(
 async def cancel_friend_request(
     request: Request,
     request_id: int,
-    user_id: int = Depends(require_csrf)
+    user_id: int = Depends(require_auth)
 ) -> dict:
     """
     Cancel a friend request you sent.
@@ -502,7 +502,7 @@ async def cancel_friend_request(
 async def remove_friend(
     request: Request,
     friend_id: int,
-    user_id: int = Depends(require_csrf)
+    user_id: int = Depends(require_auth)
 ) -> dict:
     """
     Unfriend a user (removes friendship in both directions).

@@ -11,7 +11,7 @@ from typing import Optional
 from fastapi import APIRouter, Request, HTTPException, Depends, Query
 from pydantic import BaseModel, Field
 
-from routes.auth import require_auth, require_csrf
+from routes.auth import require_auth
 from utils.conversions import to_python_value, convert_row, convert_rows
 from services.email import send_offer_notification, send_offer_response_notification, send_transaction_complete_notification
 
@@ -343,7 +343,7 @@ async def build_listing_response(env, row: dict, images: list = None) -> Listing
 async def create_listing(
     request: Request,
     body: CreateListingRequest,
-    user_id: int = Depends(require_csrf)
+    user_id: int = Depends(require_auth)
 ) -> ListingResponse:
     """
     Create a new marketplace listing.
@@ -710,7 +710,7 @@ async def update_listing(
     request: Request,
     listing_id: int,
     body: UpdateListingRequest,
-    user_id: int = Depends(require_csrf)
+    user_id: int = Depends(require_auth)
 ) -> ListingResponse:
     """Update a listing. Only the owner can update."""
     env = request.scope["env"]
@@ -808,7 +808,7 @@ async def update_listing(
 async def cancel_listing(
     request: Request,
     listing_id: int,
-    user_id: int = Depends(require_csrf)
+    user_id: int = Depends(require_auth)
 ) -> dict:
     """Cancel a listing. Only the owner can cancel."""
     env = request.scope["env"]
@@ -854,7 +854,7 @@ async def create_offer(
     request: Request,
     listing_id: int,
     body: CreateOfferRequest,
-    user_id: int = Depends(require_csrf)
+    user_id: int = Depends(require_auth)
 ) -> OfferResponse:
     """Make an offer on a listing."""
     env = request.scope["env"]
@@ -1148,7 +1148,7 @@ async def update_offer(
     request: Request,
     offer_id: int,
     body: UpdateOfferRequest,
-    user_id: int = Depends(require_csrf)
+    user_id: int = Depends(require_auth)
 ) -> OfferResponse:
     """
     Accept, reject, counter, or withdraw an offer.
@@ -1326,7 +1326,7 @@ async def update_offer(
 async def accept_offer(
     request: Request,
     offer_id: int,
-    user_id: int = Depends(require_csrf)
+    user_id: int = Depends(require_auth)
 ) -> dict:
     """Quick accept an offer. Only the seller can accept."""
     env = request.scope["env"]
@@ -1380,7 +1380,7 @@ async def accept_offer(
 async def reject_offer(
     request: Request,
     offer_id: int,
-    user_id: int = Depends(require_csrf)
+    user_id: int = Depends(require_auth)
 ) -> dict:
     """Quick reject an offer. Only the seller can reject."""
     env = request.scope["env"]
@@ -1424,7 +1424,7 @@ async def complete_transaction(
     request: Request,
     transaction_id: int,
     body: CompleteTransactionRequest,
-    user_id: int = Depends(require_csrf)
+    user_id: int = Depends(require_auth)
 ) -> TransactionResponse:
     """
     Mark a transaction as complete.
@@ -1536,7 +1536,7 @@ async def complete_transaction(
 async def create_rating(
     request: Request,
     body: CreateRatingRequest,
-    user_id: int = Depends(require_csrf)
+    user_id: int = Depends(require_auth)
 ) -> RatingResponse:
     """
     Leave a rating after a transaction.
@@ -1828,7 +1828,7 @@ async def get_marketplace_conversations(
 async def start_marketplace_conversation(
     request: Request,
     body: StartConversationRequest,
-    user_id: int = Depends(require_csrf)
+    user_id: int = Depends(require_auth)
 ) -> MarketplaceConversationResponse:
     """Start a new conversation about a listing."""
     env = request.scope["env"]
@@ -1982,7 +1982,7 @@ async def send_marketplace_message(
     request: Request,
     conversation_id: int,
     body: SendMessageRequest,
-    user_id: int = Depends(require_csrf)
+    user_id: int = Depends(require_auth)
 ) -> MarketplaceMessageResponse:
     """Send a message in a conversation."""
     env = request.scope["env"]
@@ -2085,7 +2085,7 @@ async def create_chat_offer(
     request: Request,
     conversation_id: int,
     body: ChatOfferRequest,
-    user_id: int = Depends(require_csrf)
+    user_id: int = Depends(require_auth)
 ) -> ChatOfferResponse:
     """
     Create or counter an offer from within the chat.
@@ -2199,7 +2199,7 @@ async def accept_chat_offer(
     request: Request,
     conversation_id: int,
     offer_id: int,
-    user_id: int = Depends(require_csrf)
+    user_id: int = Depends(require_auth)
 ) -> dict:
     """Accept an offer from within the chat."""
     env = request.scope["env"]
@@ -2292,7 +2292,7 @@ async def reject_chat_offer(
     request: Request,
     conversation_id: int,
     offer_id: int,
-    user_id: int = Depends(require_csrf)
+    user_id: int = Depends(require_auth)
 ) -> dict:
     """Reject an offer from within the chat. Only seller can reject."""
     env = request.scope["env"]

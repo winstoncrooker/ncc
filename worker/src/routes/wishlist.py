@@ -6,7 +6,7 @@ from fastapi import APIRouter, Request, HTTPException, Depends
 from pydantic import BaseModel, Field
 from typing import Optional
 
-from routes.auth import require_auth, require_csrf
+from routes.auth import require_auth, require_auth
 from utils.conversions import to_python_value
 
 router = APIRouter()
@@ -109,7 +109,7 @@ async def get_wishlist(
 async def add_wishlist_item(
     request: Request,
     body: WishlistCreate,
-    user_id: int = Depends(require_csrf)
+    user_id: int = Depends(require_auth)
 ) -> WishlistItem:
     """Add item to wishlist"""
     env = request.scope["env"]
@@ -170,7 +170,7 @@ async def update_wishlist_item(
     request: Request,
     item_id: int,
     body: WishlistUpdate,
-    user_id: int = Depends(require_csrf)
+    user_id: int = Depends(require_auth)
 ) -> WishlistItem:
     """Update wishlist item"""
     env = request.scope["env"]
@@ -252,7 +252,7 @@ async def update_wishlist_item(
 async def delete_wishlist_item(
     request: Request,
     item_id: int,
-    user_id: int = Depends(require_csrf)
+    user_id: int = Depends(require_auth)
 ):
     """Delete wishlist item"""
     env = request.scope["env"]

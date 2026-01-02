@@ -6,7 +6,7 @@ from fastapi import APIRouter, Request, HTTPException, Depends
 from pydantic import BaseModel
 from typing import Optional
 
-from routes.auth import require_auth, require_csrf
+from routes.auth import require_auth, require_auth
 from routes.blocks import is_blocked
 from utils.conversions import to_python_value
 from services.email import send_message_notification
@@ -185,7 +185,7 @@ async def get_conversation(
 async def send_message(
     request: Request,
     body: SendMessageRequest,
-    user_id: int = Depends(require_csrf)
+    user_id: int = Depends(require_auth)
 ) -> Message:
     """
     Send a message to a user.
@@ -272,7 +272,7 @@ async def send_message(
 async def mark_as_read(
     request: Request,
     message_id: int,
-    user_id: int = Depends(require_csrf)
+    user_id: int = Depends(require_auth)
 ) -> dict:
     """
     Mark a message as read.

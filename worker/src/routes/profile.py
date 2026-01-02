@@ -7,7 +7,7 @@ from fastapi import APIRouter, Request, HTTPException, Depends
 from pydantic import BaseModel, Field
 from typing import Optional
 
-from routes.auth import require_auth, require_csrf
+from routes.auth import require_auth, require_auth
 from utils.conversions import to_python_value
 
 router = APIRouter()
@@ -191,7 +191,7 @@ async def get_profile(
 async def update_profile(
     request: Request,
     body: ProfileUpdate,
-    user_id: int = Depends(require_csrf)
+    user_id: int = Depends(require_auth)
 ) -> ProfileResponse:
     """
     Update current user's profile.
@@ -337,7 +337,7 @@ async def get_showcase(
 async def add_to_showcase(
     request: Request,
     body: ShowcaseAdd,
-    user_id: int = Depends(require_csrf)
+    user_id: int = Depends(require_auth)
 ) -> ShowcaseAlbum:
     """
     Add album to showcase.
@@ -416,7 +416,7 @@ async def add_to_showcase(
 async def remove_from_showcase(
     request: Request,
     showcase_id: int,
-    user_id: int = Depends(require_csrf)
+    user_id: int = Depends(require_auth)
 ) -> dict:
     """
     Remove album from showcase.
@@ -447,7 +447,7 @@ async def remove_from_showcase(
 async def reorder_showcase(
     request: Request,
     body: ShowcaseReorder,
-    user_id: int = Depends(require_csrf)
+    user_id: int = Depends(require_auth)
 ) -> list[ShowcaseAlbum]:
     """
     Reorder showcase albums.
@@ -499,7 +499,7 @@ async def update_showcase_notes(
     request: Request,
     showcase_id: int,
     body: ShowcaseNotesUpdate,
-    user_id: int = Depends(require_csrf)
+    user_id: int = Depends(require_auth)
 ) -> ShowcaseAlbum:
     """
     Update notes for a showcase item.
@@ -580,7 +580,7 @@ async def get_privacy_settings(
 async def update_privacy_settings(
     request: Request,
     body: PrivacySettings,
-    user_id: int = Depends(require_csrf)
+    user_id: int = Depends(require_auth)
 ) -> PrivacySettings:
     """
     Update current user's privacy settings.

@@ -6,7 +6,7 @@ Nested comments with up to 3 levels of replies
 import json
 from fastapi import APIRouter, Request, HTTPException, Depends
 from pydantic import BaseModel, Field
-from .auth import require_auth, require_csrf
+from .auth import require_auth
 from .blocks import get_blocked_user_ids
 from utils.conversions import to_python_value as safe_value
 from services.email import send_forum_reply_notification
@@ -183,7 +183,7 @@ async def create_comment(
     request: Request,
     post_id: int,
     body: CreateCommentRequest,
-    user_id: int = Depends(require_csrf)
+    user_id: int = Depends(require_auth)
 ) -> CommentResponse:
     """
     Create a comment on a post.
@@ -330,7 +330,7 @@ async def update_comment(
     request: Request,
     comment_id: int,
     body: UpdateCommentRequest,
-    user_id: int = Depends(require_csrf)
+    user_id: int = Depends(require_auth)
 ) -> CommentResponse:
     """Update a comment (own comments only)."""
     env = request.scope["env"]
@@ -399,7 +399,7 @@ async def update_comment(
 async def delete_comment(
     request: Request,
     comment_id: int,
-    user_id: int = Depends(require_csrf)
+    user_id: int = Depends(require_auth)
 ) -> dict:
     """Delete a comment (own comments only). Also deletes all replies."""
     env = request.scope["env"]
