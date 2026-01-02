@@ -814,15 +814,14 @@ const MarketplaceModule = {
     const listingData = {
       title: document.getElementById('listing-title').value,
       description: document.getElementById('listing-description').value,
-      category: document.getElementById('listing-category').value,
       condition: document.getElementById('listing-condition').value,
-      type: document.getElementById('listing-type').value,
+      listing_type: document.getElementById('listing-type').value,
       price: document.getElementById('listing-price').value || null,
-      shipping: document.getElementById('listing-shipping').value,
-      city: document.getElementById('listing-city').value,
-      state: document.getElementById('listing-state').value,
-      photos: this.listingPhotos,
-      collection_item_id: this.selectedCollectionItem?.id || null
+      shipping_available: document.getElementById('listing-shipping').value === 'yes',
+      location_city: document.getElementById('listing-city').value,
+      location_state: document.getElementById('listing-state').value,
+      images: this.listingPhotos,
+      collection_id: this.selectedCollectionItem?.id || null
     };
 
     try {
