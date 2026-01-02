@@ -651,9 +651,12 @@ const MarketplaceModule = {
    */
   renderOfferCard(offer) {
     const coverImage = offer.listing_cover || Utils.getDefaultItemPlaceholder();
-    const amount = offer.amount ? `$${parseFloat(offer.amount).toFixed(2)}` : 'Trade Only';
+    const amount = offer.offer_amount ? `$${parseFloat(offer.offer_amount).toFixed(2)}` : 'Trade Only';
     const timeAgo = Utils.formatTime(offer.created_at);
-    const userLabel = this.myOffersType === 'received' ? `From: ${offer.buyer_name}` : `To: ${offer.seller_name}`;
+    // Get buyer/seller from nested object or flat fields
+    const buyerName = offer.buyer?.name || offer.buyer_name || 'Unknown';
+    const sellerName = offer.seller?.name || offer.seller_name || 'Unknown';
+    const userLabel = this.myOffersType === 'received' ? `From: ${buyerName}` : `To: ${sellerName}`;
 
     const quickActions = this.myOffersType === 'received' && offer.status === 'pending' ? `
       <div class="offer-actions-quick">
@@ -947,19 +950,22 @@ const MarketplaceModule = {
     locationEl.textContent = location;
     locationEl.style.display = location ? 'flex' : 'none';
 
-    // Use normalized seller info (set in openListingDetail)
+    // Get seller info from nested object or flat fields
+    const sellerId = listing.seller?.id || listing.user_id || listing.seller_id;
+    const sellerName = listing.seller?.name || listing.seller_name || 'Seller';
+    const sellerPicture = listing.seller?.picture || listing.seller_picture;
     const sellerRating = listing.seller?.rating_average;
 
-    const sellerAvatar = listing.seller_picture || Utils.getDefaultAvatar(listing.seller_name);
+    const sellerAvatar = sellerPicture || Utils.getDefaultAvatar(sellerName);
     document.getElementById('seller-avatar').src = sellerAvatar;
-    document.getElementById('seller-name').textContent = listing.seller_name;
+    document.getElementById('seller-name').textContent = sellerName;
     document.getElementById('seller-rating').textContent = sellerRating ?
       `${'★'.repeat(Math.round(sellerRating))} (${sellerRating.toFixed(1)})` : '';
 
     // Show/hide actions based on ownership
     const actionsEl = document.getElementById('listing-detail-actions');
     const currentUserId = window.Profile?.profile?.id;
-    if (listing.seller_id === currentUserId) {
+    if (sellerId === currentUserId) {
       actionsEl.innerHTML = `
         <button class="btn-make-offer" onclick="MarketplaceModule.editListing(${listing.id})">Edit Listing</button>
         <button class="btn-message-seller" onclick="MarketplaceModule.deleteListing(${listing.id})">Delete</button>
@@ -1510,13 +1516,14 @@ const MarketplaceModule = {
   messageSeller() {
     if (!this.currentListing) return;
 
+    // Get seller info from nested object or flat fields
+    const sellerId = this.currentListing.seller?.id || this.currentListing.user_id || this.currentListing.seller_id;
+    const sellerName = this.currentListing.seller?.name || this.currentListing.seller_name || 'Seller';
+    const sellerPicture = this.currentListing.seller?.picture || this.currentListing.seller_picture || '';
+
     // Use the messages module if available
     if (typeof ProfileMessages !== 'undefined' && typeof ProfileMessages.openConversation === 'function') {
-      ProfileMessages.openConversation(
-        this.currentListing.seller_id,
-        this.currentListing.seller_name || 'Seller',
-        this.currentListing.seller_picture || ''
-      );
+      ProfileMessages.openConversation(sellerId, sellerName, sellerPicture);
     } else if (window.Profile && typeof window.Profile.openConversation === 'function') {
       window.Profile.openConversation(
         this.currentListing.seller_id,

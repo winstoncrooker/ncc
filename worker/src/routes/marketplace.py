@@ -1314,6 +1314,101 @@ async def update_offer(
         raise HTTPException(status_code=500, detail=f"Error updating offer: {str(error)}")
 
 
+@router.post("/offers/{offer_id}/accept")
+async def accept_offer(
+    request: Request,
+    offer_id: int,
+    user_id: int = Depends(require_csrf)
+) -> dict:
+    """Quick accept an offer. Only the seller can accept."""
+    env = request.scope["env"]
+
+    try:
+        # Get offer with listing info
+        offer = await env.DB.prepare(
+            """SELECT o.*, l.user_id as seller_id, l.title as listing_title, l.status as listing_status
+               FROM listing_offers o
+               JOIN listings l ON o.listing_id = l.id
+               WHERE o.id = ?"""
+        ).bind(offer_id).first()
+        offer = convert_row(offer)
+
+        if not offer:
+            raise HTTPException(status_code=404, detail="Offer not found")
+
+        if offer["seller_id"] != user_id:
+            raise HTTPException(status_code=403, detail="Only seller can accept offers")
+
+        if offer["status"] != "pending":
+            raise HTTPException(status_code=400, detail=f"Cannot accept offer in status: {offer['status']}")
+
+        if offer["listing_status"] != "active":
+            raise HTTPException(status_code=400, detail="Listing is no longer active")
+
+        # Update offer status
+        await env.DB.prepare(
+            "UPDATE listing_offers SET status = 'accepted', updated_at = CURRENT_TIMESTAMP WHERE id = ?"
+        ).bind(offer_id).run()
+
+        # Mark listing as sold
+        await env.DB.prepare(
+            "UPDATE listings SET status = 'sold', updated_at = CURRENT_TIMESTAMP WHERE id = ?"
+        ).bind(offer["listing_id"]).run()
+
+        # Reject other pending offers on this listing
+        await env.DB.prepare(
+            "UPDATE listing_offers SET status = 'rejected', updated_at = CURRENT_TIMESTAMP WHERE listing_id = ? AND id != ? AND status = 'pending'"
+        ).bind(offer["listing_id"], offer_id).run()
+
+        return {"success": True, "message": "Offer accepted"}
+
+    except HTTPException:
+        raise
+    except Exception as error:
+        raise HTTPException(status_code=500, detail=f"Error accepting offer: {str(error)}")
+
+
+@router.post("/offers/{offer_id}/reject")
+async def reject_offer(
+    request: Request,
+    offer_id: int,
+    user_id: int = Depends(require_csrf)
+) -> dict:
+    """Quick reject an offer. Only the seller can reject."""
+    env = request.scope["env"]
+
+    try:
+        # Get offer with listing info
+        offer = await env.DB.prepare(
+            """SELECT o.*, l.user_id as seller_id
+               FROM listing_offers o
+               JOIN listings l ON o.listing_id = l.id
+               WHERE o.id = ?"""
+        ).bind(offer_id).first()
+        offer = convert_row(offer)
+
+        if not offer:
+            raise HTTPException(status_code=404, detail="Offer not found")
+
+        if offer["seller_id"] != user_id:
+            raise HTTPException(status_code=403, detail="Only seller can reject offers")
+
+        if offer["status"] != "pending":
+            raise HTTPException(status_code=400, detail=f"Cannot reject offer in status: {offer['status']}")
+
+        # Update offer status
+        await env.DB.prepare(
+            "UPDATE listing_offers SET status = 'rejected', updated_at = CURRENT_TIMESTAMP WHERE id = ?"
+        ).bind(offer_id).run()
+
+        return {"success": True, "message": "Offer declined"}
+
+    except HTTPException:
+        raise
+    except Exception as error:
+        raise HTTPException(status_code=500, detail=f"Error rejecting offer: {str(error)}")
+
+
 # --- Transaction Endpoints ---
 
 @router.post("/transactions/{transaction_id}/complete")
