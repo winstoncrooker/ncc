@@ -108,15 +108,24 @@ const ProfileUI = {
     container.style.display = 'flex';
     container.innerHTML = linksArray.map(link => {
       const config = Profile.socialPlatforms[link.platform];
-      if (!config) return '';
-      // For username-only platforms, build the full URL
+      if (!config || !link.url) return '';
+      // For username-only platforms (Discord, Twitch), just show the icon without a link
+      // or build the full URL if they have a prefix
       let url;
-      if (config.isUsername && config.urlPrefix) {
-        url = config.urlPrefix + link.url;
+      if (config.isUsername) {
+        if (config.urlPrefix) {
+          url = config.urlPrefix + link.url;
+        } else {
+          // Username-only without URL prefix (like Discord) - no clickable link
+          return `
+            <span class="social-link" title="${config.label}: ${Profile.escapeHtml(link.url)}">
+              ${config.icon}
+            </span>
+          `;
+        }
       } else if (link.url.startsWith('http')) {
         url = Profile.sanitizeUrl(link.url);
       } else if (config.urlPrefix) {
-        // For platforms with a prefix but not marked as username-only
         url = config.urlPrefix + link.url;
       } else {
         url = Profile.sanitizeUrl(link.url);
@@ -153,12 +162,15 @@ const ProfileUI = {
         Profile.userCategories = Array.from(categoryMap.values());
         this.renderCategoryTabs();
 
-        // Set initial category from URL or first category
+        // Set initial category from URL, localStorage, or first category
         const urlParams = new URLSearchParams(window.location.search);
         const urlCategory = urlParams.get('category');
+        const savedCategory = localStorage.getItem('ncc_last_category');
 
         if (urlCategory && Profile.userCategories.some(c => c.slug === urlCategory)) {
           Profile.currentCategorySlug = urlCategory;
+        } else if (savedCategory && Profile.userCategories.some(c => c.slug === savedCategory)) {
+          Profile.currentCategorySlug = savedCategory;
         } else if (Profile.userCategories.length > 0) {
           Profile.currentCategorySlug = Profile.userCategories[0].slug;
         }
@@ -202,6 +214,9 @@ const ProfileUI = {
 
     Profile.currentCategorySlug = slug;
     this.applyCategoryColor(slug);
+
+    // Save to localStorage for persistence on page reload
+    localStorage.setItem('ncc_last_category', slug);
 
     // Update URL without reload
     const url = new URL(window.location);

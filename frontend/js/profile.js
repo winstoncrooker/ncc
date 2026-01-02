@@ -292,7 +292,7 @@ const Profile = Object.assign(
       });
 
       // Conversation back button
-      addListener('conversation-back', 'click', () => {
+      addListener('conversation-back-btn', 'click', () => {
         ProfileMessages.backToConversations();
       });
 

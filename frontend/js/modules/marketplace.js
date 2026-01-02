@@ -489,7 +489,7 @@ const MarketplaceModule = {
     grid.innerHTML = '<div class="listings-loading">Loading your listings...</div>';
 
     try {
-      const response = await Auth.apiRequest(`/api/marketplace/my-listings?status=${this.myListingsStatus}`);
+      const response = await Auth.apiRequest(`/api/marketplace/listings/my?status=${this.myListingsStatus}`);
 
       if (response.ok) {
         const data = await response.json();
@@ -1439,8 +1439,18 @@ const MarketplaceModule = {
     if (!this.currentListing) return;
 
     // Use the messages module if available
-    if (window.Profile && typeof window.Profile.openConversation === 'function') {
-      window.Profile.openConversation(this.currentListing.seller_id);
+    if (typeof ProfileMessages !== 'undefined' && typeof ProfileMessages.openConversation === 'function') {
+      ProfileMessages.openConversation(
+        this.currentListing.seller_id,
+        this.currentListing.seller_name || 'Seller',
+        this.currentListing.seller_picture || ''
+      );
+    } else if (window.Profile && typeof window.Profile.openConversation === 'function') {
+      window.Profile.openConversation(
+        this.currentListing.seller_id,
+        this.currentListing.seller_name || 'Seller',
+        this.currentListing.seller_picture || ''
+      );
     } else {
       Auth.showInfo('Messaging feature requires the messages module');
     }
