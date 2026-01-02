@@ -73,6 +73,14 @@ const Utils = {
   },
 
   /**
+   * Generate default item placeholder SVG data URL
+   * @returns {string} Data URL for SVG placeholder
+   */
+  getDefaultItemPlaceholder() {
+    return `data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect fill="%231a1a1a" width="100" height="100"/><circle cx="50" cy="50" r="35" fill="none" stroke="%23333" stroke-width="2"/><circle cx="50" cy="50" r="15" fill="%23333"/><text x="50" y="85" text-anchor="middle" font-size="10" font-family="Arial,sans-serif" fill="%23666">No Image</text></svg>`)}`;
+  },
+
+  /**
    * Escape HTML entities to prevent XSS
    * @param {string} text - Text to escape
    * @returns {string} Escaped text

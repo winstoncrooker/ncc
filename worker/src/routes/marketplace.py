@@ -11,7 +11,7 @@ from typing import Optional
 from fastapi import APIRouter, Request, HTTPException, Depends, Query
 from pydantic import BaseModel, Field
 
-from routes.auth import require_auth, require_auth
+from routes.auth import require_auth, require_csrf
 from utils.conversions import to_python_value, convert_row, convert_rows
 from services.email import send_offer_notification, send_offer_response_notification, send_transaction_complete_notification
 
@@ -338,7 +338,7 @@ async def build_listing_response(env, row: dict, images: list = None) -> Listing
 async def create_listing(
     request: Request,
     body: CreateListingRequest,
-    user_id: int = Depends(require_auth)
+    user_id: int = Depends(require_csrf)
 ) -> ListingResponse:
     """
     Create a new marketplace listing.
@@ -705,7 +705,7 @@ async def update_listing(
     request: Request,
     listing_id: int,
     body: UpdateListingRequest,
-    user_id: int = Depends(require_auth)
+    user_id: int = Depends(require_csrf)
 ) -> ListingResponse:
     """Update a listing. Only the owner can update."""
     env = request.scope["env"]
@@ -803,7 +803,7 @@ async def update_listing(
 async def cancel_listing(
     request: Request,
     listing_id: int,
-    user_id: int = Depends(require_auth)
+    user_id: int = Depends(require_csrf)
 ) -> dict:
     """Cancel a listing. Only the owner can cancel."""
     env = request.scope["env"]
@@ -849,7 +849,7 @@ async def create_offer(
     request: Request,
     listing_id: int,
     body: CreateOfferRequest,
-    user_id: int = Depends(require_auth)
+    user_id: int = Depends(require_csrf)
 ) -> OfferResponse:
     """Make an offer on a listing."""
     env = request.scope["env"]
@@ -1143,7 +1143,7 @@ async def update_offer(
     request: Request,
     offer_id: int,
     body: UpdateOfferRequest,
-    user_id: int = Depends(require_auth)
+    user_id: int = Depends(require_csrf)
 ) -> OfferResponse:
     """
     Accept, reject, counter, or withdraw an offer.
@@ -1316,7 +1316,7 @@ async def complete_transaction(
     request: Request,
     transaction_id: int,
     body: CompleteTransactionRequest,
-    user_id: int = Depends(require_auth)
+    user_id: int = Depends(require_csrf)
 ) -> TransactionResponse:
     """
     Mark a transaction as complete.
@@ -1428,7 +1428,7 @@ async def complete_transaction(
 async def create_rating(
     request: Request,
     body: CreateRatingRequest,
-    user_id: int = Depends(require_auth)
+    user_id: int = Depends(require_csrf)
 ) -> RatingResponse:
     """
     Leave a rating after a transaction.

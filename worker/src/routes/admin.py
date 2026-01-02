@@ -5,7 +5,7 @@ User listing, analytics, and moderation for admin purposes
 
 from fastapi import APIRouter, Request, HTTPException, Depends, Query
 from pydantic import BaseModel
-from .auth import require_auth, require_auth
+from .auth import require_auth, require_csrf
 
 router = APIRouter()
 
@@ -403,7 +403,7 @@ async def list_posts(
 async def delete_post(
     request: Request,
     post_id: int,
-    user_id: int = Depends(require_auth)
+    user_id: int = Depends(require_csrf)
 ) -> dict:
     """Delete any post (admin only)."""
     env = request.scope["env"]
@@ -444,7 +444,7 @@ async def delete_post(
 async def toggle_pin_post(
     request: Request,
     post_id: int,
-    user_id: int = Depends(require_auth)
+    user_id: int = Depends(require_csrf)
 ) -> dict:
     """Toggle pin status on a post (admin only)."""
     env = request.scope["env"]
@@ -480,7 +480,7 @@ async def toggle_pin_post(
 async def toggle_lock_post(
     request: Request,
     post_id: int,
-    user_id: int = Depends(require_auth)
+    user_id: int = Depends(require_csrf)
 ) -> dict:
     """Toggle lock status on a post (admin only)."""
     env = request.scope["env"]
@@ -580,7 +580,7 @@ async def list_comments(
 async def delete_comment(
     request: Request,
     comment_id: int,
-    user_id: int = Depends(require_auth)
+    user_id: int = Depends(require_csrf)
 ) -> dict:
     """Delete any comment (admin only)."""
     env = request.scope["env"]

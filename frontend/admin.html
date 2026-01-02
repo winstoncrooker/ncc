@@ -13,551 +13,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600&family=Orbitron:wght@700&display=swap" rel="stylesheet">
-  <style>
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-    }
-
-    body {
-      font-family: 'Montserrat', sans-serif;
-      background: #0e0e0e;
-      color: #fff;
-      min-height: 100vh;
-      padding: 24px;
-    }
-
-    .container {
-      max-width: 1200px;
-      margin: 0 auto;
-    }
-
-    header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 32px;
-      padding-bottom: 16px;
-      border-bottom: 1px solid #333;
-    }
-
-    h1 {
-      font-family: 'Orbitron', sans-serif;
-      color: #1db954;
-      font-size: 1.5rem;
-    }
-
-    .back-link {
-      color: rgba(255, 255, 255, 0.6);
-      text-decoration: none;
-      transition: color 0.2s;
-    }
-
-    .back-link:hover {
-      color: #1db954;
-    }
-
-    .stats {
-      background: #1a1a1a;
-      padding: 16px 24px;
-      border-radius: 12px;
-      margin-bottom: 24px;
-      display: flex;
-      gap: 32px;
-    }
-
-    .stat {
-      text-align: center;
-    }
-
-    .stat-value {
-      font-size: 2rem;
-      font-weight: 600;
-      color: #1db954;
-    }
-
-    .stat-label {
-      color: rgba(255, 255, 255, 0.6);
-      font-size: 0.85rem;
-    }
-
-    .user-table {
-      width: 100%;
-      background: #1a1a1a;
-      border-radius: 12px;
-      overflow: hidden;
-    }
-
-    .user-table table {
-      width: 100%;
-      border-collapse: collapse;
-    }
-
-    .user-table th,
-    .user-table td {
-      padding: 16px;
-      text-align: left;
-      border-bottom: 1px solid #333;
-    }
-
-    .user-table th {
-      background: #252525;
-      color: rgba(255, 255, 255, 0.8);
-      font-weight: 500;
-      font-size: 0.85rem;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-    }
-
-    .user-table tr:last-child td {
-      border-bottom: none;
-    }
-
-    .user-table tr:hover td {
-      background: rgba(255, 255, 255, 0.03);
-    }
-
-    .user-row {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-    }
-
-    .user-avatar {
-      width: 36px;
-      height: 36px;
-      border-radius: 50%;
-      background: #333;
-      object-fit: cover;
-    }
-
-    .user-name {
-      font-weight: 500;
-    }
-
-    .user-email {
-      color: rgba(255, 255, 255, 0.6);
-      font-size: 0.9rem;
-    }
-
-    .user-id {
-      color: rgba(255, 255, 255, 0.4);
-      font-family: monospace;
-    }
-
-    .user-date {
-      color: rgba(255, 255, 255, 0.6);
-      font-size: 0.85rem;
-    }
-
-    .expand-btn {
-      background: transparent;
-      border: 1px solid #555;
-      color: rgba(255, 255, 255, 0.6);
-      width: 28px;
-      height: 28px;
-      border-radius: 4px;
-      cursor: pointer;
-      font-size: 14px;
-      transition: all 0.2s;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-
-    .expand-btn:hover {
-      background: #333;
-      color: #fff;
-    }
-
-    .expand-btn.expanded {
-      background: #1db954;
-      border-color: #1db954;
-      color: #fff;
-    }
-
-    .memberships-row {
-      display: none;
-    }
-
-    .memberships-row.show {
-      display: table-row;
-    }
-
-    .memberships-row td {
-      background: #151515;
-      padding: 12px 16px;
-    }
-
-    .memberships-content {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 8px;
-    }
-
-    .membership-tag {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      background: #252525;
-      padding: 6px 12px;
-      border-radius: 16px;
-      font-size: 0.8rem;
-    }
-
-    .membership-tag .icon {
-      font-size: 1rem;
-    }
-
-    .membership-tag .category-name {
-      color: #1db954;
-    }
-
-    .membership-tag .group-name {
-      color: rgba(255, 255, 255, 0.8);
-    }
-
-    .membership-tag .separator {
-      color: rgba(255, 255, 255, 0.3);
-    }
-
-    .no-memberships {
-      color: rgba(255, 255, 255, 0.4);
-      font-style: italic;
-    }
-
-    .loading-memberships {
-      color: rgba(255, 255, 255, 0.5);
-    }
-
-    .loading {
-      text-align: center;
-      padding: 48px;
-      color: rgba(255, 255, 255, 0.6);
-    }
-
-    .error {
-      text-align: center;
-      padding: 48px;
-      color: #e74c3c;
-    }
-
-    .export-btn {
-      background: #1db954;
-      color: #fff;
-      border: none;
-      padding: 10px 20px;
-      border-radius: 8px;
-      cursor: pointer;
-      font-family: inherit;
-      font-weight: 500;
-      transition: all 0.2s;
-    }
-
-    .export-btn:hover {
-      background: #1ed760;
-    }
-
-    .tabs {
-      display: flex;
-      gap: 8px;
-      margin-bottom: 24px;
-    }
-
-    .tab-btn {
-      background: #252525;
-      color: rgba(255, 255, 255, 0.7);
-      border: none;
-      padding: 12px 24px;
-      border-radius: 8px;
-      cursor: pointer;
-      font-family: inherit;
-      font-weight: 500;
-      transition: all 0.2s;
-    }
-
-    .tab-btn:hover {
-      background: #333;
-    }
-
-    .tab-btn.active {
-      background: #1db954;
-      color: #fff;
-    }
-
-    .tab-content {
-      display: none;
-    }
-
-    .tab-content.active {
-      display: block;
-    }
-
-    .action-btn {
-      background: transparent;
-      border: 1px solid #555;
-      color: rgba(255, 255, 255, 0.7);
-      padding: 6px 12px;
-      border-radius: 4px;
-      cursor: pointer;
-      font-size: 0.8rem;
-      margin-right: 4px;
-      transition: all 0.2s;
-    }
-
-    .action-btn:hover {
-      background: #333;
-    }
-
-    .action-btn.delete {
-      border-color: #e74c3c;
-      color: #e74c3c;
-    }
-
-    .action-btn.delete:hover {
-      background: #e74c3c;
-      color: #fff;
-    }
-
-    .action-btn.active {
-      background: #1db954;
-      border-color: #1db954;
-      color: #fff;
-    }
-
-    .badge {
-      display: inline-block;
-      padding: 2px 8px;
-      border-radius: 4px;
-      font-size: 0.75rem;
-      margin-left: 4px;
-    }
-
-    .badge.pinned {
-      background: #f39c12;
-      color: #000;
-    }
-
-    .badge.locked {
-      background: #e74c3c;
-      color: #fff;
-    }
-
-    .post-title {
-      font-weight: 500;
-      max-width: 300px;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-
-    .post-body {
-      color: rgba(255, 255, 255, 0.5);
-      font-size: 0.85rem;
-      max-width: 200px;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-
-    @media (max-width: 768px) {
-      .user-table {
-        overflow-x: auto;
-      }
-
-      .user-table table {
-        min-width: 600px;
-      }
-
-      .stats {
-        flex-direction: column;
-        gap: 16px;
-      }
-
-      .tabs {
-        flex-wrap: wrap;
-      }
-    }
-
-    /* Utility classes to replace inline styles */
-    .mb-24 { margin-bottom: 24px; }
-    .mb-16 { margin-bottom: 16px; }
-    .w-100 { width: 100%; }
-    .section-title {
-      color: #1db954;
-      margin-bottom: 12px;
-      font-size: 0.9rem;
-    }
-    .categories-container {
-      display: flex;
-      gap: 24px;
-      flex-wrap: wrap;
-    }
-    .text-muted { color: rgba(255, 255, 255, 0.5); }
-
-    /* Reports badge */
-    .report-badge {
-      background: #e63946;
-      color: #fff;
-      border-radius: 10px;
-      padding: 2px 6px;
-      font-size: 0.7rem;
-      margin-left: 4px;
-    }
-    .report-badge:empty { display: none; }
-
-    /* Reports filters */
-    .reports-filters {
-      display: flex;
-      gap: 12px;
-      flex-wrap: wrap;
-    }
-    .filter-select {
-      background: #252525;
-      border: 1px solid #444;
-      color: #fff;
-      padding: 8px 12px;
-      border-radius: 6px;
-      font-size: 0.9rem;
-    }
-
-    /* Report rows */
-    .report-preview {
-      max-width: 250px;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-      color: rgba(255,255,255,0.6);
-      font-size: 0.85rem;
-    }
-    .report-reason {
-      background: #333;
-      padding: 2px 8px;
-      border-radius: 4px;
-      font-size: 0.75rem;
-      text-transform: capitalize;
-    }
-    .report-status {
-      padding: 2px 8px;
-      border-radius: 4px;
-      font-size: 0.75rem;
-      text-transform: capitalize;
-    }
-    .report-status.pending { background: #f39c12; color: #000; }
-    .report-status.reviewed { background: #3498db; color: #fff; }
-    .report-status.actioned { background: #27ae60; color: #fff; }
-    .report-status.dismissed { background: #95a5a6; color: #fff; }
-
-    /* Modals */
-    .modal {
-      display: none;
-      position: fixed;
-      top: 0; left: 0; right: 0; bottom: 0;
-      background: rgba(0,0,0,0.7);
-      z-index: 1000;
-      align-items: center;
-      justify-content: center;
-    }
-    .modal.open { display: flex; }
-    .modal-content {
-      background: #1a1a1a;
-      border-radius: 12px;
-      max-width: 500px;
-      width: 90%;
-      max-height: 80vh;
-      overflow-y: auto;
-    }
-    .modal-content.modal-lg {
-      max-width: 700px;
-    }
-    .modal-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 16px 20px;
-      border-bottom: 1px solid #333;
-    }
-    .modal-header h3 { margin: 0; font-size: 1.1rem; }
-    .modal-close {
-      background: none;
-      border: none;
-      color: #fff;
-      font-size: 1.5rem;
-      cursor: pointer;
-    }
-    .modal-body { padding: 20px; }
-    .form-group { margin-bottom: 16px; }
-    .form-group label {
-      display: block;
-      margin-bottom: 6px;
-      color: rgba(255,255,255,0.8);
-      font-size: 0.9rem;
-    }
-    .form-group select,
-    .form-group textarea {
-      width: 100%;
-      background: #252525;
-      border: 1px solid #444;
-      color: #fff;
-      padding: 10px;
-      border-radius: 6px;
-      font-size: 0.9rem;
-    }
-    .form-group textarea { resize: vertical; min-height: 80px; }
-    .modal-actions {
-      display: flex;
-      gap: 10px;
-      justify-content: flex-end;
-      margin-top: 20px;
-    }
-    .btn-cancel {
-      background: #333;
-      border: none;
-      color: #fff;
-      padding: 10px 20px;
-      border-radius: 6px;
-      cursor: pointer;
-    }
-    .btn-danger {
-      background: #e63946;
-      border: none;
-      color: #fff;
-      padding: 10px 20px;
-      border-radius: 6px;
-      cursor: pointer;
-    }
-    .btn-danger:hover { background: #c82333; }
-    .mod-target-info {
-      background: #252525;
-      padding: 12px;
-      border-radius: 6px;
-      margin-bottom: 16px;
-      font-size: 0.9rem;
-    }
-
-    /* User history */
-    .history-section { margin-bottom: 24px; }
-    .history-section h4 {
-      color: #1db954;
-      margin-bottom: 12px;
-      font-size: 0.9rem;
-    }
-    .history-item {
-      background: #252525;
-      padding: 12px;
-      border-radius: 6px;
-      margin-bottom: 8px;
-      font-size: 0.85rem;
-    }
-    .history-item .date { color: rgba(255,255,255,0.5); }
-    .history-item .action-type {
-      background: #333;
-      padding: 2px 6px;
-      border-radius: 4px;
-      margin-right: 8px;
-    }
-  </style>
+  <link rel="stylesheet" href="css/admin.css">
 </head>
 <body>
   <div class="container">
@@ -783,7 +239,7 @@
                   <td class="user-id">${user.id}</td>
                   <td>
                     <div class="user-row">
-                      <img src="${user.picture || ''}"
+                      <img src="${getSafeImageUrl(user.picture)}"
                            alt=""
                            class="user-avatar"
                            onerror="this.style.display='none'">
@@ -816,6 +272,32 @@
       const div = document.createElement('div');
       div.textContent = text;
       return div.innerHTML;
+    }
+
+    // Escape for use in JavaScript string contexts (onclick handlers, etc.)
+    function escapeJsString(text) {
+      if (!text) return '';
+      return String(text)
+        .replace(/\\/g, '\\\\')
+        .replace(/'/g, "\\'")
+        .replace(/"/g, '\\"')
+        .replace(/\n/g, '\\n')
+        .replace(/\r/g, '\\r');
+    }
+
+    // Validate URL for image sources - only allow safe protocols
+    function isValidImageUrl(url) {
+      if (!url) return false;
+      try {
+        const parsed = new URL(url);
+        return ['http:', 'https:', 'data:'].includes(parsed.protocol);
+      } catch {
+        return false;
+      }
+    }
+
+    function getSafeImageUrl(url) {
+      return isValidImageUrl(url) ? url : '';
     }
 
     function formatDate(dateStr) {
@@ -1237,7 +719,7 @@
               ${data.reports.map(report => `
                 <tr id="report-row-${report.id}">
                   <td class="user-id">${report.id}</td>
-                  <td><span class="report-reason">${report.content_type}</span></td>
+                  <td><span class="report-reason">${escapeHtml(report.content_type || '')}</span></td>
                   <td>
                     <div class="report-preview">${escapeHtml(report.content_preview || 'Content unavailable')}</div>
                   </td>
@@ -1248,14 +730,14 @@
                     <div class="user-name">${escapeHtml(report.content_author_name || 'Unknown')}</div>
                     ${report.content_author_id ? `<button class="action-btn" onclick="showUserHistory(${report.content_author_id})">History</button>` : ''}
                   </td>
-                  <td><span class="report-reason">${report.reason}</span></td>
-                  <td><span class="report-status ${report.status}">${report.status}</span></td>
+                  <td><span class="report-reason">${escapeHtml(report.reason || '')}</span></td>
+                  <td><span class="report-status ${escapeHtml(report.status || '')}">${escapeHtml(report.status || '')}</span></td>
                   <td class="user-date">${formatDate(report.created_at)}</td>
                   <td>
                     ${report.status === 'pending' ? `
                       <button class="action-btn" onclick="updateReportStatus(${report.id}, 'reviewed')">Mark Reviewed</button>
                       <button class="action-btn" onclick="updateReportStatus(${report.id}, 'dismissed')">Dismiss</button>
-                      ${report.content_author_id ? `<button class="action-btn delete" onclick="showModActionModal(${report.id}, ${report.content_author_id}, '${escapeHtml(report.content_author_name || 'Unknown')}')">Take Action</button>` : ''}
+                      ${report.content_author_id ? `<button class="action-btn delete" onclick="showModActionModal(${report.id}, ${report.content_author_id}, '${escapeJsString(report.content_author_name || 'Unknown')}')">Take Action</button>` : ''}
                     ` : `
                       ${report.reviewed_by_name ? `<span class="text-muted">by ${escapeHtml(report.reviewed_by_name)}</span>` : ''}
                     `}
@@ -1376,8 +858,8 @@
             <h4>Warnings (${data.warnings.length})</h4>
             ${data.warnings.map(w => `
               <div class="history-item">
-                <span class="action-type">${w.warning_type}</span>
-                ${escapeHtml(w.message)}
+                <span class="action-type">${escapeHtml(w.warning_type || '')}</span>
+                ${escapeHtml(w.message || '')}
                 <div class="date">Issued by ${escapeHtml(w.issued_by_name || 'Admin')} on ${formatDate(w.created_at)}</div>
               </div>
             `).join('')}
@@ -1389,8 +871,8 @@
             <h4>Moderation Actions (${data.actions.length})</h4>
             ${data.actions.map(a => `
               <div class="history-item">
-                <span class="action-type">${a.action_type}</span>
-                ${escapeHtml(a.reason)}
+                <span class="action-type">${escapeHtml(a.action_type || '')}</span>
+                ${escapeHtml(a.reason || '')}
                 <div class="date">By ${escapeHtml(a.moderator_name || 'Admin')} on ${formatDate(a.created_at)}</div>
               </div>
             `).join('')}

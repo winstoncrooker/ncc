@@ -5,7 +5,7 @@ Upvote/downvote posts and comments
 
 from fastapi import APIRouter, Request, HTTPException, Depends
 from pydantic import BaseModel
-from .auth import require_auth
+from .auth import require_auth, require_csrf
 from utils.scoring import calculate_hot_score
 from utils.conversions import convert_row
 
@@ -32,7 +32,7 @@ class VoteResponse(BaseModel):
 async def vote(
     request: Request,
     body: VoteRequest,
-    user_id: int = Depends(require_auth)
+    user_id: int = Depends(require_csrf)
 ) -> VoteResponse:
     """
     Vote on a post or comment.
@@ -311,7 +311,7 @@ async def vote_on_comment(env, user_id: int, comment_id: int, value: int) -> Vot
 async def remove_post_vote(
     request: Request,
     post_id: int,
-    user_id: int = Depends(require_auth)
+    user_id: int = Depends(require_csrf)
 ) -> VoteResponse:
     """Remove vote from a post using atomic SQL operations."""
     env = request.scope["env"]
@@ -390,7 +390,7 @@ async def remove_post_vote(
 async def remove_comment_vote(
     request: Request,
     comment_id: int,
-    user_id: int = Depends(require_auth)
+    user_id: int = Depends(require_csrf)
 ) -> VoteResponse:
     """Remove vote from a comment using atomic SQL operations."""
     env = request.scope["env"]

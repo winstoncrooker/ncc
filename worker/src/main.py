@@ -110,9 +110,12 @@ async def http_exception_handler(request: Request, exc: HTTPException):
 
 @app.exception_handler(Exception)
 async def general_exception_handler(request: Request, exc: Exception):
+    # Log the actual error for debugging (visible in Cloudflare logs)
+    print(f"[ERROR] {request.method} {request.url.path}: {type(exc).__name__}: {exc}")
+    # Return generic message to prevent information leakage
     return JSONResponse(
         status_code=500,
-        content={"detail": str(exc)},
+        content={"detail": "An internal error occurred. Please try again."},
         headers=get_cors_headers(request)
     )
 

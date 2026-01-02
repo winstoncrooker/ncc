@@ -85,7 +85,7 @@ const ProfileUI = {
    * Render social links
    */
   renderSocialLinks(links) {
-    const container = document.getElementById('social-links');
+    const container = document.getElementById('external-links-display');
     if (!container) return;
 
     // Handle both array format [{platform, url}] and object format {platform: url}
@@ -118,8 +118,8 @@ const ProfileUI = {
         } else {
           // Username-only without URL prefix (like Discord) - no clickable link
           return `
-            <span class="social-link" title="${config.label}: ${Profile.escapeHtml(link.url)}">
-              ${config.icon}
+            <span class="external-link" title="${config.label}: ${Profile.escapeHtml(link.url)}">
+              <span class="link-icon">${config.icon}</span>
             </span>
           `;
         }
@@ -132,8 +132,8 @@ const ProfileUI = {
       }
       if (!url) return '';
       return `
-        <a href="${url}" target="_blank" rel="noopener noreferrer" class="social-link" title="${config.label}">
-          ${config.icon}
+        <a href="${url}" target="_blank" rel="noopener noreferrer" class="external-link" title="${config.label}">
+          <span class="link-icon">${config.icon}</span>
         </a>
       `;
     }).join('');

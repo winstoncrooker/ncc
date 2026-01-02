@@ -5,7 +5,7 @@ Manages user membership in categories and interest groups
 
 from fastapi import APIRouter, Request, HTTPException, Depends
 from pydantic import BaseModel
-from .auth import require_auth, require_auth
+from .auth import require_auth, require_csrf
 from utils.conversions import to_python_value as safe_value
 
 router = APIRouter()
@@ -101,7 +101,7 @@ async def get_my_interests(
 async def join_interest(
     request: Request,
     body: JoinInterestRequest,
-    user_id: int = Depends(require_auth)
+    user_id: int = Depends(require_csrf)
 ) -> JoinInterestResponse:
     """
     Join a category or interest group.
@@ -234,7 +234,7 @@ async def join_interest(
 async def leave_interest(
     request: Request,
     interest_id: int,
-    user_id: int = Depends(require_auth)
+    user_id: int = Depends(require_csrf)
 ) -> dict:
     """
     Leave a category or interest group.
@@ -279,7 +279,7 @@ async def leave_interest(
 async def batch_join_interests(
     request: Request,
     body: list[JoinInterestRequest],
-    user_id: int = Depends(require_auth)
+    user_id: int = Depends(require_csrf)
 ) -> dict:
     """
     Join multiple categories/groups at once (for onboarding).

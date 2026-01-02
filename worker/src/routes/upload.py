@@ -9,7 +9,7 @@ import uuid
 from datetime import datetime
 import js
 
-from routes.auth import require_auth, require_auth
+from routes.auth import require_auth, require_csrf
 
 router = APIRouter()
 
@@ -30,7 +30,7 @@ class UploadResponse(BaseModel):
 async def upload_image(
     request: Request,
     body: ImageUpload,
-    user_id: int = Depends(require_auth)
+    user_id: int = Depends(require_csrf)
 ) -> UploadResponse:
     """
     Upload an image to R2 storage.

@@ -6,18 +6,21 @@ Uses ServiceNow-AI/Apriel-1.6-15b-Thinker model
 from fastapi import APIRouter, Request, HTTPException, Depends
 from pydantic import BaseModel
 from typing import Optional
-from routes.auth import require_auth, require_auth
+from routes.auth import require_csrf
 import js
 from pyodide.ffi import to_js
 import re
-import json
-from urllib.parse import quote_plus
+
+# Import external API services (SOLID: Single Responsibility)
+from services.discogs import search_discogs_for_album, Album
+from services.pokemon_tcg import search_pokemon_tcg
+from services.scryfall import search_scryfall
+from services.rawg import search_rawg
 
 router = APIRouter()
 
 TOGETHER_API_URL = "https://api.together.xyz/v1/chat/completions"
 CHAT_MODEL = "ServiceNow-AI/Apriel-1.6-15b-Thinker"
-DISCOGS_API_URL = "https://api.discogs.com/database/search"
 
 # Category-specific AI prompts
 CATEGORY_AI_PROMPTS = {
@@ -69,15 +72,6 @@ ACTIONS: {{ADD:Country Denomination|Year}}, {{REMOVE:Country Denomination|Year}}
 EXPERTISE: US coins, world coins, ancient, grading (PCGS/NGC), bullion.
 BIO HELP: Help write bios about their numismatic interests, collecting focus, favorite coins."""
 }
-
-
-class Album(BaseModel):
-    """Album in user's collection"""
-    artist: str
-    album: str
-    cover: Optional[str] = None
-    year: Optional[int] = None
-    discogs_id: Optional[int] = None
 
 
 class ChatMessage(BaseModel):
@@ -454,366 +448,6 @@ def clean_response(response: str, category_slug: Optional[str] = None) -> str:
     return cleaned
 
 
-async def search_discogs_for_album(artist: str, album: str, discogs_key: str, discogs_secret: str) -> Album:
-    """
-    Search Discogs for album info and return enriched album with cover, year, discogs_id.
-    """
-    query = f"{artist} {album}"
-    print(f"[Discogs] Searching for: {query}")
-
-    try:
-        url = f"{DISCOGS_API_URL}?q={js.encodeURIComponent(query)}&type=release&per_page=10"
-
-        headers = to_js({
-            "Authorization": f"Discogs key={discogs_key}, secret={discogs_secret}",
-            "User-Agent": "NicheCollectorConnector/1.0"
-        })
-
-        response = await js.fetch(url, to_js({"headers": headers}))
-
-        if response.status != 200:
-            print(f"[Discogs] Error: {response.status}")
-            return Album(artist=artist, album=album)
-
-        data = (await response.json()).to_py()
-        results = data.get("results", [])
-
-        if not results:
-            print(f"[Discogs] No results for: {query}")
-            return Album(artist=artist, album=album)
-
-        # Score results to find best match
-        best_result = None
-        best_score = -1
-
-        for result in results:
-            score = 0
-            title = result.get("title", "").lower()
-
-            # Check artist match
-            if artist.lower() in title:
-                score += 10
-
-            # Check album match
-            if album.lower() in title:
-                score += 10
-
-            # Prefer results with cover images
-            cover = result.get("cover_image", "")
-            if cover and "spacer.gif" not in cover:
-                score += 5
-
-            # Prefer vinyl/LP formats
-            formats = result.get("format", [])
-            if isinstance(formats, list):
-                format_str = " ".join(formats).lower()
-                if "vinyl" in format_str or "lp" in format_str:
-                    score += 3
-
-            if score > best_score:
-                best_score = score
-                best_result = result
-
-        if best_result:
-            cover = best_result.get("cover_image")
-            if not cover or "spacer.gif" in cover:
-                cover = best_result.get("thumb")
-
-            year = None
-            if best_result.get("year"):
-                try:
-                    year = int(best_result["year"])
-                except (ValueError, TypeError):
-                    print(f"[Discogs] Could not parse year: {best_result.get('year')}")
-
-            print(f"[Discogs] Found: {best_result.get('title')} (score: {best_score})")
-
-            return Album(
-                artist=artist,
-                album=album,
-                cover=cover,
-                year=year,
-                discogs_id=best_result.get("id")
-            )
-
-        return Album(artist=artist, album=album)
-
-    except Exception as e:
-        print(f"[Discogs] Error: {e}")
-        return Album(artist=artist, album=album)
-
-
-async def search_pokemon_tcg(card_set: str, card_name: str) -> Album:
-    """
-    Search Pokemon TCG API for card info.
-    API is free, no auth required.
-    """
-    query = f"{card_set} {card_name}".strip()
-    print(f"[Pokemon TCG] Searching for: {query}")
-
-    try:
-        # Pokemon TCG API - search by name
-        encoded_name = quote_plus(card_name)
-        url = f"https://api.pokemontcg.io/v2/cards?q=name:{encoded_name}&pageSize=10"
-        print(f"[Pokemon TCG] URL: {url}")
-
-        headers = to_js({
-            "Content-Type": "application/json",
-            "User-Agent": "NicheCollectorConnector/1.0",
-            "Accept": "application/json"
-        })
-
-        # Add timeout using AbortController
-        controller = js.AbortController.new()
-        timeout_id = js.setTimeout(lambda: controller.abort(), 8000)  # 8 second timeout
-
-        try:
-            response = await js.fetch(url, to_js({"headers": headers, "signal": controller.signal}))
-        finally:
-            js.clearTimeout(timeout_id)
-        print(f"[Pokemon TCG] Response status: {response.status}")
-
-        if response.status != 200:
-            print(f"[Pokemon TCG] Error: {response.status}")
-            return Album(artist=card_set, album=card_name)
-
-        data = (await response.json()).to_py()
-        cards = data.get("data", [])
-
-        if not cards:
-            print(f"[Pokemon TCG] No results for: {query}")
-            return Album(artist=card_set, album=card_name)
-
-        # Find best match - prefer matching set name
-        best_card = None
-        best_score = -1
-
-        for card in cards:
-            score = 0
-            # Check name match
-            if card_name.lower() in card.get("name", "").lower():
-                score += 10
-            # Check set match
-            set_name = card.get("set", {}).get("name", "").lower()
-            if card_set.lower() in set_name:
-                score += 10
-            # Prefer cards with images
-            if card.get("images", {}).get("large"):
-                score += 5
-            # Prefer holos/rare cards
-            if "holo" in card.get("rarity", "").lower():
-                score += 3
-
-            if score > best_score:
-                best_score = score
-                best_card = card
-
-        if best_card:
-            images = best_card.get("images", {})
-            cover = images.get("large") or images.get("small")
-            set_info = best_card.get("set", {})
-            year = None
-            if set_info.get("releaseDate"):
-                try:
-                    year = int(set_info["releaseDate"][:4])
-                except (ValueError, TypeError):
-                    pass
-
-            print(f"[Pokemon TCG] Found: {best_card.get('name')} from {set_info.get('name')}")
-
-            return Album(
-                artist=set_info.get("name", card_set),
-                album=best_card.get("name", card_name),
-                cover=cover,
-                year=year
-            )
-
-        return Album(artist=card_set, album=card_name)
-
-    except Exception as e:
-        print(f"[Pokemon TCG] Error: {e}")
-        return Album(artist=card_set, album=card_name)
-
-
-async def search_scryfall(card_set: str, card_name: str) -> Album:
-    """
-    Search Scryfall API for MTG card info.
-    API is free, no auth required.
-    """
-    query = f"{card_name}"
-    print(f"[Scryfall] Searching for: {query}")
-
-    try:
-        # Scryfall fuzzy search - use Python's quote_plus for URL encoding
-        encoded_name = quote_plus(card_name)
-        url = f"https://api.scryfall.com/cards/named?fuzzy={encoded_name}"
-        print(f"[Scryfall] URL: {url}")
-
-        # Scryfall requires a User-Agent that identifies the app
-        headers = to_js({
-            "Content-Type": "application/json",
-            "User-Agent": "NicheCollectorConnector/1.0",
-            "Accept": "application/json"
-        })
-
-        response = await js.fetch(url, to_js({"headers": headers}))
-
-        print(f"[Scryfall] Response status: {response.status}")
-
-        if response.status == 404:
-            # Try search endpoint instead
-            url = f"https://api.scryfall.com/cards/search?q={encoded_name}&unique=cards"
-            print(f"[Scryfall] Trying search URL: {url}")
-            response = await js.fetch(url, to_js({"headers": headers}))
-            print(f"[Scryfall] Search response status: {response.status}")
-
-        if response.status != 200:
-            print(f"[Scryfall] Error: {response.status}")
-            return Album(artist=card_set, album=card_name)
-
-        data = (await response.json()).to_py()
-        print(f"[Scryfall] Got data keys: {list(data.keys()) if isinstance(data, dict) else 'not a dict'}")
-
-        # Handle search results vs single card
-        if "data" in data:
-            cards = data["data"]
-            card = cards[0] if cards else None
-        else:
-            card = data
-
-        if not card:
-            print(f"[Scryfall] No results for: {query}")
-            return Album(artist=card_set, album=card_name)
-
-        print(f"[Scryfall] Card keys: {list(card.keys()) if isinstance(card, dict) else 'not a dict'}")
-
-        # Get best image
-        images = card.get("image_uris", {})
-        print(f"[Scryfall] Image URIs: {images}")
-        cover = images.get("large") or images.get("normal") or images.get("small")
-
-        # If double-faced card, get front face
-        if not cover and card.get("card_faces"):
-            print(f"[Scryfall] Checking card_faces for images")
-            face_images = card["card_faces"][0].get("image_uris", {})
-            cover = face_images.get("large") or face_images.get("normal")
-
-        year = None
-        if card.get("released_at"):
-            try:
-                year = int(card["released_at"][:4])
-            except (ValueError, TypeError):
-                pass
-
-        set_name = card.get("set_name", card_set)
-        print(f"[Scryfall] Found: {card.get('name')} from {set_name}, cover: {cover[:50] if cover else 'None'}...")
-
-        return Album(
-            artist=set_name,
-            album=card.get("name", card_name),
-            cover=cover,
-            year=year
-        )
-
-    except Exception as e:
-        print(f"[Scryfall] Error: {e}")
-        return Album(artist=card_set, album=card_name)
-
-
-async def search_rawg(platform: str, game_title: str, api_key: str = "") -> Album:
-    """
-    Search RAWG.io API for video game info.
-    Requires API key (free to get at rawg.io/apidocs).
-    """
-    if not api_key:
-        # RAWG now requires an API key - return without enrichment
-        print(f"[RAWG] No API key configured, skipping lookup for: {game_title}")
-        return Album(artist=platform, album=game_title)
-
-    query = f"{game_title}"
-    print(f"[RAWG] Searching for: {query}")
-
-    try:
-        # RAWG search with API key
-        encoded_title = quote_plus(game_title)
-        url = f"https://api.rawg.io/api/games?key={api_key}&search={encoded_title}&page_size=10"
-
-        response = await js.fetch(url, to_js({
-            "headers": to_js({"Content-Type": "application/json"})
-        }))
-
-        if response.status != 200:
-            print(f"[RAWG] Error: {response.status}")
-            return Album(artist=platform, album=game_title)
-
-        data = (await response.json()).to_py()
-        games = data.get("results", [])
-
-        if not games:
-            print(f"[RAWG] No results for: {query}")
-            return Album(artist=platform, album=game_title)
-
-        # Find best match - prefer matching platform
-        best_game = None
-        best_score = -1
-
-        for game in games:
-            score = 0
-            # Check name match
-            if game_title.lower() in game.get("name", "").lower():
-                score += 10
-            # Check platform match
-            platforms = [p.get("platform", {}).get("name", "").lower() for p in game.get("platforms", [])]
-            platform_lower = platform.lower()
-            for p in platforms:
-                if platform_lower in p or p in platform_lower:
-                    score += 10
-                    break
-            # Prefer games with images
-            if game.get("background_image"):
-                score += 5
-            # Prefer higher rated
-            if game.get("rating", 0) > 4:
-                score += 3
-
-            if score > best_score:
-                best_score = score
-                best_game = game
-
-        if best_game:
-            cover = best_game.get("background_image")
-            year = None
-            if best_game.get("released"):
-                try:
-                    year = int(best_game["released"][:4])
-                except (ValueError, TypeError):
-                    pass
-
-            # Get platform name from game data
-            platforms = best_game.get("platforms", [])
-            platform_name = platform
-            for p in platforms:
-                pname = p.get("platform", {}).get("name", "")
-                if platform.lower() in pname.lower():
-                    platform_name = pname
-                    break
-
-            print(f"[RAWG] Found: {best_game.get('name')} ({year})")
-
-            return Album(
-                artist=platform_name,
-                album=best_game.get("name", game_title),
-                cover=cover,
-                year=year
-            )
-
-        return Album(artist=platform, album=game_title)
-
-    except Exception as e:
-        print(f"[RAWG] Error: {e}")
-        return Album(artist=platform, album=game_title)
-
-
 async def search_for_item(
     field1: str,
     field2: str,
@@ -887,7 +521,7 @@ async def search_for_item(
 
 
 @router.post("/")
-async def chat(request: Request, body: ChatMessage, user_id: int = Depends(require_auth)) -> ChatResponse:
+async def chat(request: Request, body: ChatMessage, user_id: int = Depends(require_csrf)) -> ChatResponse:
     """
     Send a message to the AI assistant.
     Returns response and any album actions to perform.

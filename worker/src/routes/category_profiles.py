@@ -6,7 +6,7 @@ Per-category user profiles with custom fields and items
 from fastapi import APIRouter, Request, HTTPException, Depends, Query
 from pydantic import BaseModel
 import json
-from .auth import require_auth, require_auth, get_current_user
+from .auth import require_auth, require_csrf, get_current_user
 from utils.conversions import to_python_value as safe_value
 
 router = APIRouter()
@@ -252,7 +252,7 @@ async def update_category_profile(
     request: Request,
     slug: str,
     body: UpdateCategoryProfileRequest,
-    user_id: int = Depends(require_auth)
+    user_id: int = Depends(require_csrf)
 ) -> CategoryProfileResponse:
     """Update category profile for current user."""
     env = request.scope["env"]
@@ -510,7 +510,7 @@ async def get_my_items(
 async def create_item(
     request: Request,
     body: CreateCategoryItemRequest,
-    user_id: int = Depends(require_auth)
+    user_id: int = Depends(require_csrf)
 ) -> CategoryItemResponse:
     """Add an item to a category collection."""
     env = request.scope["env"]
@@ -583,7 +583,7 @@ async def update_item(
     request: Request,
     item_id: int,
     body: UpdateCategoryItemRequest,
-    user_id: int = Depends(require_auth)
+    user_id: int = Depends(require_csrf)
 ) -> CategoryItemResponse:
     """Update an item."""
     env = request.scope["env"]
@@ -700,7 +700,7 @@ async def update_item(
 async def delete_item(
     request: Request,
     item_id: int,
-    user_id: int = Depends(require_auth)
+    user_id: int = Depends(require_csrf)
 ) -> dict:
     """Delete an item."""
     env = request.scope["env"]

@@ -6,7 +6,6 @@ Search across users, collections, and forum posts
 from fastapi import APIRouter, Request, HTTPException, Depends, Query
 from pydantic import BaseModel, Field
 from typing import Optional
-import json
 
 from routes.auth import require_auth
 from utils.conversions import to_python_value, convert_row

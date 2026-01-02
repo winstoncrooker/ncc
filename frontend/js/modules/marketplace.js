@@ -323,12 +323,12 @@ const MarketplaceModule = {
       params.append('limit', this.pagination.limit);
 
       if (this.filters.search) params.append('search', this.filters.search);
-      if (this.filters.category) params.append('category', this.filters.category);
+      // Category filter not yet supported on backend
       if (this.filters.condition) params.append('condition', this.filters.condition);
-      if (this.filters.type) params.append('type', this.filters.type);
-      if (this.filters.priceMin) params.append('price_min', this.filters.priceMin);
-      if (this.filters.priceMax) params.append('price_max', this.filters.priceMax);
-      if (this.filters.location) params.append('location', this.filters.location);
+      if (this.filters.type) params.append('listing_type', this.filters.type);
+      if (this.filters.priceMin) params.append('min_price', this.filters.priceMin);
+      if (this.filters.priceMax) params.append('max_price', this.filters.priceMax);
+      if (this.filters.location) params.append('location_state', this.filters.location);
       if (this.filters.sort) params.append('sort', this.filters.sort);
 
       const response = await Auth.apiRequest(`/api/marketplace/listings?${params.toString()}`);
@@ -395,9 +395,10 @@ const MarketplaceModule = {
     const sellerAvatar = listing.seller_picture || Utils.getDefaultAvatar(listing.seller_name);
     const rating = listing.seller_rating ? `${'★'.repeat(Math.round(listing.seller_rating))}` : '';
 
-    const coverImage = listing.photos && listing.photos.length > 0
-      ? Utils.sanitizeImageUrl(listing.photos[0], '/images/placeholder.png')
-      : (listing.cover || '/images/placeholder.png');
+    const placeholder = Utils.getDefaultItemPlaceholder();
+    const coverImage = listing.images && listing.images.length > 0
+      ? Utils.sanitizeImageUrl(listing.images[0].image_url, placeholder)
+      : Utils.sanitizeImageUrl(listing.collection_item?.cover || listing.cover, placeholder);
 
     // Check if this listing matches any wishlist item
     const wishlistMatch = this.findWishlistMatch(listing);
@@ -409,7 +410,7 @@ const MarketplaceModule = {
     return `
       <div class="listing-card ${wishlistClass}" data-id="${listing.id}">
         <div class="listing-card-image">
-          <img src="${this.escapeHtml(coverImage)}" alt="${this.escapeHtml(listing.title)}" onerror="this.src='/images/placeholder.png'">
+          <img src="${this.escapeHtml(coverImage)}" alt="${this.escapeHtml(listing.title)}" onerror="this.src=Utils.getDefaultItemPlaceholder()">
           <div class="listing-card-badges">
             ${wishlistBadge}
             <span class="listing-badge badge-condition">${this.escapeHtml(conditionLabel)}</span>
@@ -644,7 +645,7 @@ const MarketplaceModule = {
    * Render an offer card
    */
   renderOfferCard(offer) {
-    const coverImage = offer.listing_cover || '/images/placeholder.png';
+    const coverImage = offer.listing_cover || Utils.getDefaultItemPlaceholder();
     const amount = offer.amount ? `$${parseFloat(offer.amount).toFixed(2)}` : 'Trade Only';
     const timeAgo = Utils.formatTime(offer.created_at);
     const userLabel = this.myOffersType === 'received' ? `From: ${offer.buyer_name}` : `To: ${offer.seller_name}`;
@@ -658,7 +659,7 @@ const MarketplaceModule = {
 
     return `
       <div class="offer-card ${offer.status}" data-id="${offer.id}">
-        <img src="${this.escapeHtml(coverImage)}" alt="" class="offer-item-image" onerror="this.src='/images/placeholder.png'">
+        <img src="${this.escapeHtml(coverImage)}" alt="" class="offer-item-image" onerror="this.style.opacity='0.3'">
         <div class="offer-info">
           <h4 class="offer-item-title">${this.escapeHtml(offer.listing_title)}</h4>
           <p class="offer-user">${this.escapeHtml(userLabel)}</p>
@@ -711,7 +712,7 @@ const MarketplaceModule = {
 
     grid.innerHTML = collection.map(item => `
       <div class="listing-collection-item" data-id="${item.id}">
-        <img src="${this.escapeHtml(Utils.normalizeCoverUrl(item.cover) || '/images/placeholder.png')}" alt="${this.escapeHtml(item.album)}" onerror="this.src='/images/placeholder.png'">
+        <img src="${this.escapeHtml(Utils.sanitizeImageUrl(item.cover, Utils.getDefaultItemPlaceholder()))}" alt="${this.escapeHtml(item.album)}" onerror="this.style.opacity='0.3'">
         <span>${this.escapeHtml(item.album || item.artist)}</span>
       </div>
     `).join('');
@@ -870,6 +871,11 @@ const MarketplaceModule = {
       }
     }
 
+    // Normalize seller info for easier access
+    listing.seller_id = listing.seller?.id || listing.user_id;
+    listing.seller_name = listing.seller?.name || 'Seller';
+    listing.seller_picture = listing.seller?.picture || '';
+
     this.currentListing = listing;
     this.renderListingDetail(listing);
     this.openModal('listing-detail-modal');
@@ -880,7 +886,10 @@ const MarketplaceModule = {
    */
   renderListingDetail(listing) {
     const gallery = document.getElementById('listing-detail-gallery');
-    const photos = listing.photos || [listing.cover || '/images/placeholder.png'];
+    // Get photos from images array or fall back to collection item cover
+    const photos = listing.images && listing.images.length > 0
+      ? listing.images.map(img => Utils.sanitizeImageUrl(img.image_url, Utils.getDefaultItemPlaceholder()))
+      : [Utils.sanitizeImageUrl(listing.collection_item?.cover || listing.cover, Utils.getDefaultItemPlaceholder())];
 
     // Check for wishlist match and show banner
     const wishlistMatch = this.findWishlistMatch(listing);
@@ -893,7 +902,7 @@ const MarketplaceModule = {
 
     gallery.innerHTML = `
       ${wishlistBanner}
-      <img src="${this.escapeHtml(photos[0])}" alt="${this.escapeHtml(listing.title)}" class="listing-detail-main-image" onerror="this.src='/images/placeholder.png'">
+      <img src="${this.escapeHtml(photos[0])}" alt="${this.escapeHtml(listing.title)}" class="listing-detail-main-image" onerror="this.style.opacity='0.3'">
       ${photos.length > 1 ? `
         <div class="listing-detail-thumbnails">
           ${photos.map((photo, i) => `
@@ -919,11 +928,14 @@ const MarketplaceModule = {
     locationEl.textContent = location;
     locationEl.style.display = location ? 'flex' : 'none';
 
+    // Use normalized seller info (set in openListingDetail)
+    const sellerRating = listing.seller?.rating_average;
+
     const sellerAvatar = listing.seller_picture || Utils.getDefaultAvatar(listing.seller_name);
     document.getElementById('seller-avatar').src = sellerAvatar;
-    document.getElementById('seller-name').textContent = listing.seller_name || 'Seller';
-    document.getElementById('seller-rating').textContent = listing.seller_rating ?
-      `${'★'.repeat(Math.round(listing.seller_rating))} (${listing.seller_rating.toFixed(1)})` : '';
+    document.getElementById('seller-name').textContent = listing.seller_name;
+    document.getElementById('seller-rating').textContent = sellerRating ?
+      `${'★'.repeat(Math.round(sellerRating))} (${sellerRating.toFixed(1)})` : '';
 
     // Show/hide actions based on ownership
     const actionsEl = document.getElementById('listing-detail-actions');
@@ -968,9 +980,9 @@ const MarketplaceModule = {
 
     // Show listing preview
     const preview = document.getElementById('offer-listing-preview');
-    const photo = this.currentListing.photos?.[0] || this.currentListing.cover || '/images/placeholder.png';
+    const photo = this.currentListing.images?.[0]?.image_url || this.currentListing.collection_item?.cover || Utils.getDefaultItemPlaceholder();
     preview.innerHTML = `
-      <img src="${this.escapeHtml(photo)}" alt="" onerror="this.src='/images/placeholder.png'">
+      <img src="${this.escapeHtml(photo)}" alt="" onerror="this.style.opacity='0.3'">
       <div class="preview-info">
         <span class="preview-title">${this.escapeHtml(this.currentListing.title)}</span>
         <span class="preview-price">${this.currentListing.price ? '$' + parseFloat(this.currentListing.price).toFixed(2) : 'Trade Only'}</span>
@@ -1021,7 +1033,7 @@ const MarketplaceModule = {
         const isSelected = this.selectedTradeItems.some(t => t.id === item.id);
         return `
           <div class="trade-item-option ${isSelected ? 'selected' : ''}" data-id="${item.id}">
-            <img src="${this.escapeHtml(Utils.normalizeCoverUrl(item.cover) || '/images/placeholder.png')}" alt="${this.escapeHtml(item.album)}" onerror="this.src='/images/placeholder.png'">
+            <img src="${this.escapeHtml(Utils.sanitizeImageUrl(item.cover, Utils.getDefaultItemPlaceholder()))}" alt="${this.escapeHtml(item.album)}" onerror="this.style.opacity='0.3'">
             <span class="check-mark">✓</span>
             <span>${this.escapeHtml(item.album || item.artist)}</span>
           </div>
@@ -1059,7 +1071,7 @@ const MarketplaceModule = {
 
     let html = this.selectedTradeItems.map(item => `
       <div class="trade-item-selected">
-        <img src="${this.escapeHtml(Utils.normalizeCoverUrl(item.cover) || '/images/placeholder.png')}" alt="" onerror="this.src='/images/placeholder.png'">
+        <img src="${this.escapeHtml(Utils.sanitizeImageUrl(item.cover, Utils.getDefaultItemPlaceholder()))}" alt="" onerror="this.style.opacity='0.3'">
         <span class="item-name">${this.escapeHtml(item.album || item.artist)}</span>
         <button type="button" class="remove-trade-item" onclick="MarketplaceModule.removeTradeItem(${item.id})">&times;</button>
       </div>
@@ -1086,18 +1098,16 @@ const MarketplaceModule = {
     if (!this.currentListing) return;
 
     const offerType = document.querySelector('input[name="offer-type"]:checked').value;
-    const offerData = {
-      listing_id: this.currentListing.id,
-      type: offerType,
-      amount: offerType !== 'trade' ? document.getElementById('offer-amount').value : null,
-      trade_items: offerType !== 'cash' ? this.selectedTradeItems.map(i => i.id) : [],
-      message: document.getElementById('offer-message').value
-    };
 
     try {
-      const response = await Auth.apiRequest('/api/marketplace/offers', {
+      const response = await Auth.apiRequest(`/api/marketplace/listings/${this.currentListing.id}/offers`, {
         method: 'POST',
-        body: JSON.stringify(offerData)
+        body: JSON.stringify({
+          offer_type: offerType === 'cash' ? 'buy' : offerType,
+          offer_amount: offerType !== 'trade' ? parseFloat(document.getElementById('offer-amount').value) : null,
+          trade_items: offerType !== 'cash' ? this.selectedTradeItems.map(i => i.id) : [],
+          message: document.getElementById('offer-message').value
+        })
       });
 
       if (response.ok) {
@@ -1161,7 +1171,7 @@ const MarketplaceModule = {
     `;
 
     forSection.innerHTML = `
-      <img src="${this.escapeHtml(offer.listing_cover || '/images/placeholder.png')}" alt="" onerror="this.src='/images/placeholder.png'">
+      <img src="${this.escapeHtml(Utils.sanitizeImageUrl(offer.listing_cover, Utils.getDefaultItemPlaceholder()))}" alt="" onerror="this.style.opacity='0.3'">
       <div>
         <strong>${this.escapeHtml(offer.listing_title)}</strong>
         <span style="color: var(--accent);">${offer.listing_price ? '$' + parseFloat(offer.listing_price).toFixed(2) : 'Trade Only'}</span>
@@ -1183,7 +1193,7 @@ const MarketplaceModule = {
         <h4>Items Offered in Trade</h4>
         ${offer.trade_items.map(item => `
           <div class="trade-item-selected">
-            <img src="${this.escapeHtml(item.cover || '/images/placeholder.png')}" alt="" onerror="this.src='/images/placeholder.png'">
+            <img src="${this.escapeHtml(Utils.sanitizeImageUrl(item.cover, Utils.getDefaultItemPlaceholder()))}" alt="" onerror="this.style.opacity='0.3'">
             <span class="item-name">${this.escapeHtml(item.title)}</span>
           </div>
         `).join('')}
@@ -1340,7 +1350,7 @@ const MarketplaceModule = {
 
     const summary = document.getElementById('transaction-summary');
     summary.innerHTML = `
-      <img src="${this.escapeHtml(this.currentOffer.listing_cover || '/images/placeholder.png')}" alt="" onerror="this.src='/images/placeholder.png'">
+      <img src="${this.escapeHtml(Utils.sanitizeImageUrl(this.currentOffer.listing_cover, Utils.getDefaultItemPlaceholder()))}" alt="" onerror="this.style.opacity='0.3'">
       <div class="summary-info">
         <h4>${this.escapeHtml(this.currentOffer.listing_title)}</h4>
         <p>${this.currentOffer.amount ? '$' + parseFloat(this.currentOffer.amount).toFixed(2) : 'Trade'}</p>

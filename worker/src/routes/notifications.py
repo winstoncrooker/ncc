@@ -7,7 +7,7 @@ from fastapi import APIRouter, Request, HTTPException, Depends
 from pydantic import BaseModel
 from typing import Optional
 
-from routes.auth import require_auth
+from routes.auth import require_auth, require_csrf
 from utils.conversions import to_python_value
 
 router = APIRouter()
@@ -72,7 +72,7 @@ async def get_notification_settings(
 async def update_notification_settings(
     request: Request,
     body: UpdateNotificationSettings,
-    user_id: int = Depends(require_auth)
+    user_id: int = Depends(require_csrf)
 ) -> NotificationSettings:
     """
     Update notification preferences.

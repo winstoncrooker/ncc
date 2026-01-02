@@ -6,12 +6,15 @@ from fastapi import APIRouter, Request, HTTPException, Depends
 from pydantic import BaseModel
 from typing import Optional
 
-from routes.auth import require_auth, require_auth
+from routes.auth import require_auth, require_csrf
 from routes.blocks import is_blocked
 from utils.conversions import to_python_value
 from services.email import send_message_notification
 
 router = APIRouter()
+
+# Limits
+MAX_MESSAGE_LENGTH = 1000
 
 
 class Message(BaseModel):
@@ -182,7 +185,7 @@ async def get_conversation(
 async def send_message(
     request: Request,
     body: SendMessageRequest,
-    user_id: int = Depends(require_auth)
+    user_id: int = Depends(require_csrf)
 ) -> Message:
     """
     Send a message to a user.
@@ -194,8 +197,8 @@ async def send_message(
         if not body.content or not body.content.strip():
             raise HTTPException(status_code=400, detail="Message content is required")
 
-        if len(body.content) > 1000:
-            raise HTTPException(status_code=400, detail="Message too long (max 1000 characters)")
+        if len(body.content) > MAX_MESSAGE_LENGTH:
+            raise HTTPException(status_code=400, detail=f"Message too long (max {MAX_MESSAGE_LENGTH} characters)")
 
         # Can't message yourself
         if body.recipient_id == user_id:
@@ -269,7 +272,7 @@ async def send_message(
 async def mark_as_read(
     request: Request,
     message_id: int,
-    user_id: int = Depends(require_auth)
+    user_id: int = Depends(require_csrf)
 ) -> dict:
     """
     Mark a message as read.

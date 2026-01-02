@@ -6,7 +6,7 @@ Reports, moderation actions, and user warnings
 from fastapi import APIRouter, Request, HTTPException, Depends, Query
 from pydantic import BaseModel, Field
 from typing import Literal
-from .auth import require_auth, require_auth
+from .auth import require_auth, require_csrf
 from .admin import check_admin, get_admin_emails
 
 router = APIRouter()
@@ -115,7 +115,7 @@ class UserModerationHistoryResponse(BaseModel):
 async def create_report(
     request: Request,
     body: CreateReportRequest,
-    user_id: int = Depends(require_auth)
+    user_id: int = Depends(require_csrf)
 ) -> dict:
     """
     Submit a report on content.
@@ -347,7 +347,7 @@ async def update_report(
     request: Request,
     report_id: int,
     body: UpdateReportRequest,
-    user_id: int = Depends(require_auth)
+    user_id: int = Depends(require_csrf)
 ) -> dict:
     """
     Update report status (admin only).
@@ -386,7 +386,7 @@ async def update_report(
 async def take_moderation_action(
     request: Request,
     body: ModerationActionRequest,
-    user_id: int = Depends(require_auth)
+    user_id: int = Depends(require_csrf)
 ) -> ModerationActionResponse:
     """
     Take a moderation action on a user (admin only).

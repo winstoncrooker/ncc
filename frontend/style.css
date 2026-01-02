@@ -208,6 +208,7 @@ h1, h2, h3 {
   transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
   animation: fadeInUp 0.5s ease forwards;
   opacity: 0;
+  transform: translateY(20px);
 }
 
 @keyframes fadeInUp {
@@ -215,10 +216,6 @@ h1, h2, h3 {
     opacity: 1;
     transform: translateY(0);
   }
-}
-
-.card {
-  transform: translateY(20px);
 }
 
 .card img {

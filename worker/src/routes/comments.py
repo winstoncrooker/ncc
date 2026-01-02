@@ -6,7 +6,7 @@ Nested comments with up to 3 levels of replies
 import json
 from fastapi import APIRouter, Request, HTTPException, Depends
 from pydantic import BaseModel, Field
-from .auth import require_auth, require_auth
+from .auth import require_auth, require_csrf
 from .blocks import get_blocked_user_ids
 from utils.conversions import to_python_value as safe_value
 from services.email import send_forum_reply_notification
@@ -183,7 +183,7 @@ async def create_comment(
     request: Request,
     post_id: int,
     body: CreateCommentRequest,
-    user_id: int = Depends(require_auth)
+    user_id: int = Depends(require_csrf)
 ) -> CommentResponse:
     """
     Create a comment on a post.
@@ -330,7 +330,7 @@ async def update_comment(
     request: Request,
     comment_id: int,
     body: UpdateCommentRequest,
-    user_id: int = Depends(require_auth)
+    user_id: int = Depends(require_csrf)
 ) -> CommentResponse:
     """Update a comment (own comments only)."""
     env = request.scope["env"]
@@ -399,7 +399,7 @@ async def update_comment(
 async def delete_comment(
     request: Request,
     comment_id: int,
-    user_id: int = Depends(require_auth)
+    user_id: int = Depends(require_csrf)
 ) -> dict:
     """Delete a comment (own comments only). Also deletes all replies."""
     env = request.scope["env"]
@@ -419,27 +419,25 @@ async def delete_comment(
         if existing["user_id"] != user_id:
             raise HTTPException(status_code=403, detail="Not your comment")
 
-        # Count comments to delete (this comment + all descendants)
-        # Using recursive CTE to count all descendants
-        count_result = await env.DB.prepare(
+        # Delete comment and all descendants atomically using CTE with RETURNING
+        # This eliminates the race condition between counting and deleting
+        delete_result = await env.DB.prepare(
             """WITH RECURSIVE descendants AS (
                  SELECT id FROM forum_comments WHERE id = ?
                  UNION ALL
                  SELECT c.id FROM forum_comments c
                  JOIN descendants d ON c.parent_comment_id = d.id
                )
-               SELECT COUNT(*) as count FROM descendants"""
-        ).bind(comment_id).first()
+               DELETE FROM forum_comments WHERE id IN (SELECT id FROM descendants)
+               RETURNING id"""
+        ).bind(comment_id).all()
 
-        if count_result and hasattr(count_result, 'to_py'):
-            count_result = count_result.to_py()
+        if delete_result and hasattr(delete_result, 'to_py'):
+            delete_result = delete_result.to_py()
 
-        delete_count = count_result.get("count", 1) if count_result else 1
-
-        # Delete comment (cascade will handle replies)
-        await env.DB.prepare(
-            "DELETE FROM forum_comments WHERE id = ?"
-        ).bind(comment_id).run()
+        # Count actual deleted rows from RETURNING clause
+        deleted_rows = delete_result.get("results", []) if delete_result else []
+        delete_count = len(deleted_rows)
 
         # Update post comment count
         await env.DB.prepare(

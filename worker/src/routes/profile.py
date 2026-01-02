@@ -7,10 +7,13 @@ from fastapi import APIRouter, Request, HTTPException, Depends
 from pydantic import BaseModel, Field
 from typing import Optional
 
-from routes.auth import require_auth
+from routes.auth import require_auth, require_csrf
 from utils.conversions import to_python_value
 
 router = APIRouter()
+
+# Limits
+MAX_SHOWCASE_ITEMS_PER_CATEGORY = 8
 
 # Default privacy settings
 DEFAULT_PRIVACY = {
@@ -188,7 +191,7 @@ async def get_profile(
 async def update_profile(
     request: Request,
     body: ProfileUpdate,
-    user_id: int = Depends(require_auth)
+    user_id: int = Depends(require_csrf)
 ) -> ProfileResponse:
     """
     Update current user's profile.
@@ -334,7 +337,7 @@ async def get_showcase(
 async def add_to_showcase(
     request: Request,
     body: ShowcaseAdd,
-    user_id: int = Depends(require_auth)
+    user_id: int = Depends(require_csrf)
 ) -> ShowcaseAlbum:
     """
     Add album to showcase.
@@ -373,8 +376,8 @@ async def add_to_showcase(
         if count and hasattr(count, 'to_py'):
             count = count.to_py()
 
-        if count and count["count"] >= 8:
-            raise HTTPException(status_code=400, detail="Showcase limit reached (max 8 items per category)")
+        if count and count["count"] >= MAX_SHOWCASE_ITEMS_PER_CATEGORY:
+            raise HTTPException(status_code=400, detail=f"Showcase limit reached (max {MAX_SHOWCASE_ITEMS_PER_CATEGORY} items per category)")
 
         # Use INSERT ON CONFLICT to atomically insert or detect existing entry
         # The UNIQUE(user_id, collection_id) constraint handles race conditions
@@ -413,7 +416,7 @@ async def add_to_showcase(
 async def remove_from_showcase(
     request: Request,
     showcase_id: int,
-    user_id: int = Depends(require_auth)
+    user_id: int = Depends(require_csrf)
 ) -> dict:
     """
     Remove album from showcase.
@@ -444,7 +447,7 @@ async def remove_from_showcase(
 async def reorder_showcase(
     request: Request,
     body: ShowcaseReorder,
-    user_id: int = Depends(require_auth)
+    user_id: int = Depends(require_csrf)
 ) -> list[ShowcaseAlbum]:
     """
     Reorder showcase albums.
@@ -496,7 +499,7 @@ async def update_showcase_notes(
     request: Request,
     showcase_id: int,
     body: ShowcaseNotesUpdate,
-    user_id: int = Depends(require_auth)
+    user_id: int = Depends(require_csrf)
 ) -> ShowcaseAlbum:
     """
     Update notes for a showcase item.
@@ -577,7 +580,7 @@ async def get_privacy_settings(
 async def update_privacy_settings(
     request: Request,
     body: PrivacySettings,
-    user_id: int = Depends(require_auth)
+    user_id: int = Depends(require_csrf)
 ) -> PrivacySettings:
     """
     Update current user's privacy settings.

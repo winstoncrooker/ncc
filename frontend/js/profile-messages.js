@@ -4,6 +4,14 @@
  */
 
 const ProfileMessages = {
+  // Configuration
+  POLLING_INTERVAL_MS: 5000,
+
+  /**
+   * Flag to prevent overlapping polling requests
+   */
+  isPolling: false,
+
   /**
    * Load unread message count
    */
@@ -36,6 +44,7 @@ const ProfileMessages = {
 
   /**
    * Start polling for updates (messages, friend requests, friends)
+   * Uses guard flag to prevent overlapping requests if API calls take longer than 5 seconds
    */
   startPolling() {
     if (Profile.pollingInterval) {
@@ -43,23 +52,35 @@ const ProfileMessages = {
       Profile.pollingInterval = null;
     }
 
-    Profile.pollingInterval = setInterval(async () => {
-      const oldRequestCount = Profile.pendingRequestCount;
-      await ProfileFriends.loadFriendRequests();
+    const pollCallback = async () => {
+      // Guard against overlapping requests
+      if (ProfileMessages.isPolling) return;
+      ProfileMessages.isPolling = true;
 
-      const oldFriendsCount = Profile.friends.length;
-      await ProfileFriends.loadFriends();
+      try {
+        const oldRequestCount = Profile.pendingRequestCount;
+        await ProfileFriends.loadFriendRequests();
 
-      if (Profile.friends.length > oldFriendsCount) {
-        ProfileFriends.renderFriends();
+        const oldFriendsCount = Profile.friends.length;
+        await ProfileFriends.loadFriends();
+
+        if (Profile.friends.length > oldFriendsCount) {
+          ProfileFriends.renderFriends();
+        }
+
+        await ProfileMessages.loadUnreadCount();
+
+        if (Profile.currentConversation) {
+          await ProfileMessages.loadConversationMessages(Profile.currentConversation.id);
+        }
+      } catch (error) {
+        console.error('[ProfileMessages] Polling error:', error);
+      } finally {
+        ProfileMessages.isPolling = false;
       }
+    };
 
-      await this.loadUnreadCount();
-
-      if (Profile.currentConversation) {
-        await this.loadConversationMessages(Profile.currentConversation.id);
-      }
-    }, 5000);
+    Profile.pollingInterval = setInterval(pollCallback, ProfileMessages.POLLING_INTERVAL_MS);
   },
 
   /**

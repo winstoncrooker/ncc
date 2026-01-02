@@ -7,9 +7,6 @@
 .main-tabs {
   display: flex;
   gap: 8px;
-}
-
-.main-tabs {
   background: var(--bg-card, #1a1a1a);
   border: 1px solid var(--border-color, #333);
   border-radius: 25px;

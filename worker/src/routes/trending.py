@@ -8,7 +8,7 @@ from pydantic import BaseModel
 from typing import Optional
 import json
 
-from routes.auth import require_auth
+from routes.auth import require_auth, require_csrf
 from utils.conversions import to_python_value
 
 router = APIRouter()

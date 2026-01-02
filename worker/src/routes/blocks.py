@@ -7,7 +7,7 @@ from fastapi import APIRouter, Request, HTTPException, Depends
 from pydantic import BaseModel
 from typing import Optional
 
-from routes.auth import require_auth
+from routes.auth import require_auth, require_csrf
 from utils.conversions import to_python_value
 
 router = APIRouter()
@@ -74,7 +74,7 @@ async def get_blocked_user_ids(env, user_id: int) -> set:
 async def block_user(
     request: Request,
     target_id: int,
-    user_id: int = Depends(require_auth)
+    user_id: int = Depends(require_csrf)
 ) -> BlockResponse:
     """
     Block a user.
@@ -145,7 +145,7 @@ async def block_user(
 async def unblock_user(
     request: Request,
     target_id: int,
-    user_id: int = Depends(require_auth)
+    user_id: int = Depends(require_csrf)
 ) -> BlockResponse:
     """
     Unblock a user.

@@ -29,270 +29,7 @@
   <link rel="stylesheet" href="style.css">
   <link rel="stylesheet" href="css/auth.css">
   <link rel="stylesheet" href="css/profile.css">
-  <style>
-    /* Public profile specific styles */
-    .public-profile-container {
-      max-width: 900px;
-      margin: 0 auto;
-      padding: 20px;
-    }
-
-    .public-header {
-      background: #0e0e0e;
-      padding: 16px 24px;
-      border-bottom: 1px solid #333;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-
-    .public-header .logo-text {
-      font-family: 'Orbitron', sans-serif;
-      color: #1db954;
-      font-size: 1.5rem;
-      font-weight: 700;
-      text-decoration: none;
-    }
-
-    .public-header .join-btn {
-      background: #1db954;
-      color: #fff;
-      border: none;
-      padding: 10px 24px;
-      border-radius: 20px;
-      font-weight: 600;
-      cursor: pointer;
-      transition: background 0.2s;
-    }
-
-    .public-header .join-btn:hover {
-      background: #1ed760;
-    }
-
-    .profile-not-public {
-      text-align: center;
-      padding: 60px 20px;
-    }
-
-    .profile-not-public h2 {
-      color: #fff;
-      margin-bottom: 16px;
-    }
-
-    .profile-not-public p {
-      color: #888;
-      margin-bottom: 24px;
-    }
-
-    .public-profile-card {
-      background: linear-gradient(145deg, #1a1a1a, #0e0e0e);
-      border-radius: 16px;
-      padding: 32px;
-      margin-bottom: 24px;
-      border: 1px solid #333;
-    }
-
-    .public-profile-header {
-      display: flex;
-      align-items: flex-start;
-      gap: 24px;
-      margin-bottom: 24px;
-    }
-
-    .public-profile-picture {
-      width: 120px;
-      height: 120px;
-      border-radius: 50%;
-      object-fit: cover;
-      border: 3px solid #1db954;
-    }
-
-    .public-profile-info {
-      flex: 1;
-    }
-
-    .public-profile-name {
-      font-size: 1.8rem;
-      color: #fff;
-      margin: 0 0 4px;
-      font-weight: 700;
-    }
-
-    .public-profile-pronouns {
-      color: #1db954;
-      font-size: 0.9rem;
-      margin-bottom: 8px;
-    }
-
-    .public-profile-location {
-      color: #888;
-      font-size: 0.9rem;
-      margin-bottom: 12px;
-    }
-
-    .public-profile-bio {
-      color: #ccc;
-      line-height: 1.6;
-      margin: 0;
-    }
-
-    .public-stats {
-      display: flex;
-      gap: 24px;
-      margin-top: 16px;
-      padding-top: 16px;
-      border-top: 1px solid #333;
-    }
-
-    .public-stat {
-      text-align: center;
-    }
-
-    .public-stat-value {
-      font-size: 1.5rem;
-      font-weight: 700;
-      color: #1db954;
-    }
-
-    .public-stat-label {
-      font-size: 0.8rem;
-      color: #888;
-      text-transform: uppercase;
-    }
-
-    .public-showcase-section {
-      background: linear-gradient(145deg, #1a1a1a, #0e0e0e);
-      border-radius: 16px;
-      padding: 24px;
-      border: 1px solid #333;
-    }
-
-    .public-showcase-title {
-      color: #fff;
-      font-size: 1.2rem;
-      margin: 0 0 20px;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-
-    .public-showcase-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
-      gap: 16px;
-    }
-
-    .public-showcase-item {
-      aspect-ratio: 1;
-      border-radius: 8px;
-      overflow: hidden;
-      position: relative;
-      background: #222;
-    }
-
-    .public-showcase-item img {
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-    }
-
-    .public-showcase-item-info {
-      position: absolute;
-      bottom: 0;
-      left: 0;
-      right: 0;
-      background: linear-gradient(transparent, rgba(0,0,0,0.9));
-      padding: 20px 8px 8px;
-      color: #fff;
-    }
-
-    .public-showcase-item-artist {
-      font-size: 0.7rem;
-      color: #1db954;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-
-    .public-showcase-item-album {
-      font-size: 0.8rem;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-
-    .external-links-public {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 12px;
-      margin-top: 16px;
-    }
-
-    .external-link-btn {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      padding: 8px 16px;
-      background: #222;
-      border-radius: 20px;
-      color: #ccc;
-      text-decoration: none;
-      font-size: 0.85rem;
-      transition: background 0.2s;
-    }
-
-    .external-link-btn:hover {
-      background: #333;
-      color: #fff;
-    }
-
-    .member-since-public {
-      color: #666;
-      font-size: 0.8rem;
-      margin-top: 8px;
-    }
-
-    .loading-state {
-      text-align: center;
-      padding: 60px 20px;
-      color: #888;
-    }
-
-    .loading-spinner {
-      width: 40px;
-      height: 40px;
-      border: 3px solid #333;
-      border-top-color: #1db954;
-      border-radius: 50%;
-      animation: spin 1s linear infinite;
-      margin: 0 auto 16px;
-    }
-
-    @keyframes spin {
-      to { transform: rotate(360deg); }
-    }
-
-    @media (max-width: 600px) {
-      .public-profile-header {
-        flex-direction: column;
-        align-items: center;
-        text-align: center;
-      }
-
-      .public-profile-picture {
-        width: 100px;
-        height: 100px;
-      }
-
-      .public-stats {
-        justify-content: center;
-      }
-
-      .public-showcase-grid {
-        grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
-      }
-    }
-  </style>
+  <link rel="stylesheet" href="css/public.css">
 </head>
 <body>
   <!-- Header -->
@@ -351,6 +88,14 @@
 
   <script src="js/config.js"></script>
   <script>
+    // HTML escape helper to prevent XSS
+    function escapeHtml(text) {
+      if (!text) return '';
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+
     // Public Profile Viewer
     const PublicProfile = {
       async init() {
@@ -420,7 +165,9 @@
           pictureEl.src = profile.picture;
           pictureEl.alt = `${profile.name || 'Collector'}'s profile picture`;
         } else {
-          pictureEl.src = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect fill="%23333" width="100" height="100"/><text x="50" y="55" text-anchor="middle" fill="%23666" font-size="40">' + (profile.name ? profile.name[0].toUpperCase() : '?') + '</text></svg>';
+          // Safely encode the initial letter for the SVG placeholder
+          const initial = profile.name ? encodeURIComponent(profile.name[0].toUpperCase()) : '?';
+          pictureEl.src = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect fill="%23333" width="100" height="100"/><text x="50" y="55" text-anchor="middle" fill="%23666" font-size="40">' + initial + '</text></svg>';
         }
 
         // Name
@@ -502,7 +249,11 @@
           link.target = '_blank';
           link.rel = 'noopener noreferrer';
           link.className = 'external-link-btn';
-          link.innerHTML = `${icon} ${platform.charAt(0).toUpperCase() + platform.slice(1)}`;
+          // Create icon span and text node separately to avoid XSS
+          const iconSpan = document.createElement('span');
+          iconSpan.innerHTML = icon; // Safe: icon comes from hardcoded socialIcons object
+          link.appendChild(iconSpan);
+          link.appendChild(document.createTextNode(' ' + platform.charAt(0).toUpperCase() + platform.slice(1)));
           container.appendChild(link);
         }
       },
@@ -519,20 +270,35 @@
         section.style.display = 'block';
         grid.innerHTML = '';
 
+        const fallbackCover = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect fill="%23333" width="100" height="100"/><text x="50" y="55" text-anchor="middle" fill="%23666" font-size="30">No Cover</text></svg>';
+
         showcase.forEach(item => {
+          // Build DOM elements programmatically to prevent XSS
           const div = document.createElement('div');
           div.className = 'public-showcase-item';
 
-          const coverUrl = item.cover || 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect fill="%23333" width="100" height="100"/><text x="50" y="55" text-anchor="middle" fill="%23666" font-size="30">No Cover</text></svg>';
+          const img = document.createElement('img');
+          img.src = item.cover || fallbackCover;
+          img.alt = item.album || 'Item';
+          img.onerror = function() {
+            this.src = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect fill="%23333" width="100" height="100"/></svg>';
+          };
 
-          div.innerHTML = `
-            <img src="${coverUrl}" alt="${item.album || 'Item'}" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect fill=%22%23333%22 width=%22100%22 height=%22100%22/></svg>'">
-            <div class="public-showcase-item-info">
-              <div class="public-showcase-item-artist">${item.artist || ''}</div>
-              <div class="public-showcase-item-album">${item.album || ''}</div>
-            </div>
-          `;
+          const infoDiv = document.createElement('div');
+          infoDiv.className = 'public-showcase-item-info';
 
+          const artistDiv = document.createElement('div');
+          artistDiv.className = 'public-showcase-item-artist';
+          artistDiv.textContent = item.artist || '';
+
+          const albumDiv = document.createElement('div');
+          albumDiv.className = 'public-showcase-item-album';
+          albumDiv.textContent = item.album || '';
+
+          infoDiv.appendChild(artistDiv);
+          infoDiv.appendChild(albumDiv);
+          div.appendChild(img);
+          div.appendChild(infoDiv);
           grid.appendChild(div);
         });
       }
