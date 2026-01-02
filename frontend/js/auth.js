@@ -216,12 +216,24 @@ const Auth = {
       }
     }
 
-    // Handle 403 CSRF errors - prompt user to re-login
+    // Handle 403 CSRF errors - try to refresh token first
     if (response.status === 403) {
       try {
         const errorData = await response.clone().json();
         if (errorData.detail && errorData.detail.includes('CSRF')) {
-          console.log('[Auth] CSRF token missing or invalid, need re-login');
+          console.log('[Auth] CSRF token missing or invalid, attempting refresh...');
+
+          // Try to refresh the token to get a new CSRF token
+          const refreshed = await this.refreshTokenForCsrf();
+          if (refreshed) {
+            console.log('[Auth] Token refreshed, retrying original request');
+            // Retry the original request with new CSRF token
+            headers['X-CSRF-Token'] = this.getCsrfToken();
+            const retryResponse = await fetch(url, { ...options, headers });
+            return retryResponse;
+          }
+
+          // Refresh failed, log out
           this.showError('Session expired. Please log in again.');
           this.logout();
           window.dispatchEvent(new CustomEvent('auth:expired'));
@@ -259,6 +271,39 @@ const Auth = {
       }
     } catch (error) {
       console.error('Token refresh failed:', error);
+    }
+    return false;
+  },
+
+  /**
+   * Refresh token specifically to get CSRF token (bypasses apiRequest to avoid recursion)
+   */
+  async refreshTokenForCsrf() {
+    try {
+      const apiBase = typeof CONFIG !== 'undefined' ? CONFIG.API_BASE : '';
+      const token = this.getToken();
+
+      if (!token) return false;
+
+      const response = await fetch(`${apiBase}/api/auth/refresh`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        this.setToken(data.access_token);
+        if (data.csrf_token) {
+          this.setCsrfToken(data.csrf_token);
+          console.log('[Auth] CSRF token refreshed successfully');
+          return true;
+        }
+      }
+    } catch (error) {
+      console.error('[Auth] CSRF token refresh failed:', error);
     }
     return false;
   },
