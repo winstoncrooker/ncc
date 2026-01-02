@@ -2224,7 +2224,7 @@ const Forums = {
     container.querySelectorAll('.trending-post-item').forEach(item => {
       item.addEventListener('click', () => {
         const postId = parseInt(item.dataset.postId);
-        if (postId) this.showPostDetail(postId);
+        if (postId) this.openPost(postId);
       });
     });
   },

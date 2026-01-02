@@ -135,11 +135,7 @@
   background: #1a1a1a;
   border-radius: 12px;
   padding: 20px;
-  position: sticky;
-  top: 80px;
   height: fit-content;
-  max-height: calc(100vh - 100px);
-  overflow-y: auto;
 }
 
 .sidebar-section h4 {
