@@ -14,6 +14,7 @@ const MarketplaceModule = {
   selectedTradeItems: [],
   listingPhotos: [],
   selectedCollectionItem: null,
+  editingListingId: null,  // Track if we're editing vs creating
   userWishlist: [],  // Cached user wishlist for matching
   filters: {
     search: '',
@@ -682,10 +683,15 @@ const MarketplaceModule = {
   openCreateListingModal() {
     this.listingPhotos = [];
     this.selectedCollectionItem = null;
+    this.editingListingId = null;  // Reset edit mode
 
     // Reset form
     document.getElementById('create-listing-form')?.reset();
     document.getElementById('listing-photos-preview').innerHTML = '';
+
+    // Update modal title for create mode
+    const modalTitle = document.querySelector('#create-listing-modal .modal-header h2');
+    if (modalTitle) modalTitle.textContent = 'Create Listing';
 
     // Load collection for selection
     this.loadCollectionForListing();
@@ -809,7 +815,7 @@ const MarketplaceModule = {
   },
 
   /**
-   * Create a new listing
+   * Create or update a listing
    */
   async createListing() {
     const form = document.getElementById('create-listing-form');
@@ -824,29 +830,39 @@ const MarketplaceModule = {
       shipping_available: document.getElementById('listing-shipping').value === 'yes',
       location_city: document.getElementById('listing-city').value,
       location_state: document.getElementById('listing-state').value,
-      images: this.listingPhotos,
-      collection_id: this.selectedCollectionItem?.id || null
+      images: this.listingPhotos
     };
 
+    // Only include collection_id for new listings
+    if (!this.editingListingId) {
+      listingData.collection_id = this.selectedCollectionItem?.id || null;
+    }
+
     try {
-      const response = await Auth.apiRequest('/api/marketplace/listings', {
-        method: 'POST',
+      const isEditing = !!this.editingListingId;
+      const url = isEditing
+        ? `/api/marketplace/listings/${this.editingListingId}`
+        : '/api/marketplace/listings';
+      const method = isEditing ? 'PUT' : 'POST';
+
+      const response = await Auth.apiRequest(url, {
+        method,
         body: JSON.stringify(listingData)
       });
 
       if (response.ok) {
-        const data = await response.json();
-        Auth.showSuccess('Listing created successfully!');
+        Auth.showSuccess(isEditing ? 'Listing updated!' : 'Listing created!');
         this.closeModal('create-listing-modal');
+        this.editingListingId = null;
         this.loadListings();
         this.loadMyListings();
       } else {
         const error = await response.json();
-        Auth.showError(error.detail || 'Failed to create listing');
+        Auth.showError(error.detail || `Failed to ${isEditing ? 'update' : 'create'} listing`);
       }
     } catch (error) {
-      console.error('[Marketplace] Error creating listing:', error);
-      Auth.showError('Failed to create listing');
+      console.error('[Marketplace] Error saving listing:', error);
+      Auth.showError('Failed to save listing');
     }
   },
 
@@ -1411,9 +1427,55 @@ const MarketplaceModule = {
   /**
    * Edit a listing
    */
-  editListing(listingId) {
-    // For now, show a message - full edit would require populating the form
-    Auth.showInfo('Edit listing feature coming soon');
+  async editListing(listingId) {
+    // Find the listing
+    let listing = this.myListings.find(l => l.id === listingId) ||
+                  this.listings.find(l => l.id === listingId);
+
+    if (!listing) {
+      // Fetch it from API
+      try {
+        const response = await Auth.apiRequest(`/api/marketplace/listings/${listingId}`);
+        if (response.ok) {
+          listing = await response.json();
+        } else {
+          Auth.showError('Listing not found');
+          return;
+        }
+      } catch (error) {
+        console.error('[Marketplace] Error fetching listing:', error);
+        Auth.showError('Failed to load listing');
+        return;
+      }
+    }
+
+    // Set edit mode
+    this.editingListingId = listingId;
+    this.listingPhotos = listing.images?.map(img => img.image_url) || [];
+    this.selectedCollectionItem = listing.collection_item || null;
+
+    // Populate the form
+    document.getElementById('listing-title').value = listing.title || '';
+    document.getElementById('listing-description').value = listing.description || '';
+    document.getElementById('listing-condition').value = listing.condition || '';
+    document.getElementById('listing-type').value = listing.listing_type || listing.type || 'sale';
+    document.getElementById('listing-price').value = listing.price || '';
+    document.getElementById('listing-shipping').value = listing.shipping_available ? 'yes' : 'no';
+    document.getElementById('listing-city').value = listing.location_city || '';
+    document.getElementById('listing-state').value = listing.location_state || '';
+
+    // Update photos preview
+    this.renderPhotosPreview();
+
+    // Update modal title for edit mode
+    const modalTitle = document.querySelector('#create-listing-modal .modal-header h2');
+    if (modalTitle) modalTitle.textContent = 'Edit Listing';
+
+    // Close detail modal if open
+    this.closeModal('listing-detail-modal');
+
+    // Open the edit modal
+    this.openModal('create-listing-modal');
   },
 
   /**
